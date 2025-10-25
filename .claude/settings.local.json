@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm run build:*)",
+      "Bash(cat:*)",
+      "Bash(dir:*)",
+      "Bash(findstr:*)",
+      "Bash(test:*)",
+      "Bash(npm run dev:*)",
+      "Bash(npm install)",
+      "Bash(npx:*)",
+      "Bash(if exist \"c:\\Workspace\\shofz-customer\\src\\styles\\offer-stories.css.backup\" rm \"c:\\Workspace\\shofz-customer\\src\\styles\\offer-stories.css.backup\")",
+      "Bash(npm install:*)",
+      "Bash(npm run cap:sync:*)",
+      "Read(//c/**)",
+      "Bash(if exist \"c:\\Workspace\\shofz-customer\\src\\hooks\\useIncrementViewCount.ts\" rm \"c:\\Workspace\\shofz-customer\\src\\hooks\\useIncrementViewCount.ts\")",
+      "Bash(del \"c:\\Workspace\\shofz-customer\\src\\hooks\\useIncrementViewCount.ts\")"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

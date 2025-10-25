@@ -1,0 +1,460 @@
+/* ====================================================================== */
+/* 📱 INSTAGRAM-STYLE OFFER STORIES CAROUSEL */
+/* Circular Cards with Gradient Rings + Horizontal Scroll */
+/* ====================================================================== */
+
+/* ==================== CAROUSEL WRAPPER ==================== */
+.stories-carousel-wrapper {
+  width: 100%;
+  margin-bottom: 0;
+  background: linear-gradient(180deg, #fafafa 0%, #ffffff 100%);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+  overflow: hidden;
+}
+
+.stories-header {
+  padding: 12px 16px 8px;
+}
+
+.stories-heading {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #262626;
+  letter-spacing: -0.01em;
+}
+
+/* ==================== SCROLL CONTAINER WITH ARROWS ==================== */
+.stories-scroll-container {
+  position: relative;
+  width: 100%;
+}
+
+/* Navigation Arrows */
+.stories-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: white;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  opacity: 0.9;
+}
+
+.stories-arrow:hover {
+  opacity: 1;
+  transform: translateY(-50%) scale(1.1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.stories-arrow-left {
+  left: 8px;
+}
+
+.stories-arrow-right {
+  right: 8px;
+}
+
+/* Hide arrows on mobile */
+@media (max-width: 599px) {
+  .stories-arrow {
+    display: none;
+  }
+}
+
+/* ==================== STORIES CONTAINER ==================== */
+.stories-container {
+  display: flex;
+  flex-direction: row;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 12px 16px 16px;
+  gap: 12px;
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE/Edge */
+  align-items: flex-start;
+  white-space: nowrap;
+}
+
+/* Hide scrollbar */
+.stories-container::-webkit-scrollbar {
+  display: none;
+  height: 0;
+  width: 0;
+}
+
+/* ==================== STORY CARD ==================== */
+.story-card {
+  flex: 0 0 auto !important;
+  width: 80px !important;
+  min-width: 80px !important;
+  max-width: 80px !important;
+  height: auto !important;
+  display: inline-flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  text-align: center !important;
+  scroll-snap-align: start;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  outline: none;
+  vertical-align: top;
+  background: none !important;
+  border: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+
+.story-card:focus {
+  outline: 2px solid #ff6b35;
+  outline-offset: 4px;
+  border-radius: 50%;
+}
+
+.story-card:active {
+  transform: scale(0.95);
+}
+
+/* ==================== STORY RING CONTAINER ==================== */
+.story-ring-container {
+  position: relative !important;
+  width: 80px !important;
+  height: 80px !important;
+  min-width: 80px !important;
+  min-height: 80px !important;
+  max-width: 80px !important;
+  max-height: 80px !important;
+  margin-bottom: 8px !important;
+  flex-shrink: 0 !important;
+}
+
+/* Story Ring - Gradient for New, Grey for Viewed */
+.story-ring {
+  position: relative !important;
+  width: 80px !important;
+  height: 80px !important;
+  min-width: 80px !important;
+  min-height: 80px !important;
+  max-width: 80px !important;
+  max-height: 80px !important;
+  border-radius: 50% !important;
+  padding: 3px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  transition: transform 0.2s ease;
+  overflow: hidden !important;
+  flex-shrink: 0 !important;
+}
+
+/* New Offer - Vibrant Gradient Ring */
+.story-card.new .story-ring {
+  background: conic-gradient(
+    from 0deg,
+    #ff6b35 0%,
+    #f7931e 25%,
+    #ff6b35 50%,
+    #f7931e 75%,
+    #ff6b35 100%
+  );
+  animation: story-ring-rotate 3s linear infinite;
+}
+
+/* Viewed Offer - Grey Ring */
+.story-card.viewed .story-ring {
+  background: #dbdbdb;
+}
+
+/* Rotate animation for new offers */
+@keyframes story-ring-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Pause rotation on hover */
+.story-card:hover .story-ring {
+  animation-play-state: paused;
+}
+
+/* ==================== STORY IMAGE ==================== */
+.story-image {
+  width: 100% !important;
+  height: 100% !important;
+  max-width: 74px !important;
+  max-height: 74px !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  border: 3px solid white !important;
+  box-sizing: border-box !important;
+  background: #f0f0f0 !important;
+  display: block !important;
+  pointer-events: none !important;
+}
+
+/* ==================== SHOP LOGO BADGE ==================== */
+.shop-logo-wrapper {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid white;
+  background: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+}
+
+.shop-logo {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ==================== STORY TITLE ==================== */
+.story-title {
+  margin: 0;
+  width: 80px;
+  font-size: 12px;
+  font-weight: 400;
+  color: #262626;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+/* ==================== RESPONSIVE DESIGN ==================== */
+
+/* Mobile (<600px) */
+@media (max-width: 599px) {
+  .stories-container {
+    padding: 10px 12px 14px;
+    gap: 10px;
+  }
+
+  .story-card {
+    width: 68px !important;
+    min-width: 68px !important;
+    max-width: 68px !important;
+  }
+
+  .story-ring-container {
+    width: 68px !important;
+    height: 68px !important;
+    min-width: 68px !important;
+    min-height: 68px !important;
+    max-width: 68px !important;
+    max-height: 68px !important;
+  }
+
+  .story-ring {
+    width: 68px !important;
+    height: 68px !important;
+    min-width: 68px !important;
+    min-height: 68px !important;
+    max-width: 68px !important;
+    max-height: 68px !important;
+    padding: 2.5px !important;
+  }
+
+  .story-title {
+    width: 68px !important;
+    font-size: 11px;
+  }
+
+  .shop-logo-wrapper {
+    width: 20px;
+    height: 20px;
+    border-width: 1.5px;
+  }
+}
+
+/* Tablet (600px - 1023px) */
+@media (min-width: 600px) and (max-width: 1023px) {
+  .stories-container {
+    padding: 12px 16px 16px;
+    gap: 14px;
+  }
+
+  .story-card {
+    width: 85px !important;
+    min-width: 85px !important;
+    max-width: 85px !important;
+  }
+
+  .story-ring-container {
+    width: 85px !important;
+    height: 85px !important;
+    min-width: 85px !important;
+    min-height: 85px !important;
+    max-width: 85px !important;
+    max-height: 85px !important;
+  }
+
+  .story-ring {
+    width: 85px !important;
+    height: 85px !important;
+    min-width: 85px !important;
+    min-height: 85px !important;
+    max-width: 85px !important;
+    max-height: 85px !important;
+  }
+
+  .story-title {
+    width: 85px !important;
+    font-size: 12px;
+  }
+
+  .shop-logo-wrapper {
+    width: 26px;
+    height: 26px;
+  }
+}
+
+/* Desktop (>=1024px) */
+@media (min-width: 1024px) {
+  .stories-container {
+    padding: 14px 20px 18px;
+    gap: 16px;
+  }
+
+  .story-card {
+    width: 100px !important;
+    min-width: 100px !important;
+    max-width: 100px !important;
+  }
+
+  .story-ring-container {
+    width: 100px !important;
+    height: 100px !important;
+    min-width: 100px !important;
+    min-height: 100px !important;
+    max-width: 100px !important;
+    max-height: 100px !important;
+  }
+
+  .story-ring {
+    width: 100px !important;
+    height: 100px !important;
+    min-width: 100px !important;
+    min-height: 100px !important;
+    max-width: 100px !important;
+    max-height: 100px !important;
+    padding: 3.5px !important;
+  }
+
+  .story-title {
+    width: 100px !important;
+    font-size: 13px;
+  }
+
+  .shop-logo-wrapper {
+    width: 28px;
+    height: 28px;
+  }
+
+  /* Hover effect on desktop */
+  .story-card:hover .story-ring {
+    transform: scale(1.05);
+  }
+
+  .story-card:hover .story-title {
+    color: #ff6b35;
+    font-weight: 600;
+  }
+}
+
+/* ==================== ACCESSIBILITY ==================== */
+
+/* Keyboard navigation */
+.story-card:focus-visible {
+  outline: 3px solid #ff6b35;
+  outline-offset: 6px;
+  border-radius: 50%;
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .story-ring {
+    border: 2px solid black;
+  }
+
+  .story-card.viewed .story-ring {
+    background: #888888;
+  }
+
+  .story-title {
+    color: black;
+    font-weight: 600;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .story-ring {
+    animation: none;
+  }
+
+  .story-card,
+  .stories-arrow {
+    transition: none;
+  }
+}
+
+/* ==================== LOADING STATES ==================== */
+
+/* Skeleton loader for stories */
+.story-card-skeleton {
+  width: 80px;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+.story-card-skeleton .story-ring {
+  background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
+}
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* ==================== EMPTY STATE ==================== */
+
+.stories-empty {
+  padding: 20px;
+  text-align: center;
+  color: #8e8e8e;
+  font-size: 14px;
+}

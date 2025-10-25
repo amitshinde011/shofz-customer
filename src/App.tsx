@@ -3,25 +3,130 @@ import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
-import Index from "./pages/Index";
+import { BottomNav } from "@/components/BottomNav";
+import { ProtectedRoute } from "@/components/ProtectedRoute";
+import { OfflineIndicator } from "@/components/OfflineIndicator";
+import ConnectionStatus from "@/components/ConnectionStatus";
+import { usePageTracking } from "@/hooks/useAnalytics";
+import { initializeAnalytics } from "@/lib/analytics";
+import { LocationProvider } from "@/contexts/LocationContext";
+import { LocationPermissionGate } from "@/components/LocationPermissionGate";
+import Auth from "./pages/Auth";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import { useAuth } from "@/hooks/useAuth";
+import Home from "./pages/Home";
+import Products from "./pages/Products";
+import ProductDetail from "./pages/ProductDetail";
+import Shops from "./pages/Shops";
+import ShopDetail from "./pages/ShopDetail";
+import Favorites from "./pages/Favorites";
+import Profile from "./pages/Profile";
+import PrivacyPolicy from "./pages/PrivacyPolicy";
 import NotFound from "./pages/NotFound";
+import InquiryForm from "./pages/InquiryForm";
+import InquirySuccess from "./pages/InquirySuccess";
+import MyInquiries from "./pages/MyInquiries";
+import InquiryDetail from "./pages/InquiryDetail";
+import Offers from "./pages/Offers";
+import OfferDetail from "./pages/OfferDetail";
+import ShopDashboard from "./pages/ShopDashboard";
 
-const queryClient = new QueryClient();
+// Initialize Google Analytics
+initializeAnalytics();
 
-const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
-  </QueryClientProvider>
-);
+// Enhanced QueryClient with optimized cache settings
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes
+      refetchOnWindowFocus: true,
+      refetchOnReconnect: true,
+      retry: 1,
+      retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    },
+    mutations: {
+      retry: 1,
+    },
+  },
+});
+
+const App = () => {
+  const { loading } = useAuth();
+
+  console.log('[App] Render - loading:', loading);
+
+  if (loading) {
+    console.log('[App] Showing loading spinner');
+    return (
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <div className="min-h-screen bg-background flex items-center justify-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        </TooltipProvider>
+      </QueryClientProvider>
+    );
+  }
+
+  console.log('[App] Showing main app content');
+
+  return (
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <LocationProvider>
+          <LocationPermissionGate>
+            <OfflineIndicator />
+            <ConnectionStatus />
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <AppContent />
+            </BrowserRouter>
+          </LocationPermissionGate>
+        </LocationProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  );
+};
+
+function AppContent() {
+  // Track page views automatically
+  usePageTracking();
+
+  return (
+    <div className="font-inter min-h-screen">
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={<Home />} />
+        <Route path="/products" element={<Products />} />
+        <Route path="/products/:id" element={<ProductDetail />} />
+        <Route path="/shops" element={<Shops />} />
+        <Route path="/shops/:id" element={<ShopDetail />} />
+        <Route path="/offers" element={<Offers />} />
+        <Route path="/offers/:id" element={<OfferDetail />} />
+        {/* Auth Routes */}
+        <Route path="/auth" element={<Auth />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password" element={<ResetPassword />} />
+        {/* Protected Routes */}
+        <Route path="/inquiry/new" element={<ProtectedRoute><InquiryForm /></ProtectedRoute>} />
+        <Route path="/inquiry/create" element={<ProtectedRoute><InquiryForm /></ProtectedRoute>} />
+        <Route path="/inquiry/success" element={<ProtectedRoute><InquirySuccess /></ProtectedRoute>} />
+        <Route path="/inquiries" element={<ProtectedRoute><MyInquiries /></ProtectedRoute>} />
+        <Route path="/inquiries/:id" element={<ProtectedRoute><InquiryDetail /></ProtectedRoute>} />
+        <Route path="/favorites" element={<ProtectedRoute><Favorites /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/shop/dashboard" element={<ProtectedRoute><ShopDashboard /></ProtectedRoute>} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
+
+        {/* Catch-all */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+      <BottomNav />
+    </div>
+  );
+}
 
 export default App;
