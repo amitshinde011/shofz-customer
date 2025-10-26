@@ -38,7 +38,7 @@ import { useProducts } from "@/hooks/useProducts";
 import { useOffers } from "@/hooks/useOffers";
 import OfferCard from "@/components/OfferCard";
 import { useUserLocation } from "@/contexts/LocationContext";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { calculateShopStatus, getTodayHours } from "@/lib/businessHours";
 import { getFormattedDistance, estimateTravelTime, calculateDistance } from "@/lib/distanceCalculation";
 import ImageGallery from "@/components/ImageGallery";

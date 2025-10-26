@@ -6,7 +6,7 @@ import { NavLink } from "react-router-dom";
 import * as Icons from "lucide-react";
 import { useShopCategories, useShops } from "@/hooks/useShops";
 import { useActiveOffers } from "@/hooks/useOffers";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { useFeaturedShops, useFeaturedProducts, useFeaturedOffers } from "@/hooks/useFeaturedContent";
 import OfferStoriesCarousel from "@/components/OfferStoriesCarousel";
 import { HomeHeader } from "@/components/HomeHeader";

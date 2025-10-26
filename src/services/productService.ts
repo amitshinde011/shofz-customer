@@ -55,7 +55,9 @@ export const productService = {
             id,
             name,
             address,
-            rating
+            rating,
+            business_hours,
+            total_reviews
           )
         `)
         .eq('shop_id', options.shopId)
@@ -122,7 +124,9 @@ export const productService = {
             id,
             name,
             address,
-            rating
+            rating,
+            business_hours,
+            total_reviews
           )
         `)
         .eq('is_active', true)

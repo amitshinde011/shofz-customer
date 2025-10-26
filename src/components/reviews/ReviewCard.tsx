@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { StarRating } from "./StarRating";
 import { reviewDisplayService } from "@/services/reviewDisplayService";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { CheckCircle, MoreHorizontal, ThumbsUp, ThumbsDown, Flag, Store, Edit } from "lucide-react";
 import { ReviewImagesModal } from "./ReviewImagesModal";

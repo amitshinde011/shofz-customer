@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { CheckCircle, Gift, Store, Star, Loader2, XCircle } from "lucide-react";
 import { useState, useEffect } from "react";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { referralService } from "@/services/referralService";
 import { useToast } from "@/hooks/use-toast";
 import { motion } from "framer-motion";

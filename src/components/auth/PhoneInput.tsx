@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { ArrowLeft, Phone } from "lucide-react";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface PhoneInputProps {
   onBack: () => void;

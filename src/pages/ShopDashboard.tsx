@@ -15,7 +15,7 @@ import {
   ShoppingBag,
   ChevronRight
 } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { ShopPaymentConfirmation } from "@/components/payment/ShopPaymentConfirmation";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";

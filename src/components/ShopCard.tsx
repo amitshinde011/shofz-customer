@@ -6,7 +6,7 @@ import { Star, MapPin, Clock, Heart, Phone, MessageCircle, Navigation, Eye } fro
 import { ShopImage } from "@/components/AmazonImage";
 import { useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { useEntityViewCounts } from "@/hooks/useEntityViewCounts";
 import { useUserLocation } from "@/contexts/LocationContext";
 import { FeaturedBadge } from "@/components/FeaturedBadge";

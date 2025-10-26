@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToggleProductFavorite } from '@/hooks/useProducts';
 import { Product } from '@/services/productService';
 import { useQuery } from '@tanstack/react-query';

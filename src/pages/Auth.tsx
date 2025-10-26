@@ -5,7 +5,7 @@ import { ReferralCodeEntry } from "@/components/auth/ReferralCodeEntry";
 import { ProfileSetup } from "@/components/auth/ProfileSetup";
 import { useToast } from "@/hooks/use-toast";
 import { referralService } from "@/services/referralService";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 
 export type AuthStep = "auth" | "referral" | "profile-setup";
 

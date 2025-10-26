@@ -3,14 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Grid, List, Map, ArrowUpDown, MapPin, X, ChevronRight, Grid3x3 } from "lucide-react";
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Link, useSearchParams, useNavigate } from "react-router-dom";
 import SearchBar from "@/components/SearchBar";
 import ShopCard from "@/components/ShopCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
 import { useShops, useToggleShopFavorite, useUserFavoriteShops } from "@/hooks/useShops";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { Shop } from "@/services/shopService";
 import { useUserLocation } from "@/contexts/LocationContext";
 import FilterSheet, { FilterState } from "@/components/FilterSheet";
@@ -52,11 +52,19 @@ export default function Shops() {
   const { location, error: locationError, requestLocation, openSettings, isNative } = useUserLocation();
   const [featuredOnly, setFeaturedOnly] = useState(false);
 
-  // Read featured filter from URL on mount
+  const prevUrlFeaturedRef = useRef<boolean | null>(null);
+
+  // Single effect: URL → State (source of truth)
   useEffect(() => {
-    const isFeatured = searchParams.get('featured') === 'true';
-    setFeaturedOnly(isFeatured);
-  }, [searchParams]);
+    const urlFeatured = searchParams.get('featured') === 'true';
+    
+    // Only update if URL actually changed (not on every render)
+    if (prevUrlFeaturedRef.current !== urlFeatured) {
+      prevUrlFeaturedRef.current = urlFeatured;
+      setFeaturedOnly(urlFeatured);
+      setFilters(prev => ({ ...prev, isFeatured: urlFeatured }));
+    }
+  }, [searchParams]); // Only depend on searchParams
 
   // Debounced search query
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -71,9 +79,13 @@ export default function Shops() {
   // Fetch shops and favorites
   const shopSearchOptions = useMemo(() => ({
     search: debouncedQuery || undefined,
-    location: location ? { lat: location.lat, lng: location.lng, radius: 50 } : undefined,
+    location: location ? { 
+      lat: location.lat, 
+      lng: location.lng, 
+      radius: filters.distance // Use filter value instead of hardcoded 50
+    } : undefined,
     limit: 50,
-  }), [debouncedQuery, location?.lat, location?.lng]);
+  }), [debouncedQuery, location?.lat, location?.lng, filters.distance]);
 
   const { data: shopsResponse, isLoading } = useShops(shopSearchOptions);
   const { data: favoritesResponse } = useUserFavoriteShops();
@@ -85,14 +97,15 @@ export default function Shops() {
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
     let count = 0;
-    if (featuredOnly) count++;
+    // Don't count isFeatured since it's displayed separately
     if (filters.categories.length > 0) count++;
+    if (filters.distance < 50) count++;
     if (filters.rating > 0) count++;
     if (filters.hasDelivery) count++;
     if (filters.isOpen) count++;
     if (filters.minReviews && filters.minReviews > 0) count++;
     return count;
-  }, [filters, featuredOnly]);
+  }, [filters]);
 
   const filteredAndSortedShops = useMemo(() => {
     let filtered = [...shops];
@@ -306,7 +319,7 @@ export default function Shops() {
           </div>
 
           {/* Active Filters Display */}
-          {activeFilterCount > 0 && (
+          {(featuredOnly || activeFilterCount > 0) && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -318,13 +331,55 @@ export default function Shops() {
                   Featured Shops
                   <X className="w-3.5 h-3.5 cursor-pointer hover:text-destructive transition-colors" onClick={() => {
                     setFeaturedOnly(false);
-                    navigate('/shops');
+                    setFilters(prev => ({ ...prev, isFeatured: false }));
+                    const newParams = new URLSearchParams(searchParams);
+                    newParams.delete('featured');
+                    navigate(newParams.toString() ? `/shops?${newParams.toString()}` : '/shops', { replace: true });
                   }} />
                 </Badge>
               )}
-              {activeFilterCount > (featuredOnly ? 1 : 0) && (
-                <Badge variant="secondary" className="rounded-full px-3 py-1 font-medium">
-                  {activeFilterCount - (featuredOnly ? 1 : 0)} more filter{activeFilterCount > (featuredOnly ? 2 : 1) ? 's' : ''}
+              {filters.distance < 50 && (
+                <Badge variant="secondary" className="flex items-center gap-1.5 rounded-full px-3 py-1 font-medium">
+                  Within {filters.distance}km
+                  <X className="w-3.5 h-3.5 cursor-pointer hover:text-destructive transition-colors" onClick={() => {
+                    setFilters(prev => ({ ...prev, distance: 50 }));
+                  }} />
+                </Badge>
+              )}
+
+              {filters.rating > 0 && (
+                <Badge variant="secondary" className="flex items-center gap-1.5 rounded-full px-3 py-1 font-medium">
+                  Rating ≥ {filters.rating}★
+                  <X className="w-3.5 h-3.5 cursor-pointer hover:text-destructive transition-colors" onClick={() => {
+                    setFilters(prev => ({ ...prev, rating: 0 }));
+                  }} />
+                </Badge>
+              )}
+
+              {filters.hasDelivery && (
+                <Badge variant="secondary" className="flex items-center gap-1.5 rounded-full px-3 py-1 font-medium">
+                  Delivery Available
+                  <X className="w-3.5 h-3.5 cursor-pointer hover:text-destructive transition-colors" onClick={() => {
+                    setFilters(prev => ({ ...prev, hasDelivery: false }));
+                  }} />
+                </Badge>
+              )}
+
+              {filters.isOpen && (
+                <Badge variant="secondary" className="flex items-center gap-1.5 rounded-full px-3 py-1 font-medium">
+                  Open Now
+                  <X className="w-3.5 h-3.5 cursor-pointer hover:text-destructive transition-colors" onClick={() => {
+                    setFilters(prev => ({ ...prev, isOpen: false }));
+                  }} />
+                </Badge>
+              )}
+
+              {filters.minReviews && filters.minReviews > 0 && (
+                <Badge variant="secondary" className="flex items-center gap-1.5 rounded-full px-3 py-1 font-medium">
+                  Min {filters.minReviews} reviews
+                  <X className="w-3.5 h-3.5 cursor-pointer hover:text-destructive transition-colors" onClick={() => {
+                    setFilters(prev => ({ ...prev, minReviews: 0 }));
+                  }} />
                 </Badge>
               )}
               <Button
@@ -333,7 +388,7 @@ export default function Shops() {
                 onClick={() => {
                   setFeaturedOnly(false);
                   setFilters(defaultFilters);
-                  navigate('/shops');
+                  navigate('/shops', { replace: true });
                 }}
                 className="h-7 px-2 text-xs"
               >
@@ -368,11 +423,30 @@ export default function Shops() {
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            <FilterSheet
-              filters={filters}
-              onFiltersChange={setFilters}
-              activeFilterCount={activeFilterCount}
-            />
+          <FilterSheet
+            filters={filters}
+            onFiltersChange={(newFilters) => {
+              setFilters(newFilters);
+              
+              // Sync featured filter
+              if (newFilters.isFeatured !== featuredOnly) {
+                setFeaturedOnly(newFilters.isFeatured || false);
+                
+                // Update URL
+                const newParams = new URLSearchParams(searchParams);
+                if (newFilters.isFeatured) {
+                  newParams.set('featured', 'true');
+                } else {
+                  newParams.delete('featured');
+                }
+                
+                const newSearch = newParams.toString();
+                const newPath = newSearch ? `/shops?${newSearch}` : '/shops';
+                navigate(newPath, { replace: true });
+              }
+            }}
+            activeFilterCount={activeFilterCount}
+          />
 
             <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
               <SelectTrigger className="w-[140px] rounded-full font-medium text-xs h-8">
@@ -431,25 +505,26 @@ export default function Shops() {
               return (
                 <motion.div key={shop.id} variants={itemVariants}>
                   <ShopCard
-                    shop={{
-                      id: shop.id,
-                      name: shop.name,
-                      image: shop.logo_url || '/placeholder.svg',
-                      category: shop.categories?.[0] || 'General',
-                      subcategories: shop.categories || [],
-                      rating: shop.rating || 0,
-                      reviewCount: shop.total_reviews || 0,
-                      distance,
-                      address: shop.address || '',
-                      isOpen: shopStatus.isOpen,
-                      nextStatusChange: shopStatus.nextStatusChange,
-                      delivery: false,
-                      deliveryTime: '30-45 min',
-                      establishedYear: 2020,
-                      phone: shop.phone_number,
-                      coordinates: shop.location,
-                      isVerified: shop.is_verified,
-                    }}
+                  shop={{
+                    id: shop.id,
+                    name: shop.name,
+                    image: shop.logo_url || '/placeholder.svg',
+                    category: shop.categories?.[0] || 'General',
+                    subcategories: shop.categories || [],
+                    rating: shop.rating || 0,
+                    reviewCount: shop.total_reviews || 0,
+                    distance,
+                    address: shop.address || '',
+                    isOpen: shopStatus.isOpen,
+                    nextStatusChange: shopStatus.nextStatusChange,
+                    delivery: false,
+                    deliveryTime: '30-45 min',
+                    establishedYear: 2020,
+                    phone: shop.phone_number,
+                    coordinates: shop.location,
+                    isVerified: shop.is_verified,
+                    is_featured: shop.is_featured,
+                  }}
                     variant="grid"
                     onToggleFavorite={toggleFavorite}
                     isFavorite={favoriteShopIds.includes(shop.id)}

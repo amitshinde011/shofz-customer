@@ -13,7 +13,7 @@ import { ArrowLeft, Plus, Minus, Send, Store, ChevronRight } from "lucide-react"
 import { useCreateInquiry } from "@/hooks/useInquiries";
 import { useShop } from "@/hooks/useShops";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { z } from "zod";
 import ShopSelector from "@/components/ShopSelector";
 import { AttachmentUpload } from "@/components/AttachmentUpload";

@@ -6,8 +6,9 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Filter, X, CalendarIcon } from "lucide-react";
-import { useState } from "react";
+import { Separator } from "@/components/ui/separator";
+import { Filter, X, CalendarIcon, Star } from "lucide-react";
+import { useState, useEffect } from "react";
 import { format } from "date-fns";
 import { cn } from "@/lib/utils";
 
@@ -19,6 +20,7 @@ export interface OfferFilterState {
   validFrom?: Date;
   validUntil?: Date;
   minDiscount: number;
+  isFeatured?: boolean;
 }
 
 interface OfferFilterSheetProps {
@@ -39,6 +41,11 @@ export default function OfferFilterSheet({
   const [isOpen, setIsOpen] = useState(false);
   const [localFilters, setLocalFilters] = useState<OfferFilterState>(filters);
 
+  // Sync local filters when parent filters change
+  useEffect(() => {
+    setLocalFilters(filters);
+  }, [filters]);
+
   const offerTypeOptions = [
     { value: "percentage", label: "Percentage Off" },
     { value: "fixed", label: "Fixed Amount" },
@@ -58,9 +65,11 @@ export default function OfferFilterSheet({
       categories: [],
       shops: [],
       minDiscount: 0,
+      isFeatured: false,
     };
     setLocalFilters(resetFilters);
     onFiltersChange(resetFilters);
+    setIsOpen(false);
   };
 
   const toggleOfferType = (type: string) => {
@@ -91,7 +100,13 @@ export default function OfferFilterSheet({
   };
 
   return (
-    <Sheet open={isOpen} onOpenChange={setIsOpen}>
+      <Sheet open={isOpen} onOpenChange={(open) => {
+        setIsOpen(open);
+        if (!open) {
+          // Reset local state to match parent when closing without applying
+          setLocalFilters(filters);
+        }
+      }}>
       <SheetTrigger asChild>
         <Button
           variant="outline"
@@ -138,6 +153,26 @@ export default function OfferFilterSheet({
               ))}
             </div>
           </div>
+
+          <Separator />
+
+          {/* Featured Filter */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold flex items-center gap-2">
+                <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                Show Featured Only
+              </Label>
+              <Switch
+                checked={localFilters.isFeatured || false}
+                onCheckedChange={(checked) => 
+                  setLocalFilters(prev => ({ ...prev, isFeatured: checked }))
+                }
+              />
+            </div>
+          </div>
+
+          <Separator />
 
           {/* Discount Range Filter */}
           <div className="space-y-3">

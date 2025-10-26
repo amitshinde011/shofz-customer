@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, ArrowUpDown, X, Grid3x3, List, ChevronRight, Tag, MapPin } from "lucide-react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import SearchBar from "@/components/SearchBar";
 import OfferCard from "@/components/OfferCard";
@@ -43,7 +43,9 @@ export default function Offers() {
   const { location, loading: locationLoading, requestLocation } = useUserLocation();
   const [featuredOnly, setFeaturedOnly] = useState(false);
 
-  // Apply search query and featured filter from URL on mount
+  const prevUrlFeaturedRef = useRef<boolean | null>(null);
+
+  // Single effect: URL → State (source of truth)
   useEffect(() => {
     const urlSearchQuery = searchParams.get('search');
     if (urlSearchQuery) {
@@ -55,9 +57,15 @@ export default function Offers() {
       setSelectedShop(urlShopId);
     }
 
-    const isFeatured = searchParams.get('featured') === 'true';
-    setFeaturedOnly(isFeatured);
-  }, [searchParams]);
+    const urlFeatured = searchParams.get('featured') === 'true';
+    
+    // Only update if URL actually changed (not on every render)
+    if (prevUrlFeaturedRef.current !== urlFeatured) {
+      prevUrlFeaturedRef.current = urlFeatured;
+      setFeaturedOnly(urlFeatured);
+      setFilters(prev => ({ ...prev, isFeatured: urlFeatured }));
+    }
+  }, [searchParams]); // Only depend on searchParams
 
   // Debounced search query
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -77,7 +85,7 @@ export default function Offers() {
     limit: 100,
   });
 
-  const { data: shopData } = useShop(selectedShop || '');
+  const { data: shopData } = useShop(selectedShop ?? 'NO_SHOP');
 
   const offers = offersResponse?.data || [];
 
@@ -229,7 +237,7 @@ export default function Offers() {
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
     let count = 0;
-    if (featuredOnly) count++;
+    // Don't count isFeatured since it's displayed separately
     if (filters.offerTypes.length > 0) count++;
     if (filters.discountRange[0] > 0 || filters.discountRange[1] < 100) count++;
     if (filters.categories.length > 0) count++;
@@ -238,7 +246,7 @@ export default function Offers() {
     if (filters.validFrom) count++;
     if (filters.validUntil) count++;
     return count;
-  }, [filters, featuredOnly]);
+  }, [filters]);
 
   // Reset to first page when filters change
   useEffect(() => {
@@ -315,7 +323,7 @@ export default function Offers() {
           </div>
 
           {/* Active Filters Display */}
-          {(selectedShop || activeFilterCount > 0) && (
+          {(featuredOnly || selectedShop || activeFilterCount > 0) && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
@@ -328,7 +336,10 @@ export default function Offers() {
                   Featured Offers
                   <X className="w-3.5 h-3.5 cursor-pointer hover:text-destructive transition-colors" onClick={() => {
                     setFeaturedOnly(false);
-                    navigate('/offers');
+                    setFilters(prev => ({ ...prev, isFeatured: false }));
+                    const newParams = new URLSearchParams(searchParams);
+                    newParams.delete('featured');
+                    navigate(newParams.toString() ? `/offers?${newParams.toString()}` : '/offers', { replace: true });
                   }} />
                 </Badge>
               )}
@@ -340,21 +351,21 @@ export default function Offers() {
                 </Badge>
               )}
               
-              {activeFilterCount > (featuredOnly ? 1 : 0) + (selectedShop ? 1 : 0) && (
+              {activeFilterCount > 0 && (
                 <Badge variant="secondary" className="rounded-full px-3 py-1 font-medium">
-                  {activeFilterCount - (featuredOnly ? 1 : 0) - (selectedShop ? 1 : 0)} more filter{activeFilterCount > (featuredOnly ? 2 : 1) + (selectedShop ? 1 : 0) ? 's' : ''}
+                  {activeFilterCount} more filter{activeFilterCount > 1 ? 's' : ''}
                 </Badge>
               )}
               
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={() => {
-                  setSelectedShop(null);
-                  setFeaturedOnly(false);
-                  setFilters(defaultFilters);
-                  navigate('/offers');
-                }}
+            onClick={() => {
+              setSelectedShop(null);
+              setFeaturedOnly(false);
+              setFilters(defaultFilters);
+              navigate('/offers', { replace: true });
+            }}
                 className="h-7 px-2 text-xs"
               >
                 <X className="w-3 h-3 mr-1" />
@@ -413,7 +424,26 @@ export default function Offers() {
 
             <OfferFilterSheet
               filters={filters}
-              onFiltersChange={setFilters}
+              onFiltersChange={(newFilters) => {
+                setFilters(newFilters);
+                
+                // Sync featured filter
+                if (newFilters.isFeatured !== featuredOnly) {
+                  setFeaturedOnly(newFilters.isFeatured || false);
+                  
+                  // Update URL
+                  const newParams = new URLSearchParams(searchParams);
+                  if (newFilters.isFeatured) {
+                    newParams.set('featured', 'true');
+                  } else {
+                    newParams.delete('featured');
+                  }
+                  
+                  const newSearch = newParams.toString();
+                  const newPath = newSearch ? `/offers?${newSearch}` : '/offers';
+                  navigate(newPath, { replace: true });
+                }
+              }}
               activeFilterCount={activeFilterCount}
               availableCategories={availableCategories}
               availableShops={availableShops}

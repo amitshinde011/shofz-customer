@@ -11,10 +11,10 @@ import { usePageTracking } from "@/hooks/useAnalytics";
 import { initializeAnalytics } from "@/lib/analytics";
 import { LocationProvider } from "@/contexts/LocationContext";
 import { LocationPermissionGate } from "@/components/LocationPermissionGate";
+import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import Auth from "./pages/Auth";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
-import { useAuth } from "@/hooks/useAuth";
 import Home from "./pages/Home";
 import Products from "./pages/Products";
 import ProductDetail from "./pages/ProductDetail";
@@ -53,47 +53,39 @@ const queryClient = new QueryClient({
 });
 
 const App = () => {
-  const { loading } = useAuth();
-
-  console.log('[App] Render - loading:', loading);
-
-  if (loading) {
-    console.log('[App] Showing loading spinner');
-    return (
+  return (
+    <AuthProvider>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <div className="min-h-screen bg-background flex items-center justify-center">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
+          <LocationProvider>
+            <LocationPermissionGate>
+              <OfflineIndicator />
+              <ConnectionStatus />
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <AppContent />
+              </BrowserRouter>
+            </LocationPermissionGate>
+          </LocationProvider>
         </TooltipProvider>
       </QueryClientProvider>
-    );
-  }
-
-  console.log('[App] Showing main app content');
-
-  return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <LocationProvider>
-          <LocationPermissionGate>
-            <OfflineIndicator />
-            <ConnectionStatus />
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <AppContent />
-            </BrowserRouter>
-          </LocationPermissionGate>
-        </LocationProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
+    </AuthProvider>
   );
 };
 
 function AppContent() {
   // Track page views automatically
   usePageTracking();
+  const { loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="font-inter min-h-screen">

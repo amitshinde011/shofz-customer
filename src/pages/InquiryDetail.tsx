@@ -19,7 +19,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useRealtimeChat } from "@/hooks/useRealtimeChat";
 import { useRealtimeInquiry } from "@/hooks/useRealtimeInquiry";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { TypingIndicator } from "@/components/TypingIndicator";
 import { MultiAttachmentUpload, Attachment } from "@/components/MultiAttachmentUpload";
 import { MessageAttachments } from "@/components/MessageAttachments";

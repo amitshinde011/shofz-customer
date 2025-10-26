@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { Product } from "@/services/productService";
 import { useEntityViewCounts } from "@/hooks/useEntityViewCounts";
 import { ProductThumbnail } from "@/components/AmazonImage";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { FeaturedBadge } from "@/components/FeaturedBadge";
 
 interface ProductCardProps {

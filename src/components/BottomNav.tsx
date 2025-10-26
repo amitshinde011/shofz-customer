@@ -1,6 +1,6 @@
 import { Home, Search, Store, User, Tag } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { useScrollDirection } from "@/hooks/useScrollDirection";
 import { useIsMobile } from "@/hooks/use-mobile";
 

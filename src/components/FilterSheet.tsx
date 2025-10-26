@@ -1,11 +1,11 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
-import { Filter, X } from "lucide-react";
+import { Filter, X, Star } from "lucide-react";
 import { useShopCategories } from "@/hooks/useShops";
 
 export interface FilterState {
@@ -20,6 +20,7 @@ export interface FilterState {
   minReviews?: number;
   brands?: string[];
   subcategories?: string[];
+  isFeatured?: boolean;
 }
 
 interface FilterSheetProps {
@@ -39,45 +40,72 @@ const defaultFilters: FilterState = {
   minReviews: 0,
   brands: [],
   subcategories: [],
+  isFeatured: false,
 };
 
 export default function FilterSheet({ filters, onFiltersChange, activeFilterCount }: FilterSheetProps) {
   const [isOpen, setIsOpen] = useState(false);
+  const [localFilters, setLocalFilters] = useState<FilterState>(filters);
   const { data: categoriesResponse } = useShopCategories();
   const categories = categoriesResponse?.data || [];
 
+  // Sync local filters when parent filters change
+  useEffect(() => {
+    setLocalFilters(filters);
+  }, [filters]);
+
   const handleCategoryChange = (category: string, checked: boolean) => {
     const updatedCategories = checked
-      ? [...filters.categories, category]
-      : filters.categories.filter(c => c !== category);
+      ? [...localFilters.categories, category]
+      : localFilters.categories.filter(c => c !== category);
     
-    onFiltersChange({
-      ...filters,
+    setLocalFilters({
+      ...localFilters,
       categories: updatedCategories,
     });
   };
 
+  const handleApplyFilters = () => {
+    onFiltersChange(localFilters);
+    setIsOpen(false);
+  };
+
   const clearAllFilters = () => {
+    setLocalFilters(defaultFilters);
     onFiltersChange(defaultFilters);
+    setIsOpen(false);
   };
 
   const hasActiveFilters = activeFilterCount > 0;
 
   return (
-    <Sheet open={isOpen} onOpenChange={setIsOpen}>
+    <Sheet open={isOpen} onOpenChange={(open) => {
+      setIsOpen(open);
+      if (!open) {
+        // Reset local state when closing without applying
+        setLocalFilters(filters);
+      }
+    }}>
       <SheetTrigger asChild>
-        <Button variant="outline" size="sm" className="relative">
-          <Filter className="w-4 h-4 mr-2" />
+        <Button
+          variant="outline"
+          size="sm"
+          className="relative h-8 rounded-full font-medium text-xs"
+        >
+          <Filter className="w-3.5 h-3.5 mr-1.5" />
           Filters
           {hasActiveFilters && (
-            <Badge className="absolute -top-2 -right-2 w-5 h-5 rounded-full p-0 flex items-center justify-center text-xs">
+            <Badge
+              variant="destructive"
+              className="absolute -top-2 -right-2 w-5 h-5 rounded-full p-0 flex items-center justify-center text-[10px]"
+            >
               {activeFilterCount}
             </Badge>
           )}
         </Button>
       </SheetTrigger>
 
-      <SheetContent side="bottom" className="h-[90vh] overflow-y-auto">
+      <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
         <SheetHeader className="space-y-2">
           <div className="flex items-center justify-between">
             <SheetTitle>Filters</SheetTitle>
@@ -106,7 +134,7 @@ export default function FilterSheet({ filters, onFiltersChange, activeFilterCoun
                 <div key={category} className="flex items-center space-x-3">
                   <Checkbox
                     id={category}
-                    checked={filters.categories.includes(category)}
+                    checked={localFilters.categories.includes(category)}
                     onCheckedChange={(checked) =>
                       handleCategoryChange(category, checked as boolean)
                     }
@@ -130,12 +158,12 @@ export default function FilterSheet({ filters, onFiltersChange, activeFilterCoun
           {/* Price Range */}
           <div>
             <h3 className="font-semibold text-foreground mb-3">
-              Price Range: ₹{filters.priceRange[0].toLocaleString()} - ₹{filters.priceRange[1].toLocaleString()}
+              Price Range: ₹{localFilters.priceRange[0].toLocaleString()} - ₹{localFilters.priceRange[1].toLocaleString()}
             </h3>
             <Slider
-              value={filters.priceRange}
+              value={localFilters.priceRange}
               onValueChange={(value) =>
-                onFiltersChange({ ...filters, priceRange: value as [number, number] })
+                setLocalFilters({ ...localFilters, priceRange: value as [number, number] })
               }
               max={50000}
               min={0}
@@ -149,12 +177,12 @@ export default function FilterSheet({ filters, onFiltersChange, activeFilterCoun
           {/* Distance */}
           <div>
             <h3 className="font-semibold text-foreground mb-3">
-              Distance: {filters.distance} km
+              Distance: {localFilters.distance} km
             </h3>
             <Slider
-              value={[filters.distance]}
+              value={[localFilters.distance]}
               onValueChange={(value) =>
-                onFiltersChange({ ...filters, distance: value[0] })
+                setLocalFilters({ ...localFilters, distance: value[0] })
               }
               max={50}
               min={1}
@@ -168,12 +196,12 @@ export default function FilterSheet({ filters, onFiltersChange, activeFilterCoun
           {/* Rating */}
           <div>
             <h3 className="font-semibold text-foreground mb-3">
-              Minimum Rating: {filters.rating} stars
+              Minimum Rating: {localFilters.rating} stars
             </h3>
             <Slider
-              value={[filters.rating]}
+              value={[localFilters.rating]}
               onValueChange={(value) =>
-                onFiltersChange({ ...filters, rating: value[0] })
+                setLocalFilters({ ...localFilters, rating: value[0] })
               }
               max={5}
               min={0}
@@ -184,14 +212,36 @@ export default function FilterSheet({ filters, onFiltersChange, activeFilterCoun
 
           <Separator />
 
+          {/* Featured Filter */}
+          <div className="space-y-3">
+            <div className="flex items-center space-x-3">
+              <Checkbox
+                id="isFeatured"
+                checked={localFilters.isFeatured}
+                onCheckedChange={(checked) =>
+                  setLocalFilters({ ...localFilters, isFeatured: checked as boolean })
+                }
+              />
+              <label
+                htmlFor="isFeatured"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-2"
+              >
+                <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+                Show Featured Only
+              </label>
+            </div>
+          </div>
+
+          <Separator />
+
           {/* Stock Status */}
           <div className="space-y-3">
             <div className="flex items-center space-x-3">
               <Checkbox
                 id="inStock"
-                checked={filters.inStockOnly}
+                checked={localFilters.inStockOnly}
                 onCheckedChange={(checked) =>
-                  onFiltersChange({ ...filters, inStockOnly: checked as boolean })
+                  setLocalFilters({ ...localFilters, inStockOnly: checked as boolean })
                 }
               />
               <label
@@ -205,9 +255,9 @@ export default function FilterSheet({ filters, onFiltersChange, activeFilterCoun
             <div className="flex items-center space-x-3">
               <Checkbox
                 id="hasDelivery"
-                checked={filters.hasDelivery}
+                checked={localFilters.hasDelivery}
                 onCheckedChange={(checked) =>
-                  onFiltersChange({ ...filters, hasDelivery: checked as boolean })
+                  setLocalFilters({ ...localFilters, hasDelivery: checked as boolean })
                 }
               />
               <label
@@ -221,9 +271,9 @@ export default function FilterSheet({ filters, onFiltersChange, activeFilterCoun
             <div className="flex items-center space-x-3">
               <Checkbox
                 id="isOpen"
-                checked={filters.isOpen}
+                checked={localFilters.isOpen}
                 onCheckedChange={(checked) =>
-                  onFiltersChange({ ...filters, isOpen: checked as boolean })
+                  setLocalFilters({ ...localFilters, isOpen: checked as boolean })
                 }
               />
               <label
@@ -240,12 +290,12 @@ export default function FilterSheet({ filters, onFiltersChange, activeFilterCoun
           {/* Minimum Reviews */}
           <div>
             <h3 className="font-semibold text-foreground mb-3">
-              Minimum Reviews: {filters.minReviews || 0}
+              Minimum Reviews: {localFilters.minReviews || 0}
             </h3>
             <Slider
-              value={[filters.minReviews || 0]}
+              value={[localFilters.minReviews || 0]}
               onValueChange={(value) =>
-                onFiltersChange({ ...filters, minReviews: value[0] })
+                setLocalFilters({ ...localFilters, minReviews: value[0] })
               }
               max={100}
               min={0}
@@ -256,7 +306,7 @@ export default function FilterSheet({ filters, onFiltersChange, activeFilterCoun
         </div>
 
         <div className="flex space-x-3 mt-8 pb-6">
-          <Button className="flex-1" onClick={() => setIsOpen(false)}>
+          <Button className="flex-1" onClick={handleApplyFilters}>
             Apply Filters
           </Button>
           <Button variant="outline" className="flex-1" onClick={clearAllFilters}>

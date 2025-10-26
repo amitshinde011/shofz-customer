@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useAuth } from './useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from './use-toast';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';

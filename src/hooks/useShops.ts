@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { shopService, Shop } from '@/services/shopService';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ShopSearchOptions {
   search?: string;
@@ -28,16 +28,16 @@ export const useShops = (options?: ShopSearchOptions) => {
 };
 
 export const useShop = (id: string) => {
-  console.log('useShop hook called with id:', id);
+  if (import.meta.env.DEV && id && id !== 'NO_SHOP') {
+    console.log('useShop hook called with id:', id);
+  }
   return useQuery({
     queryKey: ['shops', id],
     queryFn: async () => {
-      console.log('Fetching shop by ID:', id);
       const result = await shopService.getShopById(id);
-      console.log('Shop fetch result for', id, ':', result);
       return result;
     },
-    enabled: !!id,
+    enabled: !!id && id !== 'NO_SHOP',
   });
 };
 

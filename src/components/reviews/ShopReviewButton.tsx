@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Star } from "lucide-react";
 import { reviewService } from "@/services/reviewService";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { ReviewSubmissionModal } from "./ReviewSubmissionModal";
 import { useNavigate } from "react-router-dom";
 
