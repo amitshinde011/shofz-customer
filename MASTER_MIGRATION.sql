@@ -444,7 +444,7 @@ CREATE TABLE credit_plans (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 
   -- Plan details
-  name VARCHAR(100) NOT NULL,
+  name VARCHAR(100) NOT NULL UNIQUE,
   description TEXT,
 
   -- Pricing
@@ -2844,7 +2844,7 @@ DECLARE
   v_shop_owner_id UUID;
 BEGIN
   -- Get daily cost for featured offers
-  SELECT cost_per_action, daily_cost, default_duration_days
+  SELECT cost_per_action, daily_cost, duration_days
   INTO v_cost_record
   FROM credit_costs
   WHERE action_type = 'feature_offer' AND is_active = true
@@ -2905,11 +2905,12 @@ BEGIN
 
   -- Create featured_items record
   INSERT INTO featured_items (
-    entity_type, entity_id, shop_id, daily_cost, 
-    featured_at, featured_until, status
+  shop_id, entity_id, entity_type, featured_until,
+  total_credits_allocated, daily_cost, credits_consumed, credits_used,
+  status, version
   ) VALUES (
-    'offer', p_offer_id, p_shop_id, v_daily_cost,
-    NOW(), v_end_date, 'active'
+  p_shop_id, p_shop_id, 'shop', v_end_date,
+  v_total_cost, v_daily_cost, 0, 0, 'active', 1
   )
   RETURNING id INTO v_featured_item_id;
 
@@ -2952,7 +2953,7 @@ DECLARE
   v_shop_owner_id UUID;
 BEGIN
   -- Get daily cost for featured products
-  SELECT cost_per_action, daily_cost, default_duration_days
+  SELECT cost_per_action, daily_cost, duration_days
   INTO v_cost_record
   FROM credit_costs
   WHERE action_type = 'feature_product' AND is_active = true
@@ -3013,11 +3014,12 @@ BEGIN
 
   -- Create featured_items record
   INSERT INTO featured_items (
-    entity_type, entity_id, shop_id, daily_cost, 
-    featured_at, featured_until, status
+  shop_id, entity_id, entity_type, featured_until,
+  total_credits_allocated, daily_cost, credits_consumed, credits_used,
+  status, version
   ) VALUES (
-    'product', p_product_id, p_shop_id, v_daily_cost,
-    NOW(), v_end_date, 'active'
+  p_shop_id, p_shop_id, 'shop', v_end_date,
+  v_total_cost, v_daily_cost, 0, 0, 'active', 1
   )
   RETURNING id INTO v_featured_item_id;
 
@@ -3059,7 +3061,7 @@ DECLARE
   v_shop_owner_id UUID;
 BEGIN
   -- Get daily cost for featured shops
-  SELECT cost_per_action, daily_cost, default_duration_days
+  SELECT cost_per_action, daily_cost, duration_days
   INTO v_cost_record
   FROM credit_costs
   WHERE action_type = 'feature_shop' AND is_active = true
@@ -3120,11 +3122,12 @@ BEGIN
 
   -- Create featured_items record
   INSERT INTO featured_items (
-    entity_type, entity_id, shop_id, daily_cost, 
-    featured_at, featured_until, status
+  shop_id, entity_id, entity_type, featured_until,
+  total_credits_allocated, daily_cost, credits_consumed, credits_used,
+  status, version
   ) VALUES (
-    'shop', p_shop_id, p_shop_id, v_daily_cost,
-    NOW(), v_end_date, 'active'
+  p_shop_id, p_shop_id, 'shop', v_end_date,
+  v_total_cost, v_daily_cost, 0, 0, 'active', 1
   )
   RETURNING id INTO v_featured_item_id;
 
@@ -3699,11 +3702,11 @@ CREATE POLICY "Shop owners can upload to shop-assets"
   TO authenticated
   WITH CHECK (
     bucket_id = 'shop-assets'
-    AND (storage.foldername(name))[1] IN ('logos', 'covers', 'qr-codes', 'gallery')
+    AND (storage.foldername(storage.objects.name))[1] IN ('logos', 'covers', 'qr-codes', 'gallery')
     AND EXISTS (
       SELECT 1 FROM shops
-      WHERE id::text = split_part((storage.foldername(name))[2], '_', 1)
-      AND owner_id = auth.uid()
+      WHERE shops.id::text = split_part((storage.foldername(storage.objects.name))[2], '_', 1)
+      AND shops.owner_id = auth.uid()
     )
   );
 
@@ -3714,8 +3717,8 @@ CREATE POLICY "Shop owners can update shop-assets"
     bucket_id = 'shop-assets'
     AND EXISTS (
       SELECT 1 FROM shops
-      WHERE id::text = split_part((storage.foldername(name))[2], '_', 1)
-      AND owner_id = auth.uid()
+      WHERE shops.id::text = split_part((storage.foldername(storage.objects.name))[2], '_', 1)
+      AND shops.owner_id = auth.uid()
     )
   );
 
@@ -3726,8 +3729,8 @@ CREATE POLICY "Shop owners can delete shop-assets"
     bucket_id = 'shop-assets'
     AND EXISTS (
       SELECT 1 FROM shops
-      WHERE id::text = split_part((storage.foldername(name))[2], '_', 1)
-      AND owner_id = auth.uid()
+      WHERE shops.id::text = split_part((storage.foldername(storage.objects.name))[2], '_', 1)
+      AND shops.owner_id = auth.uid()
     )
   );
 
@@ -3744,7 +3747,7 @@ CREATE POLICY "Shop owners can upload product images"
     AND EXISTS (
       SELECT 1 FROM products
       JOIN shops ON shops.id = products.shop_id
-      WHERE products.id::text = split_part((storage.foldername(name))[1], '_', 1)
+      WHERE products.id::text = split_part((storage.foldername(storage.objects.name))[1], '_', 1)
       AND shops.owner_id = auth.uid()
     )
   );
@@ -3759,7 +3762,7 @@ CREATE POLICY "Users can upload own avatar"
   TO authenticated
   WITH CHECK (
     bucket_id = 'avatars'
-    AND (storage.foldername(name))[1] = auth.uid()::text
+    AND (storage.foldername(storage.objects.name))[1] = auth.uid()::text
   );
 
 CREATE POLICY "Users can update own avatar"
@@ -3767,7 +3770,7 @@ CREATE POLICY "Users can update own avatar"
   TO authenticated
   USING (
     bucket_id = 'avatars'
-    AND (storage.foldername(name))[1] = auth.uid()::text
+    AND (storage.foldername(storage.objects.name))[1] = auth.uid()::text
   );
 
 CREATE POLICY "Anyone can view avatars"
@@ -3780,7 +3783,7 @@ CREATE POLICY "Users can upload payment evidence"
   TO authenticated
   WITH CHECK (
     bucket_id = 'payment-evidence'
-    AND (storage.foldername(name))[1] = auth.uid()::text
+    AND (storage.foldername(storage.objects.name))[1] = auth.uid()::text
   );
 
 CREATE POLICY "Users can view relevant payment evidence"
@@ -3789,7 +3792,7 @@ CREATE POLICY "Users can view relevant payment evidence"
   USING (
     bucket_id = 'payment-evidence'
     AND (
-      (storage.foldername(name))[1] = auth.uid()::text
+      (storage.foldername(storage.objects.name))[1] = auth.uid()::text
       OR is_admin()
     )
   );
