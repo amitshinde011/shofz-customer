@@ -12,7 +12,6 @@ import { initializeAnalytics } from "@/lib/analytics";
 import { LocationProvider } from "@/contexts/LocationContext";
 import { LocationPermissionGate } from "@/components/LocationPermissionGate";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
-import { ChatWidget } from "@/components/support/ChatWidget";
 import Auth from "./pages/Auth";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -120,7 +119,6 @@ function AppContent() {
         <Route path="*" element={<NotFound />} />
       </Routes>
       <BottomNav />
-      <ChatWidget />
     </div>
   );
 }
