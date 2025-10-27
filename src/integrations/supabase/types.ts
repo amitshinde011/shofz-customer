@@ -2957,14 +2957,14 @@ export type Database = {
         Returns: Json
       }
       feature_offer_atomic: {
-        Args: { p_duration_days: number; p_offer_id: string; p_shop_id: string }
+        Args: {  p_shop_id: string; p_offer_id: string; p_duration_days: number }
         Returns: Json
       }
       feature_product_atomic: {
-        Args: {
-          p_duration_days: number
+        Args: {          
+          p_shop_id: string          
           p_product_id: string
-          p_shop_id: string
+          p_duration_days: number
         }
         Returns: Json
       }

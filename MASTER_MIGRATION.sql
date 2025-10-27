@@ -2932,15 +2932,11 @@ $$;
 -- ============================================================================
 -- Fix feature_product_atomic function
 -- ============================================================================
-CREATE OR REPLACE FUNCTION public.feature_product_atomic(
-  p_product_id UUID,
-  p_shop_id UUID,
-  p_duration_days INTEGER DEFAULT 30
-)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
+CREATE OR REPLACE FUNCTION public.feature_product_atomic(p_product_id uuid, p_shop_id uuid, p_duration_days integer DEFAULT 30)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
 AS $$
 DECLARE
   v_cost_record RECORD;
@@ -2971,7 +2967,26 @@ BEGIN
 
   v_total_cost := v_daily_cost * p_duration_days;
   v_end_date := NOW() + (p_duration_days || ' days')::INTERVAL;
+  
+  -- **AUTO-EXPIRE OLD FEATURED ITEMS BEFORE CHECKING**
+  UPDATE featured_items
+  SET status = 'expired', updated_at = NOW()
+  WHERE entity_id = p_product_id
+    AND entity_type = 'product'
+    AND status = 'active'
+    AND featured_until < NOW();
 
+  -- Check if already actively featured (after expiring old records)
+  IF EXISTS (
+    SELECT 1 FROM featured_items
+    WHERE entity_id = p_product_id
+      AND entity_type = 'product'
+      AND status = 'active'
+      AND featured_until > NOW()
+  ) THEN
+    RAISE EXCEPTION 'This product is already featured until an active future date';
+  END IF;
+  
   -- Get current shop credits with row lock
   SELECT total_credits, reserved_credits
   INTO v_current_credits
@@ -3012,20 +3027,22 @@ BEGIN
     v_shop_owner_id
   );
 
-  -- Create featured_items record
+  -- ✅ FIX: Create featured_items record with CORRECT entity_id and entity_type
   INSERT INTO featured_items (
-  shop_id, entity_id, entity_type, featured_until,
-  total_credits_allocated, daily_cost, credits_consumed, credits_used,
-  status, version
+    shop_id, entity_id, entity_type, featured_until,
+    total_credits_allocated, daily_cost, credits_consumed, credits_used,
+    status, version
   ) VALUES (
-  p_shop_id, p_shop_id, 'shop', v_end_date,
-  v_total_cost, v_daily_cost, 0, 0, 'active', 1
+    p_shop_id, p_product_id, 'product', v_end_date,  -- ✅ FIXED: p_product_id, 'product'
+    v_total_cost, v_daily_cost, 0, 0, 'active', 1
   )
   RETURNING id INTO v_featured_item_id;
 
-  -- Update the product to mark it as featured
+  -- ✅ FIX: Update the product to mark it as featured with featured_until
   UPDATE products
-  SET is_featured = true, updated_at = NOW()
+  SET is_featured = true, 
+      featured_until = v_end_date,  -- ✅ ADDED: Set featured_until
+      updated_at = NOW()
   WHERE id = p_product_id;
 
   RETURN jsonb_build_object(
@@ -3038,17 +3055,15 @@ BEGIN
 END;
 $$;
 
+
 -- ============================================================================
 -- Fix feature_shop_atomic function
 -- ============================================================================
-CREATE OR REPLACE FUNCTION public.feature_shop_atomic(
-  p_shop_id UUID,
-  p_duration_days INTEGER DEFAULT 30
-)
-RETURNS JSONB
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path = public
+CREATE OR REPLACE FUNCTION public.feature_offer_atomic(p_offer_id uuid, p_shop_id uuid, p_duration_days integer DEFAULT 30)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public'
 AS $$
 DECLARE
   v_cost_record RECORD;
@@ -3060,15 +3075,15 @@ DECLARE
   v_featured_item_id UUID;
   v_shop_owner_id UUID;
 BEGIN
-  -- Get daily cost for featured shops
+  -- Get daily cost for featured offers
   SELECT cost_per_action, daily_cost, duration_days
   INTO v_cost_record
   FROM credit_costs
-  WHERE action_type = 'feature_shop' AND is_active = true
+  WHERE action_type = 'feature_offer' AND is_active = true
   LIMIT 1;
 
   IF NOT FOUND THEN
-    RAISE EXCEPTION 'Credit cost configuration not found for feature_shop';
+    RAISE EXCEPTION 'Credit cost configuration not found for feature_offer';
   END IF;
 
   v_daily_cost := COALESCE(v_cost_record.daily_cost, 0);
@@ -3080,6 +3095,25 @@ BEGIN
   v_total_cost := v_daily_cost * p_duration_days;
   v_end_date := NOW() + (p_duration_days || ' days')::INTERVAL;
 
+  -- **AUTO-EXPIRE OLD FEATURED ITEMS BEFORE CHECKING**
+  UPDATE featured_items
+  SET status = 'expired', updated_at = NOW()
+  WHERE entity_id = p_offer_id
+    AND entity_type = 'offer'
+    AND status = 'active'
+    AND featured_until < NOW();
+
+  -- Check if already actively featured (after expiring old records)
+  IF EXISTS (
+    SELECT 1 FROM featured_items
+    WHERE entity_id = p_offer_id
+      AND entity_type = 'offer'
+      AND status = 'active'
+      AND featured_until > NOW()
+  ) THEN
+    RAISE EXCEPTION 'This offer is already featured until an active future date';
+  END IF;
+  
   -- Get current shop credits with row lock
   SELECT total_credits, reserved_credits
   INTO v_current_credits
@@ -3115,26 +3149,28 @@ BEGIN
   ) VALUES (
     p_shop_id, 'reservation', -v_total_cost,
     v_current_credits.total_credits - v_total_cost,
-    'shop', p_shop_id,
+    'offer', p_offer_id,
     'Upfront deduction for featuring (' || p_duration_days || ' days @ ' || v_daily_cost || '/day)',
     v_shop_owner_id
   );
 
-  -- Create featured_items record
+  -- ✅ FIX: Create featured_items record with CORRECT entity_id and entity_type
   INSERT INTO featured_items (
-  shop_id, entity_id, entity_type, featured_until,
-  total_credits_allocated, daily_cost, credits_consumed, credits_used,
-  status, version
+    shop_id, entity_id, entity_type, featured_until,
+    total_credits_allocated, daily_cost, credits_consumed, credits_used,
+    status, version
   ) VALUES (
-  p_shop_id, p_shop_id, 'shop', v_end_date,
-  v_total_cost, v_daily_cost, 0, 0, 'active', 1
+    p_shop_id, p_offer_id, 'offer', v_end_date,  -- ✅ FIXED: p_offer_id, 'offer'
+    v_total_cost, v_daily_cost, 0, 0, 'active', 1
   )
   RETURNING id INTO v_featured_item_id;
 
-  -- Update the shop to mark it as featured
-  UPDATE shops
-  SET is_featured = true, updated_at = NOW()
-  WHERE id = p_shop_id;
+  -- ✅ FIX: Update the offer to mark it as featured with featured_until
+  UPDATE offers
+  SET is_featured = true, 
+      featured_until = v_end_date,  -- ✅ ADDED: Set featured_until
+      updated_at = NOW()
+  WHERE id = p_offer_id;
 
   RETURN jsonb_build_object(
     'success', true,
@@ -3145,6 +3181,7 @@ BEGIN
   );
 END;
 $$;
+
 -- ============================================================================
 -- SECTION 20: ROW LEVEL SECURITY (RLS)
 -- ============================================================================
@@ -3887,3 +3924,33 @@ BEGIN
   RAISE NOTICE '4. Review and adjust platform_settings as needed';
   RAISE NOTICE '5. Test all RLS policies with different user roles';
 END $$;
+
+-- Prevent multiple active features at database level
+CREATE UNIQUE INDEX IF NOT EXISTS idx_featured_items_unique_active 
+ON featured_items (entity_id, entity_type, status)
+WHERE status = 'active' AND featured_until > NOW();
+
+-- Add updated_at column to featured_items table
+ALTER TABLE featured_items 
+ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ DEFAULT now();
+
+-- Add trigger to automatically update updated_at on row changes
+CREATE OR REPLACE FUNCTION update_featured_items_updated_at()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = now();
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER set_featured_items_updated_at
+    BEFORE UPDATE ON featured_items
+    FOR EACH ROW
+    EXECUTE FUNCTION update_featured_items_updated_at();
+
+-- Add comment
+COMMENT ON COLUMN featured_items.updated_at IS 'Timestamp of last update, automatically maintained by trigger';
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_featured_items_unique_active 
+ON featured_items (entity_id, entity_type, status)
+WHERE status = 'active';

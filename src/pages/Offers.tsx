@@ -350,13 +350,79 @@ export default function Offers() {
                   <X className="w-3.5 h-3.5 cursor-pointer hover:text-destructive transition-colors" onClick={() => setSelectedShop(null)} />
                 </Badge>
               )}
-              
-              {activeFilterCount > 0 && (
-                <Badge variant="secondary" className="rounded-full px-3 py-1 font-medium">
-                  {activeFilterCount} more filter{activeFilterCount > 1 ? 's' : ''}
+
+              {filters.offerTypes.length > 0 && filters.offerTypes.map((type) => (
+                <Badge key={type} variant="secondary" className="flex items-center gap-1.5 rounded-full px-3 py-1 font-medium">
+                  {type.charAt(0).toUpperCase() + type.slice(1)}
+                  <X className="w-3.5 h-3.5 cursor-pointer hover:text-destructive transition-colors" onClick={() => {
+                    setFilters(prev => ({
+                      ...prev,
+                      offerTypes: prev.offerTypes.filter(t => t !== type)
+                    }));
+                  }} />
+                </Badge>
+              ))}
+
+              {filters.categories.length > 0 && filters.categories.map((category) => (
+                <Badge key={category} variant="secondary" className="flex items-center gap-1.5 rounded-full px-3 py-1 font-medium">
+                  {category}
+                  <X className="w-3.5 h-3.5 cursor-pointer hover:text-destructive transition-colors" onClick={() => {
+                    setFilters(prev => ({
+                      ...prev,
+                      categories: prev.categories.filter(c => c !== category)
+                    }));
+                  }} />
+                </Badge>
+              ))}
+
+              {filters.shops.length > 0 && filters.shops.map((shop) => (
+                <Badge key={shop} variant="secondary" className="flex items-center gap-1.5 rounded-full px-3 py-1 font-medium">
+                  Shop: {shop}
+                  <X className="w-3.5 h-3.5 cursor-pointer hover:text-destructive transition-colors" onClick={() => {
+                    setFilters(prev => ({
+                      ...prev,
+                      shops: prev.shops.filter(s => s !== shop)
+                    }));
+                  }} />
+                </Badge>
+              ))}
+
+              {(filters.discountRange[0] > 0 || filters.discountRange[1] < 100) && (
+                <Badge variant="secondary" className="flex items-center gap-1.5 rounded-full px-3 py-1 font-medium">
+                  Discount: {filters.discountRange[0]}% - {filters.discountRange[1]}%
+                  <X className="w-3.5 h-3.5 cursor-pointer hover:text-destructive transition-colors" onClick={() => {
+                    setFilters(prev => ({ ...prev, discountRange: [0, 100] }));
+                  }} />
                 </Badge>
               )}
-              
+
+              {filters.minDiscount > 0 && (
+                <Badge variant="secondary" className="flex items-center gap-1.5 rounded-full px-3 py-1 font-medium">
+                  Min {filters.minDiscount}% off
+                  <X className="w-3.5 h-3.5 cursor-pointer hover:text-destructive transition-colors" onClick={() => {
+                    setFilters(prev => ({ ...prev, minDiscount: 0 }));
+                  }} />
+                </Badge>
+              )}
+
+              {filters.validFrom && (
+                <Badge variant="secondary" className="flex items-center gap-1.5 rounded-full px-3 py-1 font-medium">
+                  From: {new Date(filters.validFrom).toLocaleDateString()}
+                  <X className="w-3.5 h-3.5 cursor-pointer hover:text-destructive transition-colors" onClick={() => {
+                    setFilters(prev => ({ ...prev, validFrom: undefined }));
+                  }} />
+                </Badge>
+              )}
+
+              {filters.validUntil && (
+                <Badge variant="secondary" className="flex items-center gap-1.5 rounded-full px-3 py-1 font-medium">
+                  Until: {new Date(filters.validUntil).toLocaleDateString()}
+                  <X className="w-3.5 h-3.5 cursor-pointer hover:text-destructive transition-colors" onClick={() => {
+                    setFilters(prev => ({ ...prev, validUntil: undefined }));
+                  }} />
+                </Badge>
+              )}
+
               <Button
                 variant="ghost"
                 size="sm"

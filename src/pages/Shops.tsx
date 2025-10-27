@@ -338,6 +338,19 @@ export default function Shops() {
                   }} />
                 </Badge>
               )}
+
+              {filters.categories.length > 0 && filters.categories.map((category) => (
+                <Badge key={category} variant="secondary" className="flex items-center gap-1.5 rounded-full px-3 py-1 font-medium">
+                  {category}
+                  <X className="w-3.5 h-3.5 cursor-pointer hover:text-destructive transition-colors" onClick={() => {
+                    setFilters(prev => ({
+                      ...prev,
+                      categories: prev.categories.filter(c => c !== category)
+                    }));
+                  }} />
+                </Badge>
+              ))}
+
               {filters.distance < 50 && (
                 <Badge variant="secondary" className="flex items-center gap-1.5 rounded-full px-3 py-1 font-medium">
                   Within {filters.distance}km

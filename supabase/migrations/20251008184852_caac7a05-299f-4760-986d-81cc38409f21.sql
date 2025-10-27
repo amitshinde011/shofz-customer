@@ -11,7 +11,7 @@ SELECT cron.schedule(
   $$
   SELECT
     net.http_post(
-        url:='https://ikxmehpfxjycevztjrvc.supabase.co/functions/v1/process-credit-deductions',
+        url:='https://bgcwvvosbpidxrabaotm.supabase.co/functions/v1/process-credit-deductions',
         headers:='{"Content-Type": "application/json", "Authorization": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlreG1laHBmeGp5Y2V2enRqcnZjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTkwNDQwMjMsImV4cCI6MjA3NDYyMDAyM30.avXl3qP_sXZ4-YJC3XhJhxFdBscPyXHzxDb5PJ-jmcc"}'::jsonb,
         body:='{"scheduled": true}'::jsonb
     ) as request_id;
