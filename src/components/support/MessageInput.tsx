@@ -1,4 +1,4 @@
-import { useState, useRef, KeyboardEvent } from 'react';
+import { useState, useRef, KeyboardEvent, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Paperclip, Send, X } from 'lucide-react';
@@ -7,12 +7,16 @@ import { supabase } from '@/integrations/supabase/client';
 
 interface MessageInputProps {
   onSend: (message: string, attachments?: string[]) => void;
+  onTypingStart?: () => void;
+  onTypingStop?: () => void;
   disabled?: boolean;
   placeholder?: string;
 }
 
 export const MessageInput = ({
   onSend,
+  onTypingStart,
+  onTypingStop,
   disabled = false,
   placeholder = 'Type your message...',
 }: MessageInputProps) => {
@@ -21,10 +25,49 @@ export const MessageInput = ({
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const typingTimeoutRef = useRef<NodeJS.Timeout>();
+
+  // Cleanup typing indicator on unmount
+  useEffect(() => {
+    return () => {
+      if (typingTimeoutRef.current) {
+        clearTimeout(typingTimeoutRef.current);
+      }
+      if (onTypingStop) {
+        onTypingStop();
+      }
+    };
+  }, [onTypingStop]);
+
+  const handleTyping = (value: string) => {
+    setMessage(value);
+    
+    // Trigger typing start
+    if (value.trim() && onTypingStart) {
+      onTypingStart();
+    }
+    
+    // Reset timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+    
+    // Stop typing after 2 seconds of no input
+    typingTimeoutRef.current = setTimeout(() => {
+      if (onTypingStop) {
+        onTypingStop();
+      }
+    }, 2000);
+  };
 
   const handleSend = async () => {
     if (!message.trim() && attachments.length === 0) return;
     if (disabled || isUploading) return;
+
+    // Stop typing indicator when sending
+    if (onTypingStop) {
+      onTypingStop();
+    }
 
     try {
       let attachmentUrls: string[] = [];
@@ -153,7 +196,7 @@ export const MessageInput = ({
         <Textarea
           ref={textareaRef}
           value={message}
-          onChange={(e) => setMessage(e.target.value)}
+          onChange={(e) => handleTyping(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           disabled={disabled || isUploading}

@@ -4,12 +4,14 @@ import { MessageCircle, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ChatInterface } from './ChatInterface';
 import { useCustomerTickets } from '@/hooks/useSupportTickets';
+import { useUnreadSupportMessages } from '@/hooks/useUnreadSupportMessages';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useLocation } from 'react-router-dom';
 
 export const ChatWidget = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { data: tickets } = useCustomerTickets();
+  const { unreadCount } = useUnreadSupportMessages();
   const location = useLocation();
 
   // Hide widget on support page
@@ -20,6 +22,9 @@ export const ChatWidget = () => {
   const activeTickets = tickets?.filter(
     (t) => t.status === 'open' || t.status === 'in_progress'
   ).length || 0;
+
+  // Show unread count or active tickets
+  const badgeCount = unreadCount > 0 ? unreadCount : activeTickets;
 
   return (
     <>
@@ -39,12 +44,12 @@ export const ChatWidget = () => {
           ) : (
             <>
               <MessageCircle className="h-6 w-6" />
-              {activeTickets > 0 && (
+              {badgeCount > 0 && (
                 <Badge
                   variant="destructive"
                   className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
                 >
-                  {activeTickets}
+                  {badgeCount > 9 ? '9+' : badgeCount}
                 </Badge>
               )}
             </>

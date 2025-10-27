@@ -1,16 +1,17 @@
 import { useState } from 'react';
 import { Card } from '@/components/ui/card';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, MessageCircle } from 'lucide-react';
-import { NewTicketForm } from './NewTicketForm';
-import { TicketsList } from './TicketsList';
 import { ChatMessages } from './ChatMessages';
 import { MessageInput } from './MessageInput';
+import { TicketsList } from './TicketsList';
+import { NewTicketForm } from './NewTicketForm';
+import { NotificationPermissionBanner } from './NotificationPermissionBanner';
 import { TicketStatusManager } from './TicketStatusManager';
 import { useCustomerTickets } from '@/hooks/useSupportTickets';
 import { useRealtimeSupportChat } from '@/hooks/useRealtimeSupportChat';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Plus, ArrowLeft, MessageCircle } from 'lucide-react';
 import type { Database } from '@/integrations/supabase/types';
 import { formatTicketNumber } from '@/lib/supportHelpers';
 import { cn } from '@/lib/utils';
@@ -29,9 +30,15 @@ export const ChatInterface = ({ fullPage = false, initialTicketId }: ChatInterfa
   const [selectedTicket, setSelectedTicket] = useState<SupportTicket | null>(null);
 
   const { data: tickets, isLoading: ticketsLoading } = useCustomerTickets();
-  const { messages, isLoading: messagesLoading, isSending, sendMessage } = useRealtimeSupportChat(
-    selectedTicket?.id || null
-  );
+  const { 
+    messages, 
+    isLoading: messagesLoading, 
+    isSending, 
+    sendMessage,
+    typingUsers,
+    startTyping,
+    stopTyping,
+  } = useRealtimeSupportChat(selectedTicket?.id || null);
 
   const handleNewTicketSuccess = (ticketId: string) => {
     // Find the newly created ticket
@@ -58,6 +65,9 @@ export const ChatInterface = ({ fullPage = false, initialTicketId }: ChatInterfa
 
   return (
     <Card className={cn('flex flex-col overflow-hidden', fullPage ? 'h-[calc(100vh-120px)]' : 'h-[600px]')}>
+      {/* Notification Permission Banner */}
+      <NotificationPermissionBanner />
+
       {/* Header */}
       <div className="border-b bg-card p-4">
         <div className="flex items-center justify-between">
@@ -119,10 +129,13 @@ export const ChatInterface = ({ fullPage = false, initialTicketId }: ChatInterfa
             <ChatMessages
               messages={messages}
               isLoading={messagesLoading}
+              isTyping={typingUsers.some(u => u.user_role === 'support')}
             />
             <TicketStatusManager ticket={selectedTicket} />
             <MessageInput
               onSend={handleSendMessage}
+              onTypingStart={startTyping}
+              onTypingStop={stopTyping}
               disabled={isSending}
               placeholder="Type your message..."
             />
