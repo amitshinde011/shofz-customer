@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useScrollDirection } from '@/hooks/useScrollDirection';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { InstallPWAButton } from '@/components/InstallPWAButton';
 
 export function HomeHeader() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -92,6 +93,9 @@ export function HomeHeader() {
             >
               <Heart className="w-5 h-5" />
             </Link>
+
+            {/* Install PWA Button */}
+            <InstallPWAButton />
 
             {/* Inquiries/Cart */}
             <Link
