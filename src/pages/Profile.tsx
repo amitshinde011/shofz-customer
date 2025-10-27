@@ -179,7 +179,7 @@ export default function Profile() {
           icon: HelpCircle,
           label: "Help & Support",
           description: "Get help or contact support",
-          action: () => toast({ title: "Coming soon", description: "Help center will be available soon" })
+          action: () => navigate("/support")
         },
         {
           icon: Shield,

@@ -12,6 +12,7 @@ import { initializeAnalytics } from "@/lib/analytics";
 import { LocationProvider } from "@/contexts/LocationContext";
 import { LocationPermissionGate } from "@/components/LocationPermissionGate";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { ChatWidget } from "@/components/support/ChatWidget";
 import Auth from "./pages/Auth";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -31,6 +32,7 @@ import InquiryDetail from "./pages/InquiryDetail";
 import Offers from "./pages/Offers";
 import OfferDetail from "./pages/OfferDetail";
 import ShopDashboard from "./pages/ShopDashboard";
+import CustomerSupport from "./pages/CustomerSupport";
 
 // Initialize Google Analytics
 initializeAnalytics();
@@ -111,12 +113,14 @@ function AppContent() {
         <Route path="/favorites" element={<ProtectedRoute><Favorites /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
         <Route path="/shop/dashboard" element={<ProtectedRoute><ShopDashboard /></ProtectedRoute>} />
+        <Route path="/support" element={<ProtectedRoute><CustomerSupport /></ProtectedRoute>} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
         {/* Catch-all */}
         <Route path="*" element={<NotFound />} />
       </Routes>
       <BottomNav />
+      <ChatWidget />
     </div>
   );
 }
