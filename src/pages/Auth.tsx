@@ -37,19 +37,20 @@ export default function Auth({ onAuthComplete }: AuthProps) {
       console.log('[Auth] Referral code detected in URL:', urlCode);
       setIsValidatingUrlReferral(true);
       
-      const validation = await referralService.validateReferralCode(urlCode);
+      const normalizedCode = urlCode.toUpperCase();
+      const validation = await referralService.validateReferralCode(normalizedCode);
       
       if (validation.valid) {
         console.log('[Auth] URL referral code is valid:', validation);
         
         setReferralData({
-          referralCode: urlCode.toUpperCase(),
+          referralCode: normalizedCode,
           shopName: validation.shopName,
           shopLogo: validation.shopLogo,
           shopRating: validation.shopRating,
         });
         
-        setUrlReferralCode(urlCode.toUpperCase());
+        setUrlReferralCode(normalizedCode);
         
         toast({
           title: "Referral code applied! 🎉",
@@ -66,28 +67,75 @@ export default function Auth({ onAuthComplete }: AuthProps) {
         });
       }
       
+      // Clean up URL parameters after validation
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('ref');
+      newSearchParams.delete('referral');
+      const newSearch = newSearchParams.toString();
+      navigate({
+        pathname: location.pathname,
+        search: newSearch,
+      }, { replace: true });
+      
       setIsValidatingUrlReferral(false);
     };
     
     extractAndValidateReferral();
-  }, [searchParams, toast]);
+  }, [searchParams, navigate, location.pathname]);
 
   const handleAuthComplete = async () => {
-    // Process referral if provided
+    // Wait for user data to be available (race condition fix)
+    if (!user?.id) {
+      console.log('[Auth] Waiting for user data to be available...');
+      
+      let attempts = 0;
+      while (!user?.id && attempts < 10) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        attempts++;
+      }
+      
+      if (!user?.id) {
+        console.error('[Auth] User data not available after signup');
+        toast({
+          title: "Session error",
+          description: "Please sign in again to complete setup",
+          variant: "destructive",
+        });
+        navigate('/auth', { replace: true });
+        return;
+      }
+    }
+
+    // Process referral if provided AND user hasn't already used one (CRITICAL FIX)
     if (referralData && user?.id) {
       console.log('[Auth] Processing referral after signup:', referralData);
-      const result = await referralService.processCustomerReferral(
-        user.id,
-        referralData.referralCode
-      );
-
-      if (result.success) {
-        toast({
-          title: "Thanks for using a referral code!",
-          description: `${referralData.shopName || 'The shop'} has been credited.`,
-        });
+      
+      // Check if user already used a referral
+      const hasUsed = await referralService.hasUsedReferral(user.id);
+      if (hasUsed) {
+        console.log('[Auth] User already used a referral code, skipping');
+        // Clear referral data
+        setReferralData(null);
+        setUrlReferralCode(null);
       } else {
-        console.error('[Auth] Failed to process referral:', result.error);
+        const result = await referralService.processCustomerReferral(
+          user.id,
+          referralData.referralCode
+        );
+
+        if (result.success) {
+          toast({
+            title: "Thanks for using a referral code!",
+            description: `${referralData.shopName || 'The shop'} has been credited.`,
+          });
+        } else {
+          console.error('[Auth] Failed to process referral:', result.error);
+          toast({
+            title: "Referral processing failed",
+            description: result.error || "Could not apply referral code",
+            variant: "destructive",
+          });
+        }
       }
     }
 
