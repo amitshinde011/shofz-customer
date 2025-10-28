@@ -64,7 +64,7 @@ export function InstallPWAButton() {
           className="hover:bg-white/10 px-2"
           title="Install App (Open in Safari)"
         >
-          <Compass className="w-5 h-5 text-blue-400" />
+          <Compass className="w-5 h-5 text-blue-400 animate-bounce" />
           <span className="hidden md:inline ml-2 text-sm">Install App</span>
         </Button>
 
@@ -179,7 +179,7 @@ export function InstallPWAButton() {
           className="hover:bg-white/10 px-2"
           title="Install App"
         >
-          <Download className="w-5 h-5" />
+          <Download className="w-5 h-5 animate-bounce" />
           <span className="hidden md:inline ml-2 text-sm">Install App</span>
         </Button>
 
@@ -242,7 +242,7 @@ export function InstallPWAButton() {
       className="hover:bg-white/10 px-2"
       title="Install App"
     >
-      <Download className="w-5 h-5" />
+      <Download className="w-5 h-5 animate-bounce" />
       <span className="hidden md:inline ml-2 text-sm">Install App</span>
     </Button>
   );
