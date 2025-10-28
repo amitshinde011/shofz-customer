@@ -58,13 +58,14 @@ export function InstallPWAButton() {
     return (
       <>
         <Button
-          variant="default"
+          variant="ghost"
           size="sm"
           onClick={handleIOSNonSafariClick}
           className="hover:bg-white/10 px-2"
           title="Install App (Open in Safari)"
         >
-          <Download className="w-5 h-5 animate-bounce" />
+          <Compass className="w-5 h-5 text-blue-400 animate-bounce" />
+          <span className="hidden md:inline ml-2 text-sm">Install App</span>
         </Button>
 
         <Dialog open={showIOSChromeInstructions} onOpenChange={setShowIOSChromeInstructions}>
@@ -80,7 +81,7 @@ export function InstallPWAButton() {
                 PWA installation is only supported in Safari on iOS. Follow these steps to install Shofz:
               </DialogDescription>
             </DialogHeader>
-
+            
             <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
               <Compass className="h-4 w-4 text-blue-600 dark:text-blue-400" />
               <AlertTitle>Why Safari?</AlertTitle>
@@ -96,9 +97,9 @@ export function InstallPWAButton() {
                 </div>
                 <div className="flex-1">
                   <p className="font-medium text-sm mb-2">Copy this page's URL</p>
-                  <Button
+                  <Button 
                     onClick={handleCopyURL}
-                    variant="outline"
+                    variant="outline" 
                     size="sm"
                     className="w-full"
                   >
@@ -146,14 +147,14 @@ export function InstallPWAButton() {
             </div>
 
             <div className="flex gap-2 mt-4">
-              <Button
+              <Button 
                 onClick={() => setShowIOSChromeInstructions(false)}
                 variant="outline"
                 className="flex-1"
               >
                 Got it
               </Button>
-              <Button
+              <Button 
                 onClick={handleCopyURL}
                 className="flex-1"
               >
@@ -172,13 +173,14 @@ export function InstallPWAButton() {
     return (
       <>
         <Button
-          variant="default"
+          variant="ghost"
           size="sm"
           onClick={handleIOSSafariClick}
           className="hover:bg-white/10 px-2"
-          title="Install App (Open in Safari)"
+          title="Install App"
         >
           <Download className="w-5 h-5 animate-bounce" />
+          <span className="hidden md:inline ml-2 text-sm">Install App</span>
         </Button>
 
         <Dialog open={showIOSInstructions} onOpenChange={setShowIOSInstructions}>
@@ -234,13 +236,14 @@ export function InstallPWAButton() {
   // Chrome/Edge on Android/Desktop: Show normal install button
   return (
     <Button
-      variant="default"
+      variant="ghost"
       size="sm"
       onClick={promptInstall}
       className="hover:bg-white/10 px-2"
-      title="Install App (Open in Safari)"
+      title="Install App"
     >
       <Download className="w-5 h-5 animate-bounce" />
+      <span className="hidden md:inline ml-2 text-sm">Install App</span>
     </Button>
   );
 }
