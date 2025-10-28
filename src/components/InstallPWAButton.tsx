@@ -58,14 +58,18 @@ export function InstallPWAButton() {
     return (
       <>
         <Button
-          variant="ghost"
+          variant="default"
           size="sm"
           onClick={handleIOSNonSafariClick}
-          className="hover:bg-white/10 px-2"
+          className="relative bg-primary hover:bg-primary/90 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 animate-pulse px-3"
           title="Install App (Open in Safari)"
         >
-          <Compass className="w-5 h-5 text-blue-400" />
-          <span className="hidden md:inline ml-2 text-sm">Install App</span>
+          <span className="absolute -top-1 -right-1 flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-destructive"></span>
+          </span>
+          <Compass className="w-5 h-5 animate-bounce" />
+          <span className="ml-2 text-sm font-semibold">Install</span>
         </Button>
 
         <Dialog open={showIOSChromeInstructions} onOpenChange={setShowIOSChromeInstructions}>
@@ -173,14 +177,18 @@ export function InstallPWAButton() {
     return (
       <>
         <Button
-          variant="ghost"
+          variant="default"
           size="sm"
           onClick={handleIOSSafariClick}
-          className="hover:bg-white/10 px-2"
+          className="relative bg-primary hover:bg-primary/90 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 animate-pulse px-3"
           title="Install App"
         >
-          <Download className="w-5 h-5" />
-          <span className="hidden md:inline ml-2 text-sm">Install App</span>
+          <span className="absolute -top-1 -right-1 flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-destructive"></span>
+          </span>
+          <Download className="w-5 h-5 animate-bounce" />
+          <span className="ml-2 text-sm font-semibold">Install</span>
         </Button>
 
         <Dialog open={showIOSInstructions} onOpenChange={setShowIOSInstructions}>
@@ -236,14 +244,18 @@ export function InstallPWAButton() {
   // Chrome/Edge on Android/Desktop: Show normal install button
   return (
     <Button
-      variant="ghost"
+      variant="default"
       size="sm"
       onClick={promptInstall}
-      className="hover:bg-white/10 px-2"
+      className="relative bg-primary hover:bg-primary/90 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300 animate-pulse px-3"
       title="Install App"
     >
-      <Download className="w-5 h-5" />
-      <span className="hidden md:inline ml-2 text-sm">Install App</span>
+      <span className="absolute -top-1 -right-1 flex h-3 w-3">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
+        <span className="relative inline-flex rounded-full h-3 w-3 bg-destructive"></span>
+      </span>
+      <Download className="w-5 h-5 animate-bounce" />
+      <span className="ml-2 text-sm font-semibold">Install</span>
     </Button>
   );
 }
