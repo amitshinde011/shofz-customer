@@ -215,7 +215,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email,
         password,
         options: {
-          data: { name },
+          data: { 
+            name,
+            app_type: 'customer' // Identify this is Customer App
+          },
           emailRedirectTo: `${window.location.origin}/`
         }
       });

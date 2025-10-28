@@ -1,11 +1,12 @@
-import { useState } from "react";
-import { useLocation, useNavigate } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { UnifiedAuth } from "@/components/auth/UnifiedAuth";
 import { ReferralCodeEntry } from "@/components/auth/ReferralCodeEntry";
 import { ProfileSetup } from "@/components/auth/ProfileSetup";
 import { useToast } from "@/hooks/use-toast";
 import { referralService } from "@/services/referralService";
 import { useAuth } from "@/contexts/AuthContext";
+import { Gift } from "lucide-react";
 
 export type AuthStep = "auth" | "referral" | "profile-setup";
 
@@ -18,27 +19,123 @@ export default function Auth({ onAuthComplete }: AuthProps) {
   const [referralData, setReferralData] = useState<any>(null);
   const [isNewUser, setIsNewUser] = useState(false);
   const [isCheckingReferral, setIsCheckingReferral] = useState(false);
+  const [urlReferralCode, setUrlReferralCode] = useState<string | null>(null);
+  const [isValidatingUrlReferral, setIsValidatingUrlReferral] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { user, authenticateWithEmail } = useAuth();
+  const [searchParams] = useSearchParams();
 
-  const handleAuthComplete = async () => {
-    // Process referral if provided
-    if (referralData && user?.id) {
-      console.log('[Auth] Processing referral after signup:', referralData);
-      const result = await referralService.processCustomerReferral(
-        user.id,
-        referralData.referralCode
-      );
-
-      if (result.success) {
+  // Extract and validate referral code from URL on mount
+  useEffect(() => {
+    const extractAndValidateReferral = async () => {
+      const urlCode = searchParams.get('ref') || searchParams.get('referral');
+      
+      if (!urlCode) return;
+      
+      console.log('[Auth] Referral code detected in URL:', urlCode);
+      setIsValidatingUrlReferral(true);
+      
+      const normalizedCode = urlCode.toUpperCase();
+      const validation = await referralService.validateReferralCode(normalizedCode);
+      
+      if (validation.valid) {
+        console.log('[Auth] URL referral code is valid:', validation);
+        
+        setReferralData({
+          referralCode: normalizedCode,
+          shopName: validation.shopName,
+          shopLogo: validation.shopLogo,
+          shopRating: validation.shopRating,
+        });
+        
+        setUrlReferralCode(normalizedCode);
+        
         toast({
-          title: "Thanks for using a referral code!",
-          description: `${referralData.shopName || 'The shop'} has been credited.`,
+          title: "Referral code applied! 🎉",
+          description: `You'll support ${validation.shopName || 'this shop'} when you sign up.`,
+          duration: 5000,
         });
       } else {
-        console.error('[Auth] Failed to process referral:', result.error);
+        console.log('[Auth] Invalid referral code in URL:', urlCode);
+        
+        toast({
+          title: "Invalid referral code",
+          description: "The referral code in the URL is not valid.",
+          variant: "destructive",
+        });
+      }
+      
+      // Clean up URL parameters after validation
+      const newSearchParams = new URLSearchParams(searchParams);
+      newSearchParams.delete('ref');
+      newSearchParams.delete('referral');
+      const newSearch = newSearchParams.toString();
+      navigate({
+        pathname: location.pathname,
+        search: newSearch,
+      }, { replace: true });
+      
+      setIsValidatingUrlReferral(false);
+    };
+    
+    extractAndValidateReferral();
+  }, [searchParams, navigate, location.pathname]);
+
+  const handleAuthComplete = async () => {
+    // Wait for user data to be available (race condition fix)
+    if (!user?.id) {
+      console.log('[Auth] Waiting for user data to be available...');
+      
+      let attempts = 0;
+      while (!user?.id && attempts < 10) {
+        await new Promise(resolve => setTimeout(resolve, 200));
+        attempts++;
+      }
+      
+      if (!user?.id) {
+        console.error('[Auth] User data not available after signup');
+        toast({
+          title: "Session error",
+          description: "Please sign in again to complete setup",
+          variant: "destructive",
+        });
+        navigate('/auth', { replace: true });
+        return;
+      }
+    }
+
+    // Process referral if provided AND user hasn't already used one (CRITICAL FIX)
+    if (referralData && user?.id) {
+      console.log('[Auth] Processing referral after signup:', referralData);
+      
+      // Check if user already used a referral
+      const hasUsed = await referralService.hasUsedReferral(user.id);
+      if (hasUsed) {
+        console.log('[Auth] User already used a referral code, skipping');
+        // Clear referral data
+        setReferralData(null);
+        setUrlReferralCode(null);
+      } else {
+        const result = await referralService.processCustomerReferral(
+          user.id,
+          referralData.referralCode
+        );
+
+        if (result.success) {
+          toast({
+            title: "Thanks for using a referral code!",
+            description: `${referralData.shopName || 'The shop'} has been credited.`,
+          });
+        } else {
+          console.error('[Auth] Failed to process referral:', result.error);
+          toast({
+            title: "Referral processing failed",
+            description: result.error || "Could not apply referral code",
+            variant: "destructive",
+          });
+        }
       }
     }
 
@@ -78,8 +175,15 @@ export default function Auth({ onAuthComplete }: AuthProps) {
     }
     
     setIsCheckingReferral(false);
-    // New user without referral: show referral code entry
-    setCurrentStep("referral");
+    
+    // If referral from URL exists, skip manual entry and complete
+    if (referralData && urlReferralCode) {
+      console.log('[Auth] Using referral from URL, skipping manual entry');
+      handleAuthComplete();
+    } else {
+      // No URL referral: show manual referral code entry
+      setCurrentStep("referral");
+    }
   };
 
   const handleSkip = () => {
@@ -97,11 +201,31 @@ export default function Auth({ onAuthComplete }: AuthProps) {
   switch (currentStep) {
     case "auth":
       return (
-        <UnifiedAuth
-          onBack={handleSkip}
-          onAuthSuccess={handleAuthSuccess}
-          onAuthenticate={authenticateWithEmail}
-        />
+        <div className="relative">
+          {referralData && urlReferralCode && (
+            <div className="absolute top-0 left-0 right-0 z-10 mx-4 mt-4">
+              <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-3 shadow-sm">
+                <div className="flex items-center gap-2">
+                  <Gift className="w-4 h-4 text-green-600 dark:text-green-400" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-green-900 dark:text-green-100">
+                      Referral Active: {referralData.shopName}
+                    </p>
+                    <p className="text-xs text-green-700 dark:text-green-300">
+                      Complete signup to support this shop
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+          
+          <UnifiedAuth
+            onBack={handleSkip}
+            onAuthSuccess={handleAuthSuccess}
+            onAuthenticate={authenticateWithEmail}
+          />
+        </div>
       );
 
     case "profile-setup":
