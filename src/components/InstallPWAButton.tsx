@@ -61,23 +61,10 @@ export function InstallPWAButton() {
           variant="default"
           size="sm"
           onClick={handleIOSNonSafariClick}
-          className="
-          bg-blue-600 hover:bg-blue-700
-          text-white
-          px-3
-          shadow-md hover:shadow-lg
-          transition-all duration-200
-          border border-blue-400
-          relative
-          overflow-hidden
-          before:absolute before:inset-0 
-          before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent
-          before:animate-[shimmer_2s_ease-in-out_infinite]
-        "
+          className="hover:bg-white/10 px-2"
           title="Install App (Open in Safari)"
         >
-          <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full"></span>
-          <Download className="w-5 h-5" />
+          <Download className="w-5 h-5 animate-bounce" />
         </Button>
 
         <Dialog open={showIOSChromeInstructions} onOpenChange={setShowIOSChromeInstructions}>
@@ -188,23 +175,10 @@ export function InstallPWAButton() {
           variant="default"
           size="sm"
           onClick={handleIOSSafariClick}
-          className="
-          bg-blue-600 hover:bg-blue-700
-          text-white
-          px-3
-          shadow-md hover:shadow-lg
-          transition-all duration-200
-          border border-blue-400
-          relative
-          overflow-hidden
-          before:absolute before:inset-0 
-          before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent
-          before:animate-[shimmer_2s_ease-in-out_infinite]
-        "
-          title="Install App"
+          className="hover:bg-white/10 px-2"
+          title="Install App (Open in Safari)"
         >
-          <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full"></span>
-          <Download className="w-5 h-5" />
+          <Download className="w-5 h-5 animate-bounce" />
         </Button>
 
         <Dialog open={showIOSInstructions} onOpenChange={setShowIOSInstructions}>
@@ -263,23 +237,10 @@ export function InstallPWAButton() {
       variant="default"
       size="sm"
       onClick={promptInstall}
-      className="
-      bg-blue-600 hover:bg-blue-700
-      text-white
-      px-3
-      shadow-md hover:shadow-lg
-      transition-all duration-200
-      border border-blue-400
-      relative
-      overflow-hidden
-      before:absolute before:inset-0 
-      before:bg-gradient-to-r before:from-transparent before:via-white/20 before:to-transparent
-      before:animate-[shimmer_2s_ease-in-out_infinite]
-    "
-      title="Install App"
+      className="hover:bg-white/10 px-2"
+      title="Install App (Open in Safari)"
     >
-      <span className="absolute -top-1 -right-1 h-2 w-2 bg-red-500 rounded-full"></span>
-      <Download className="w-5 h-5" />
+      <Download className="w-5 h-5 animate-bounce" />
     </Button>
   );
 }
