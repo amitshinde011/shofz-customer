@@ -15,10 +15,15 @@ export const FeaturedOfferCard = ({ offer }: FeaturedOfferCardProps) => {
   const navigate = useNavigate();
   
   const getDiscountText = () => {
-    if (offer.discount_type === 'percentage') {
-      return `${offer.discount_value}% OFF`;
+    if (offer.offer_type === "promotion") {
+      return "PROMO";
     }
-    return `₹${offer.discount_value} OFF`;
+    if (offer.discount_type === "percentage") {
+      return `${offer.discount_value}% OFF`;
+    } else if (offer.discount_type === "fixed") {
+      return `₹${offer.discount_value} OFF`;
+    }
+    return `${offer.discount_value} OFF`;
   };
 
   const getOfferTypeLabel = () => {
