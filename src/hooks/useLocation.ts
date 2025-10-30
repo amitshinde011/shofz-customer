@@ -178,45 +178,27 @@ export function useLocation() {
       try {
         const parsed = JSON.parse(cachedLocation);
         const age = Date.now() - parsed.timestamp;
-        console.log('[useLocation] Found cached location, age:', age, 'ms (', Math.round(age / 60000), 'minutes )');
-        // Use cached location if less than 5 minutes old
-        if (age < 5 * 60 * 1000) {
-          console.log('[useLocation] Using cached location (valid for', Math.round((5 * 60 * 1000 - age) / 60000), 'more minutes)');
+        console.log('[useLocation] Found cached location, age:', age, 'ms');
+        // Use cached location if less than 30 minutes old
+        if (age < 30 * 60 * 1000) {
+          console.log('[useLocation] Using cached location');
           setLocation(parsed);
           setLoading(false);
           return;
         } else {
-          console.log('[useLocation] Cached location expired (older than 5 minutes), requesting fresh');
+          console.log('[useLocation] Cached location too old, requesting fresh');
         }
       } catch (e) {
         console.error('[useLocation] Error parsing cached location:', e);
       }
     } else {
-      console.log('[useLocation] No cached location found, requesting fresh');
+      console.log('[useLocation] No cached location found');
     }
 
-    // Request fresh location
+    // Request fresh location in background (non-blocking)
     requestLocation();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Auto-refresh location every 5 minutes
-  useEffect(() => {
-    if (!location) return; // Only set up interval if we have an initial location
-
-    console.log('[useLocation] Setting up 5-minute auto-refresh');
-    
-    const refreshInterval = setInterval(() => {
-      console.log('[useLocation] Auto-refreshing location (5 minutes elapsed)');
-      requestLocation();
-    }, 5 * 60 * 1000); // 5 minutes
-
-    return () => {
-      console.log('[useLocation] Cleaning up auto-refresh interval');
-      clearInterval(refreshInterval);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location]);
 
   // Watch for location changes - only update if significantly different
   useEffect(() => {
