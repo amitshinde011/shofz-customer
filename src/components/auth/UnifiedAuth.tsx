@@ -8,10 +8,11 @@ import { useToast } from "@/hooks/use-toast";
 
 interface UnifiedAuthProps {
   onBack: () => void;
-  onAuthSuccess: (isNewUser: boolean) => void;
+  onAuthSuccess: (isNewUser: boolean, user?: any) => void;
   onAuthenticate: (email: string, password: string, name?: string) => Promise<{ 
     success: boolean; 
     isNewUser?: boolean;
+    user?: any;
     error?: string;
   }>;
 }
@@ -70,7 +71,7 @@ export function UnifiedAuth({ onBack, onAuthSuccess, onAuthenticate }: UnifiedAu
         title: result.isNewUser ? "Welcome!" : "Welcome back!",
         description: result.isNewUser ? "Your account has been created" : "You've successfully signed in",
       });
-      onAuthSuccess(result.isNewUser || false);
+      onAuthSuccess(result.isNewUser || false, result.user);
     } else {
       toast({
         title: "Authentication failed",
@@ -239,7 +240,7 @@ export function UnifiedAuth({ onBack, onAuthSuccess, onAuthenticate }: UnifiedAu
             <Button
               onClick={handleContinue}
               disabled={loading}
-              className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary-dark text-primary-foreground rounded-xl"
+              className="w-full h-12 text-base font-semibold bg-primary hover:bg-primary/80 text-primary-foreground rounded-xl"
             >
               {loading ? (
                 <>
