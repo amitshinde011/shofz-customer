@@ -56,7 +56,7 @@ export const FeaturedOfferCard = ({ offer }: FeaturedOfferCardProps) => {
 
   return (
     <NavLink to={`/offers/${offer.id}`} className="block">
-      <Card className="overflow-hidden hover:shadow-xl transition-all duration-300 border-2 border-amber-200 bg-gradient-to-br from-red-50/50 to-orange-50/50 h-full group relative">
+      <Card className="overflow-hidden hover:shadow-xl transition-all duration-300  bg-gradient-to-br from-red-50/50 to-orange-50/50 h-full group relative">
         {/* Featured Badge - Top Left */}
         <div className="absolute top-2 left-2 z-10">
           <FeaturedBadge size="sm" />
