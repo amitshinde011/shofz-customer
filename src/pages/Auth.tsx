@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import { UnifiedAuth } from "@/components/auth/UnifiedAuth";
 import { ReferralCodeEntry } from "@/components/auth/ReferralCodeEntry";
@@ -26,6 +26,13 @@ export default function Auth({ onAuthComplete }: AuthProps) {
   const { toast } = useToast();
   const { user, authenticateWithEmail } = useAuth();
   const [searchParams] = useSearchParams();
+  const userRef = useRef(user);
+  const authUserIdRef = useRef<string | null>(user?.id ?? null);
+
+  useEffect(() => {
+    userRef.current = user;
+    authUserIdRef.current = user?.id ?? null;
+  }, [user]);
 
   // Extract and validate referral code from URL on mount
   useEffect(() => {
@@ -85,16 +92,18 @@ export default function Auth({ onAuthComplete }: AuthProps) {
 
   const handleAuthComplete = async () => {
     // Wait for user data to be available (race condition fix)
-    if (!user?.id) {
+    let resolvedUserId = userRef.current?.id ?? authUserIdRef.current;
+    if (!resolvedUserId) {
       console.log('[Auth] Waiting for user data to be available...');
       
       let attempts = 0;
-      while (!user?.id && attempts < 10) {
+      while (!resolvedUserId && attempts < 10) {
         await new Promise(resolve => setTimeout(resolve, 200));
         attempts++;
+        resolvedUserId = userRef.current?.id ?? authUserIdRef.current;
       }
       
-      if (!user?.id) {
+      if (!resolvedUserId) {
         console.error('[Auth] User data not available after signup');
         toast({
           title: "Session error",
@@ -106,12 +115,14 @@ export default function Auth({ onAuthComplete }: AuthProps) {
       }
     }
 
+    const currentUserId = resolvedUserId;
+
     // Process referral if provided AND user hasn't already used one (CRITICAL FIX)
-    if (referralData && user?.id) {
+    if (referralData && currentUserId) {
       console.log('[Auth] Processing referral after signup:', referralData);
       
       // Check if user already used a referral
-      const hasUsed = await referralService.hasUsedReferral(user.id);
+      const hasUsed = await referralService.hasUsedReferral(currentUserId);
       if (hasUsed) {
         console.log('[Auth] User already used a referral code, skipping');
         // Clear referral data
@@ -119,7 +130,7 @@ export default function Auth({ onAuthComplete }: AuthProps) {
         setUrlReferralCode(null);
       } else {
         const result = await referralService.processCustomerReferral(
-          user.id,
+          currentUserId,
           referralData.referralCode
         );
 
@@ -148,7 +159,11 @@ export default function Auth({ onAuthComplete }: AuthProps) {
     }
   };
 
-  const handleAuthSuccess = (newUser: boolean) => {
+  const handleAuthSuccess = (newUser: boolean, authUser?: { id?: string }) => {
+    if (authUser?.id) {
+      authUserIdRef.current = authUser.id;
+    }
+
     setIsNewUser(newUser);
     if (newUser) {
       // New user: show profile setup
@@ -163,8 +178,9 @@ export default function Auth({ onAuthComplete }: AuthProps) {
     setIsCheckingReferral(true);
     
     // Check if user already used a referral code
-    if (user?.id) {
-      const hasUsedReferral = await referralService.hasUsedReferral(user.id);
+    const resolvedUserId = userRef.current?.id ?? authUserIdRef.current;
+    if (resolvedUserId) {
+      const hasUsedReferral = await referralService.hasUsedReferral(resolvedUserId);
       if (hasUsedReferral) {
         // Skip referral step, go straight to completion
         console.log('[Auth] User already used referral, skipping referral step');
