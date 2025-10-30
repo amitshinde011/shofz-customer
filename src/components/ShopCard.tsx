@@ -226,7 +226,7 @@ export default function ShopCard({ shop, variant = "grid", onToggleFavorite, isF
                 <Button
                   variant="ghost"
                   size="icon"
-                  className={`absolute top-3 left-3 w-10 h-10 rounded-full backdrop-blur-md transition-all duration-300 ${isFavorite
+                  className={`absolute top-3 right-2 w-5 h-5 rounded-full backdrop-blur-md transition-all duration-300 ${isFavorite
                     ? 'bg-white/30 text-black hover:bg-white/40 shadow-lg'
                     : 'bg-white/20 text-black hover:bg-white/30'
                     }`}
@@ -239,7 +239,7 @@ export default function ShopCard({ shop, variant = "grid", onToggleFavorite, isF
               {/* Status Badge - Repositioned to avoid overlap with Featured badge */}
               <Badge
                 variant={shop.isOpen ? "default" : "secondary"}
-                className={`absolute ${isCompact ? 'top-2 right-2 text-xs px-2 py-0.5' : 'top-3 right-3 text-sm px-3 py-1.5'} font-bold rounded-full shadow-lg ${shop.isOpen
+                className={`absolute ${isCompact ? 'top-2 left-4 text-xs px-2 py-0.5' : 'top-2 left-4 text-sm px-1 py-0.5'} font-bold rounded-full shadow-lg ${shop.isOpen
                   ? "bg-success text-black hover:bg-success"
                   : "bg-muted text-black"
                   }`}
