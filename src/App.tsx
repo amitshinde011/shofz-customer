@@ -32,6 +32,7 @@ import Offers from "./pages/Offers";
 import OfferDetail from "./pages/OfferDetail";
 import ShopDashboard from "./pages/ShopDashboard";
 import CustomerSupport from "./pages/CustomerSupport";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 // Initialize Google Analytics
 initializeAnalytics();
@@ -79,6 +80,7 @@ function AppContent() {
   // Track page views automatically
   usePageTracking();
   const { loading } = useAuth();
+  const isMobile = useIsMobile();
 
   if (loading) {
     return (
@@ -89,7 +91,14 @@ function AppContent() {
   }
 
   return (
-    <div className="font-inter min-h-screen">
+    <div
+      className="font-inter min-h-screen pb-20 md:pb-0"
+      style={
+        isMobile
+          ? { paddingBottom: "calc(4rem + env(safe-area-inset-bottom))" }
+          : undefined
+      }
+    >
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<Home />} />
