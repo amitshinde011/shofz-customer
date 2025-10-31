@@ -48,6 +48,9 @@ export function ProfileSetup({ onComplete, userData }: ProfileSetupProps) {
               Welcome, {user?.name || 'there'}!
             </h2>
             <p className="text-lg text-muted-foreground">
+              Please check your email to verify your account
+            </p>
+            <p className="text-sm text-muted-foreground">
               Your account has been created successfully
             </p>
             <p className="text-sm text-muted-foreground">

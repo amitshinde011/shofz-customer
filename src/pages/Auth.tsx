@@ -21,6 +21,8 @@ export default function Auth({ onAuthComplete }: AuthProps) {
   const [isCheckingReferral, setIsCheckingReferral] = useState(false);
   const [urlReferralCode, setUrlReferralCode] = useState<string | null>(null);
   const [isValidatingUrlReferral, setIsValidatingUrlReferral] = useState(false);
+  const [pendingEmailConfirmation, setPendingEmailConfirmation] = useState(false);
+  const [pendingEmail, setPendingEmail] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -91,20 +93,24 @@ export default function Auth({ onAuthComplete }: AuthProps) {
   }, [searchParams, navigate, location.pathname]);
 
   const handleAuthComplete = async () => {
-    // Wait for user data to be available (race condition fix)
+    // Wait for user data if needed
     let resolvedUserId = userRef.current?.id ?? authUserIdRef.current;
+    
     if (!resolvedUserId) {
       console.log('[Auth] Waiting for user data to be available...');
       
-      let attempts = 0;
-      while (!resolvedUserId && attempts < 10) {
-        await new Promise(resolve => setTimeout(resolve, 200));
-        attempts++;
+      for (let attempt = 0; attempt < 15; attempt++) {
+        await new Promise(resolve => setTimeout(resolve, 300));
         resolvedUserId = userRef.current?.id ?? authUserIdRef.current;
+        
+        if (resolvedUserId) {
+          console.log(`[Auth] User data available after ${attempt * 300}ms`);
+          break;
+        }
       }
       
       if (!resolvedUserId) {
-        console.error('[Auth] User data not available after signup');
+        console.error('[Auth] User data not available after 4.5 seconds');
         toast({
           title: "Session error",
           description: "Please sign in again to complete setup",
@@ -115,56 +121,41 @@ export default function Auth({ onAuthComplete }: AuthProps) {
       }
     }
 
-    const currentUserId = resolvedUserId;
-
-    // Process referral if provided AND user hasn't already used one (CRITICAL FIX)
-    if (referralData && currentUserId) {
-      console.log('[Auth] Processing referral after signup:', referralData);
-      
-      // Check if user already used a referral
-      const hasUsed = await referralService.hasUsedReferral(currentUserId);
-      if (hasUsed) {
-        console.log('[Auth] User already used a referral code, skipping');
-        // Clear referral data
-        setReferralData(null);
-        setUrlReferralCode(null);
-      } else {
-        const result = await referralService.processCustomerReferral(
-          currentUserId,
-          referralData.referralCode
-        );
-
-        if (result.success) {
-          toast({
-            title: "Thanks for using a referral code!",
-            description: `${referralData.shopName || 'The shop'} has been credited.`,
-          });
-        } else {
-          console.error('[Auth] Failed to process referral:', result.error);
-          toast({
-            title: "Referral processing failed",
-            description: result.error || "Could not apply referral code",
-            variant: "destructive",
-          });
-        }
-      }
-    }
-
+    // Referral is already processed in background by handleAuthSuccess
+    // Complete onboarding
     if (onAuthComplete) {
       onAuthComplete();
     } else {
-      // Redirect to the page they were trying to access, or home
       const from = (location.state as any)?.from || '/';
       navigate(from, { replace: true });
     }
   };
 
-  const handleAuthSuccess = (newUser: boolean, authUser?: { id?: string }) => {
+  const handleAuthSuccess = (newUser: boolean, authUser?: { id?: string; email?: string }, requiresEmailConfirmation?: boolean) => {
+    // Handle email confirmation requirement
+    if (requiresEmailConfirmation && authUser?.email) {
+      setPendingEmailConfirmation(true);
+      setPendingEmail(authUser.email);
+      // DON'T change screen - stay on auth step with inline banner
+      return;
+    }
+
+    // Clear email confirmation state after successful sign-in
+    setPendingEmailConfirmation(false);
+    setPendingEmail(null);
+
     if (authUser?.id) {
       authUserIdRef.current = authUser.id;
     }
 
     setIsNewUser(newUser);
+    
+    // Process referral in background for BOTH new users and returning users
+    if (referralData && authUser?.id) {
+      console.log('[Auth] Processing referral in background:', referralData);
+      processReferralInBackground(authUser.id, referralData);
+    }
+    
     if (newUser) {
       // New user: show profile setup
       setCurrentStep("profile-setup");
@@ -174,32 +165,56 @@ export default function Auth({ onAuthComplete }: AuthProps) {
     }
   };
 
-  const handleProfileSetupComplete = async () => {
-    setIsCheckingReferral(true);
-    
-    // Check if user already used a referral code
-    const resolvedUserId = userRef.current?.id ?? authUserIdRef.current;
-    if (resolvedUserId) {
-      const hasUsedReferral = await referralService.hasUsedReferral(resolvedUserId);
-      if (hasUsedReferral) {
-        // Skip referral step, go straight to completion
-        console.log('[Auth] User already used referral, skipping referral step');
-        setIsCheckingReferral(false);
-        handleAuthComplete();
+  const processReferralInBackground = async (userId: string, refData: any) => {
+    try {
+      // Check if user already used a referral
+      const hasUsed = await referralService.hasUsedReferral(userId);
+      if (hasUsed) {
+        console.log('[Auth] User already used a referral, skipping');
         return;
       }
+
+      // Process referral with timeout
+      const referralPromise = referralService.processCustomerReferral(
+        userId,
+        refData.referralCode
+      );
+      
+      const timeoutPromise = new Promise((_, reject) => 
+        setTimeout(() => reject(new Error('Referral processing timeout')), 10000)
+      );
+      
+      const result = await Promise.race([referralPromise, timeoutPromise]) as any;
+
+      if (result.success) {
+        toast({
+          title: "Referral applied! 🎉",
+          description: `${refData.shopName || 'The shop'} has been credited.`,
+          duration: 5000,
+        });
+      } else {
+        console.error('[Auth] Referral processing failed:', result.error);
+        toast({
+          title: "Referral not applied",
+          description: "The referral code could not be applied",
+          variant: "destructive",
+          duration: 4000,
+        });
+      }
+    } catch (error) {
+      console.error('[Auth] Referral processing exception:', error);
+      toast({
+        title: "Referral not applied",
+        description: "There was an issue processing the referral",
+        variant: "destructive",
+        duration: 4000,
+      });
     }
-    
-    setIsCheckingReferral(false);
-    
-    // If referral from URL exists, skip manual entry and complete
-    if (referralData && urlReferralCode) {
-      console.log('[Auth] Using referral from URL, skipping manual entry');
-      handleAuthComplete();
-    } else {
-      // No URL referral: show manual referral code entry
-      setCurrentStep("referral");
-    }
+  };
+
+  const handleProfileSetupComplete = async () => {
+    // Referral is already processed in background during handleAuthSuccess
+    handleAuthComplete();
   };
 
   const handleSkip = () => {
@@ -215,34 +230,25 @@ export default function Auth({ onAuthComplete }: AuthProps) {
   };
 
   switch (currentStep) {
-    case "auth":
-      return (
-        <div className="relative">
-          {referralData && urlReferralCode && (
-            <div className="absolute top-0 left-0 right-0 z-10 mx-4 mt-4">
-              <div className="bg-green-50 dark:bg-green-950 border border-green-200 dark:border-green-800 rounded-lg p-3 shadow-sm">
-                <div className="flex items-center gap-2">
-                  <Gift className="w-4 h-4 text-green-600 dark:text-green-400" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-green-900 dark:text-green-100">
-                      Referral Active: {referralData.shopName}
-                    </p>
-                    <p className="text-xs text-green-700 dark:text-green-300">
-                      Complete signup to support this shop
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-          
+      case "auth":
+        return (
           <UnifiedAuth
             onBack={handleSkip}
             onAuthSuccess={handleAuthSuccess}
             onAuthenticate={authenticateWithEmail}
+            emailConfirmationPending={pendingEmailConfirmation}
+            pendingEmail={pendingEmail}
+            referralBanner={
+              urlReferralCode && referralData ? (
+                <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 mb-4">
+                  <p className="text-sm text-foreground">
+                    🎁 Referred by <strong>{referralData.shopName || 'a shop'}</strong>
+                  </p>
+                </div>
+              ) : null
+            }
           />
-        </div>
-      );
+        );
 
     case "profile-setup":
       return (
