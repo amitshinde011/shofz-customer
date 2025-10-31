@@ -125,6 +125,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return null;
       }
 
+      // ✅ FIX 4: Check email verification
+      if (!data.email_verified) {
+        console.warn('[AuthContext] User email not verified');
+        await supabase.auth.signOut();
+        toastRef.current({
+          title: "Email verification required",
+          description: "Please verify your email before signing in",
+          variant: "destructive",
+        });
+        return null;
+      }
+
       // Check if user has customer role
       const { data: roleData } = await supabase
         .from('user_roles')
@@ -223,6 +235,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       });
 
+      // ✅ FIX 1: Check if email confirmation is required
+      if (!error && data.user && !data.user.email_confirmed_at) {
+        console.log('[AuthContext] Email confirmation required');
+        return { 
+          success: true, 
+          requiresEmailConfirmation: true,
+          user: data.user 
+        };
+      }
+
       // Handle "user already registered" in shared database
       if (error?.message?.includes('already registered')) {
         // Verify credentials by signing in
@@ -246,12 +268,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .eq('is_active', true)
           .maybeSingle();
 
+        // ✅ FIX 2: User already has customer role - sign them in
         if (roleData) {
-          // User already has customer role
-          await supabase.auth.signOut();
+          console.log('[AuthContext] User already has customer role, signing in');
           return { 
-            success: false, 
-            error: 'You already have a customer account. Please sign in instead.' 
+            success: true, 
+            isNewUser: false,
+            user: signInData.user 
           };
         }
 
@@ -274,17 +297,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         // Add customer role to shared user_roles table
-        await supabase.from('user_roles').insert({
+        const { error: roleInsertError } = await supabase.from('user_roles').insert({
           user_id: userId,
           role: 'customer'
         });
 
+        if (roleInsertError) {
+          console.error('[AuthContext] Failed to add customer role:', roleInsertError);
+          await supabase.auth.signOut();
+          return { success: false, error: 'Failed to set up account. Please try again.' };
+        }
+
         // Create customer profile
-        await supabase.from('customer_profiles').insert({
+        const { error: profileInsertError } = await supabase.from('customer_profiles').insert({
           user_id: userId
         });
 
-        return { success: true, user: signInData.user };
+        if (profileInsertError) {
+          console.error('[AuthContext] Failed to create customer profile:', profileInsertError);
+          // Don't fail signup for this, profile can be created later
+        }
+
+        // ✅ FIX 3: Verify role was added successfully
+        const { data: verifyRole } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', userId)
+          .eq('role', 'customer')
+          .eq('is_active', true)
+          .single();
+
+        if (!verifyRole) {
+          console.error('[AuthContext] Role verification failed');
+          await supabase.auth.signOut();
+          return { success: false, error: 'Failed to verify account setup. Please try again.' };
+        }
+
+        return { success: true, isNewUser: true, user: signInData.user };
       }
 
       if (error) {
@@ -309,6 +358,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (error) {
         console.error('[AuthContext] Sign in error:', error);
         return { success: false, error: error.message };
+      }
+
+      // ✅ FIX 6: Check email verification
+      if (!data.user.email_confirmed_at) {
+        await supabase.auth.signOut();
+        return { 
+          success: false, 
+          error: 'Please verify your email before signing in. Check your inbox for the confirmation link.' 
+        };
       }
 
       // Verify user has customer role

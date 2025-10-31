@@ -25,6 +25,8 @@ export function ReferralCodeEntry({ onCodeValidated, onSkip }: ReferralCodeEntry
   const [code, setCode] = useState("");
   const [isValidating, setIsValidating] = useState(false);
   const [validationResult, setValidationResult] = useState<ValidationResult | null>(null);
+  const [validationAttempts, setValidationAttempts] = useState(0);
+  const MAX_ATTEMPTS = 10;
 
   const validateCode = async (inputCode: string) => {
     if (!inputCode || inputCode.length < 6) {
@@ -32,6 +34,20 @@ export function ReferralCodeEntry({ onCodeValidated, onSkip }: ReferralCodeEntry
       return;
     }
 
+    // ✅ FIX 7: Rate limiting
+    if (validationAttempts >= MAX_ATTEMPTS) {
+      setValidationResult({ isValid: false });
+      return;
+    }
+
+    // ✅ FIX 7: Format validation
+    const codeRegex = /^[A-Z0-9]{6,20}$/;
+    if (!codeRegex.test(inputCode.toUpperCase())) {
+      setValidationResult({ isValid: false });
+      return;
+    }
+
+    setValidationAttempts(prev => prev + 1);
     setIsValidating(true);
 
     try {

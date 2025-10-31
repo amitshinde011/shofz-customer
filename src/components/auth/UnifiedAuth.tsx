@@ -8,16 +8,18 @@ import { useToast } from "@/hooks/use-toast";
 
 interface UnifiedAuthProps {
   onBack: () => void;
-  onAuthSuccess: (isNewUser: boolean, user?: any) => void;
+  onAuthSuccess: (isNewUser: boolean, user?: any, requiresEmailConfirmation?: boolean) => void;
   onAuthenticate: (email: string, password: string, name?: string) => Promise<{ 
     success: boolean; 
     isNewUser?: boolean;
     user?: any;
     error?: string;
+    requiresEmailConfirmation?: boolean;
   }>;
+  referralBanner?: React.ReactNode;
 }
 
-export function UnifiedAuth({ onBack, onAuthSuccess, onAuthenticate }: UnifiedAuthProps) {
+export function UnifiedAuth({ onBack, onAuthSuccess, onAuthenticate, referralBanner }: UnifiedAuthProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -68,10 +70,14 @@ export function UnifiedAuth({ onBack, onAuthSuccess, onAuthenticate }: UnifiedAu
 
     if (result.success) {
       toast({
-        title: result.isNewUser ? "Welcome!" : "Welcome back!",
-        description: result.isNewUser ? "Your account has been created" : "You've successfully signed in",
+        title: result.requiresEmailConfirmation 
+          ? "Check your email" 
+          : (result.isNewUser ? "Welcome!" : "Welcome back!"),
+        description: result.requiresEmailConfirmation
+          ? "We've sent you a confirmation link"
+          : (result.isNewUser ? "Your account has been created" : "You've successfully signed in"),
       });
-      onAuthSuccess(result.isNewUser || false, result.user);
+      onAuthSuccess(result.isNewUser || false, result.user, result.requiresEmailConfirmation);
     } else {
       toast({
         title: "Authentication failed",
@@ -117,6 +123,8 @@ export function UnifiedAuth({ onBack, onAuthSuccess, onAuthenticate }: UnifiedAu
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
         >
+          {referralBanner}
+          
           <h2 className="text-xl font-semibold text-foreground mb-4 font-inter text-center">
             Discover Local Shops, Products & Deals
           </h2>
