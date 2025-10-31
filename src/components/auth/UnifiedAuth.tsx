@@ -17,9 +17,11 @@ interface UnifiedAuthProps {
     requiresEmailConfirmation?: boolean;
   }>;
   referralBanner?: React.ReactNode;
+  emailConfirmationPending?: boolean;
+  pendingEmail?: string | null;
 }
 
-export function UnifiedAuth({ onBack, onAuthSuccess, onAuthenticate, referralBanner }: UnifiedAuthProps) {
+export function UnifiedAuth({ onBack, onAuthSuccess, onAuthenticate, referralBanner, emailConfirmationPending, pendingEmail }: UnifiedAuthProps) {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
@@ -69,15 +71,23 @@ export function UnifiedAuth({ onBack, onAuthSuccess, onAuthenticate, referralBan
     setLoading(false);
 
     if (result.success) {
+      // Don't navigate away if email confirmation required
+      if (result.requiresEmailConfirmation) {
+        toast({
+          title: "Check your email",
+          description: "We've sent you a confirmation link. Click it, then sign in below.",
+          duration: 8000,
+        });
+        // Stay on this screen
+        return;
+      }
+      
+      // Normal flow for sign-in or completed sign-up
       toast({
-        title: result.requiresEmailConfirmation 
-          ? "Check your email" 
-          : (result.isNewUser ? "Welcome!" : "Welcome back!"),
-        description: result.requiresEmailConfirmation
-          ? "We've sent you a confirmation link"
-          : (result.isNewUser ? "Your account has been created" : "You've successfully signed in"),
+        title: result.isNewUser ? "Welcome!" : "Welcome back!",
+        description: result.isNewUser ? "Your account has been created" : "You've successfully signed in",
       });
-      onAuthSuccess(result.isNewUser || false, result.user, result.requiresEmailConfirmation);
+      onAuthSuccess(result.isNewUser || false, result.user, false);
     } else {
       toast({
         title: "Authentication failed",
@@ -124,7 +134,31 @@ export function UnifiedAuth({ onBack, onAuthSuccess, onAuthenticate, referralBan
           transition={{ duration: 0.8, delay: 0.2, ease: "easeOut" }}
         >
           {referralBanner}
-          
+
+          {/* Email Confirmation Inline Banner */}
+          {emailConfirmationPending && pendingEmail && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              className="bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-4"
+            >
+              <div className="flex items-start gap-3">
+                <Mail className="w-5 h-5 text-blue-600 dark:text-blue-400 mt-0.5 flex-shrink-0" />
+                <div className="flex-1">
+                  <h3 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">
+                    Check your email
+                  </h3>
+                  <p className="text-xs text-blue-700 dark:text-blue-300 mb-2">
+                    We've sent a confirmation link to <strong>{pendingEmail}</strong>
+                  </p>
+                  <p className="text-xs text-blue-600 dark:text-blue-400">
+                    📧 Click the link to activate, then sign in below
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
           <h2 className="text-xl font-semibold text-foreground mb-4 font-inter text-center">
             Discover Local Shops, Products & Deals
           </h2>

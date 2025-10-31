@@ -356,16 +356,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
 
       if (error) {
+        // Special handling for unverified email
+        if (error.message.includes('Email not confirmed')) {
+          return { 
+            success: false, 
+            error: 'Please verify your email before signing in. Check your inbox for the confirmation link.',
+            requiresEmailConfirmation: true
+          };
+        }
         console.error('[AuthContext] Sign in error:', error);
         return { success: false, error: error.message };
       }
 
-      // ✅ FIX 6: Check email verification
+      // Check email verification
       if (!data.user.email_confirmed_at) {
         await supabase.auth.signOut();
         return { 
           success: false, 
-          error: 'Please verify your email before signing in. Check your inbox for the confirmation link.' 
+          error: 'Please verify your email before signing in. Check your inbox for the confirmation link.',
+          requiresEmailConfirmation: true
         };
       }
 
@@ -383,7 +392,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { success: false, error: 'This app is for customers only. Please use the Shop Owner app.' };
       }
 
-      return { success: true, user: data.user };
+      return { success: true, user: data.user, isNewUser: false };
     } catch (error: any) {
       console.error('[AuthContext] Exception in signInWithEmail:', error);
       return { success: false, error: error.message || 'Failed to sign in' };
