@@ -16,7 +16,7 @@ export default defineConfig(({ mode }) => ({
     VitePWA({
       registerType: 'autoUpdate',
       filename: 'sw.js',
-      includeAssets: ['shofz-logo.png', 'shofz-logo.svg', 'icon-*.png'],
+      includeAssets: ['shofz-logo.png', 'shofz-logo.svg', 'icon-192x192.png', 'icon-512x512.png', 'icon-maskable-192x192.png', 'icon-maskable-512x512.png'],
       manifest: {
         name: 'Shofz - Hyperlocal Shopping',
         short_name: 'Shofz',
