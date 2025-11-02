@@ -40,35 +40,42 @@ export function usePWAInstall(): PWAInstallHook {
   const isIOSSafari = isIOS && isSafari;
 
   useEffect(() => {
+    console.log('[PWA] Checking installability...');
+    console.log('[PWA] isStandalone:', isStandalone);
+    console.log('[PWA] isIOS:', isIOS);
+    
     // Don't show install button if already installed
     if (isStandalone) {
+      console.log('[PWA] Already installed');
       setIsInstalled(true);
       return;
     }
 
     // For iOS, always show the button (we'll handle it differently)
     if (isIOS) {
+      console.log('[PWA] iOS detected - showing manual install option');
       setIsInstallable(true);
       return;
     }
 
     // Listen for the beforeinstallprompt event (Chrome/Edge)
     const handleBeforeInstallPrompt = (e: Event) => {
+      console.log('[PWA] beforeinstallprompt event fired! ✅');
       e.preventDefault();
       const promptEvent = e as BeforeInstallPromptEvent;
       setDeferredPrompt(promptEvent);
       setIsInstallable(true);
-      console.log('PWA: App is installable');
     };
 
     // Listen for successful installation
     const handleAppInstalled = () => {
-      console.log('PWA: App was installed');
+      console.log('[PWA] App installed successfully! ✅');
       setIsInstalled(true);
       setIsInstallable(false);
       setDeferredPrompt(null);
     };
 
+    console.log('[PWA] Adding event listeners for beforeinstallprompt');
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     window.addEventListener('appinstalled', handleAppInstalled);
 

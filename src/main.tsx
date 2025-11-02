@@ -29,3 +29,16 @@ createRoot(document.getElementById("root")!).render(
     <App />
   </ErrorBoundary>
 );
+
+// Register service worker for PWA
+if ('serviceWorker' in navigator && !Capacitor.isNativePlatform()) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js', { scope: '/' })
+      .then(registration => {
+        console.log('PWA: Service Worker registered', registration);
+      })
+      .catch(error => {
+        console.error('PWA: Service Worker registration failed', error);
+      });
+  });
+}

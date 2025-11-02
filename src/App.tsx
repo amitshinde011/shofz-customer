@@ -7,6 +7,7 @@ import { BottomNav } from "@/components/BottomNav";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { OfflineIndicator } from "@/components/OfflineIndicator";
 import ConnectionStatus from "@/components/ConnectionStatus";
+import { PWAInstallBanner } from "@/components/PWAInstallBanner";
 import { usePageTracking } from "@/hooks/useAnalytics";
 import { initializeAnalytics } from "@/lib/analytics";
 import { LocationProvider } from "@/contexts/LocationContext";
@@ -99,6 +100,7 @@ function AppContent() {
           : undefined
       }
     >
+      <PWAInstallBanner />
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<Home />} />
