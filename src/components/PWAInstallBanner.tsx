@@ -26,7 +26,7 @@ export function PWAInstallBanner() {
         <X className="w-4 h-4" />
       </button>
       <h3 className="font-semibold mb-2">Install Shofz App</h3>
-      <p className="text-sm mb-3 opacity-90">Get quick access and offline features</p>
+      <p className="text-sm mb-3 opacity-90">Get quick access and all the features of Shofz on your home screen</p>
       <Button onClick={promptInstall} variant="secondary" size="sm">
         Install Now
       </Button>
