@@ -51,11 +51,9 @@ export function useLocation() {
   const requestLocation = async () => {
     console.log('[useLocation] requestLocation called');
     const isNative = Capacitor.isNativePlatform();
-    let mounted = true;
 
     console.log('[useLocation] Setting loading to true, requesting position');
     setLoading(true);
-    setError(null); // Clear previous errors
 
     try {
       let position;
@@ -94,12 +92,11 @@ export function useLocation() {
         };
 
         console.log('[useLocation] Position received:', newLocation);
-        if (mounted) {
-          setLocation(newLocation);
-          setError(null);
-          setLoading(false);
-          localStorage.setItem('userLocation', JSON.stringify(newLocation));
-        }
+        setLocation(newLocation);
+        setError(null);
+        setLoading(false);
+
+        localStorage.setItem('userLocation', JSON.stringify(newLocation));
       } else {
         // Use browser Geolocation API on web
         console.log('[useLocation] Using browser Geolocation API');
@@ -115,12 +112,11 @@ export function useLocation() {
               timestamp: Date.now(),
             };
 
-            if (mounted) {
-              setLocation(newLocation);
-              setError(null);
-              setLoading(false);
-              localStorage.setItem('userLocation', JSON.stringify(newLocation));
-            }
+            setLocation(newLocation);
+            setError(null);
+            setLoading(false);
+
+            localStorage.setItem('userLocation', JSON.stringify(newLocation));
           },
           (error) => {
             let errorMsg = 'Failed to get your location';
@@ -173,10 +169,10 @@ export function useLocation() {
     }
   };
 
-  // Load cached location on mount only (no automatic request)
+  // Try to get location on mount
   useEffect(() => {
     console.log('[useLocation] Initial mount effect running');
-    // Check localStorage for cached location
+    // First check localStorage for cached location
     const cachedLocation = localStorage.getItem('userLocation');
     if (cachedLocation) {
       try {
@@ -187,9 +183,10 @@ export function useLocation() {
         if (age < 30 * 60 * 1000) {
           console.log('[useLocation] Using cached location');
           setLocation(parsed);
+          setLoading(false);
           return;
         } else {
-          console.log('[useLocation] Cached location expired');
+          console.log('[useLocation] Cached location too old, requesting fresh');
         }
       } catch (e) {
         console.error('[useLocation] Error parsing cached location:', e);
@@ -197,21 +194,20 @@ export function useLocation() {
     } else {
       console.log('[useLocation] No cached location found');
     }
-    
-    // Don't automatically request location - wait for user gesture
-    // This fixes the "violation" warning
+
+    // Request fresh location in background (non-blocking)
+    requestLocation();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Watch for location changes - only when user has granted permission
+  // Watch for location changes - only update if significantly different
   useEffect(() => {
-    // Only start watching if we already have a location (permission granted)
-    if (!location) return;
-
     const isNative = Capacitor.isNativePlatform();
     let watchId: string | number | undefined;
 
     const startWatching = async () => {
       if (isNative) {
+        // Use Capacitor Geolocation on native
         try {
           watchId = await Geolocation.watchPosition(
             {
@@ -232,6 +228,7 @@ export function useLocation() {
                   timestamp: Date.now(),
                 };
 
+                // Only update if location changed significantly (>100m)
                 setLocation(prev => {
                   if (!prev) return newLocation;
 
@@ -240,16 +237,10 @@ export function useLocation() {
                   const significantChange = latDiff > 0.001 || lngDiff > 0.001;
 
                   if (significantChange) {
-                    // Always update timestamp to keep cache fresh
-                    const updatedLocation = { ...newLocation, timestamp: Date.now() };
-                    localStorage.setItem('userLocation', JSON.stringify(updatedLocation));
-                    return updatedLocation;
+                    localStorage.setItem('userLocation', JSON.stringify(newLocation));
+                    return newLocation;
                   }
-                  
-                  // Update timestamp even if location didn't change significantly
-                  const updatedLocation = { ...prev, timestamp: Date.now() };
-                  localStorage.setItem('userLocation', JSON.stringify(updatedLocation));
-                  return updatedLocation;
+                  return prev;
                 });
               }
             }
@@ -258,6 +249,7 @@ export function useLocation() {
           console.error('Failed to start location watch:', error);
         }
       } else {
+        // Use browser Geolocation API
         if (!navigator.geolocation) return;
 
         watchId = navigator.geolocation.watchPosition(
@@ -276,15 +268,10 @@ export function useLocation() {
               const significantChange = latDiff > 0.001 || lngDiff > 0.001;
 
               if (significantChange) {
-                const updatedLocation = { ...newLocation, timestamp: Date.now() };
-                localStorage.setItem('userLocation', JSON.stringify(updatedLocation));
-                return updatedLocation;
+                localStorage.setItem('userLocation', JSON.stringify(newLocation));
+                return newLocation;
               }
-              
-              // Update timestamp even if location didn't change significantly
-              const updatedLocation = { ...prev, timestamp: Date.now() };
-              localStorage.setItem('userLocation', JSON.stringify(updatedLocation));
-              return updatedLocation;
+              return prev;
             });
           },
           (error) => {
@@ -310,7 +297,7 @@ export function useLocation() {
         }
       }
     };
-  }, [location]); // Only watch when we have initial location
+  }, []);
 
   return {
     location,

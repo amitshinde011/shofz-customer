@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { Session } from '@supabase/supabase-js';
+import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -94,13 +94,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     session: null,
     loading: true,
   });
-  
-  const initialSessionProcessedRef = useRef(false);
-  const lastValidationTimeRef = useRef<number>(0);
-  const sessionRef = useRef<Session | null>(null);
   const { toast } = useToast();
+  const toastRef = useRef(toast);
 
-  const fetchUserProfile = async (userId: string, session?: Session | null): Promise<AuthUser | null> => {
+  useEffect(() => {
+    toastRef.current = toast;
+  }, [toast]);
+
+  const fetchUserProfile = async (userId: string): Promise<AuthUser | null> => {
     try {
       // Check cache first
       const cached = getUserProfileFromStorage(userId);
@@ -108,19 +109,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return cached;
       }
 
-      // ✅ Check email verification from Supabase session (source of truth)
-      if (session?.user && !session.user.email_confirmed_at) {
-        console.warn('[AuthContext] User email not verified in Supabase session');
-        await supabase.auth.signOut();
-        toast({
-          title: "Email verification required",
-          description: "Please verify your email before signing in",
-          variant: "destructive",
-        });
-        return null;
-      }
-
-      // Fetch user profile - CORRECT: without Promise.resolve wrapper
+      // Fetch from database
       const { data, error } = await supabase
         .from('users')
         .select('*')
@@ -133,11 +122,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (!data) {
-        console.warn('[AuthContext] No user data found');
         return null;
       }
 
-      // Check user role - CORRECT: without Promise.resolve wrapper
+      // ✅ FIX 4: Check email verification
+      if (!data.email_verified) {
+        console.warn('[AuthContext] User email not verified');
+        await supabase.auth.signOut();
+        toastRef.current({
+          title: "Email verification required",
+          description: "Please verify your email before signing in",
+          variant: "destructive",
+        });
+        return null;
+      }
+
+      // Check if user has customer role
       const { data: roleData } = await supabase
         .from('user_roles')
         .select('role')
@@ -147,7 +147,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       if (!roleData) {
-        console.warn('[AuthContext] No customer role found for user');
         return null;
       }
 
@@ -174,61 +173,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('[AuthContext] Setting up global auth listener (ONCE)');
     }
     let mounted = true;
-    let globalTimeoutId: NodeJS.Timeout | undefined;
 
     const handleAuthChange = async (event: string, session: Session | null) => {
       if (!mounted) return;
 
-      console.log('[AuthContext] handleAuthChange event:', event, 'session:', !!session);
-      
-      // Mark initial session as processed
-      if (event === 'INITIAL_SESSION' || (event === 'SIGNED_IN' && !initialSessionProcessedRef.current)) {
-        initialSessionProcessedRef.current = true;
+      if (import.meta.env.DEV) {
+        console.log('[AuthContext] Auth event:', event, 'Session:', !!session);
       }
 
-      try {
-        if (session?.user) {
-          const profile = await fetchUserProfile(session.user.id, session);
-
-          if (!profile) {
-            console.warn('[AuthContext] No profile found for user, signing out');
-            await supabase.auth.signOut();
-            clearUserProfileFromStorage();
-            if (mounted) {
-              setAuthState({ user: null, session: null, loading: false });
-            }
-            return;
-          }
-
-          if (mounted) {
-            saveUserProfileToStorage(profile);
-            setAuthState({
-              user: profile,
-              session,
-              loading: false,
-            });
-          }
-        } else {
-          clearUserProfileFromStorage();
-          if (mounted) {
-            setAuthState({
-              user: null,
-              session: null,
-              loading: false,
-            });
-          }
-        }
+      if (session?.user) {
+        const profile = await fetchUserProfile(session.user.id);
         
-        // Clear global timeout since we got a result
-        if (globalTimeoutId) {
-          clearTimeout(globalTimeoutId);
-          globalTimeoutId = undefined;
+        if (mounted) {
+          setAuthState({
+            user: profile,
+            session,
+            loading: false,
+          });
         }
-      } catch (error) {
-        console.error('[AuthContext] Error in handleAuthChange:', error);
-        await supabase.auth.signOut();
+      } else {
         clearUserProfileFromStorage();
-        
         if (mounted) {
           setAuthState({
             user: null,
@@ -241,25 +205,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
 
-    // Get initial session - simple and direct
+    // Get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (mounted) {
         handleAuthChange('INITIAL_SESSION', session);
       }
     });
-
-    // Start failsafe timeout only after 1 second (give auth a chance to load)
-    const initialTimeoutId = setTimeout(() => {
-      globalTimeoutId = setTimeout(() => {
-        console.log('[AuthContext] Auth initialization timeout - forcing loading to false');
-        setAuthState(prev => {
-          if (prev.loading) {
-            return { ...prev, loading: false };
-          }
-          return prev;
-        });
-      }, 9000); // 10s total (1s + 9s)
-    }, 1000);
 
     return () => {
       if (import.meta.env.DEV) {
@@ -267,60 +218,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       mounted = false;
       subscription.unsubscribe();
-      clearTimeout(initialTimeoutId);
-      if (globalTimeoutId) clearTimeout(globalTimeoutId);
     };
   }, []); // ← EMPTY DEPS = RUNS ONCE
-
-  // Keep session ref updated
-  useEffect(() => {
-    sessionRef.current = authState.session;
-  }, [authState.session]);
-
-  // Session validation on app focus - using ref to avoid stale closure
-  useEffect(() => {
-    const MIN_VALIDATION_INTERVAL = 30 * 60 * 1000; // 30 minutes
-
-    const handleFocus = async () => {
-      const now = Date.now();
-      const timeSinceLastValidation = now - lastValidationTimeRef.current;
-
-      // Only validate if:
-      // 1. We have a session (check ref to avoid stale closure)
-      // 2. More than 30 minutes since last validation
-      if (sessionRef.current && timeSinceLastValidation > MIN_VALIDATION_INTERVAL) {
-        console.log('[AuthContext] App gained focus, validating session (last validation:', timeSinceLastValidation, 'ms ago)');
-
-        try {
-          const { data: { session }, error } = await supabase.auth.getSession();
-
-          lastValidationTimeRef.current = now;
-
-          if (error || !session) {
-            console.log('[AuthContext] Session validation failed, signing out');
-            await supabase.auth.signOut();
-            clearUserProfileFromStorage();
-            setAuthState({
-              user: null,
-              session: null,
-              loading: false,
-            });
-          } else {
-            console.log('[AuthContext] Session is still valid');
-          }
-        } catch (error) {
-          console.error('[AuthContext] Session validation error:', error);
-          // Don't sign out on validation errors, just log them
-        }
-      }
-    };
-
-    window.addEventListener('focus', handleFocus);
-
-    return () => {
-      window.removeEventListener('focus', handleFocus);
-    };
-  }, []); // Empty deps - event listener registered once, uses ref for session
 
   const signUpWithEmail = async (email: string, password: string, name: string) => {
     try {
