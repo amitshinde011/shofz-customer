@@ -1,37 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
-import { User, Session } from '@supabase/supabase-js';
+import { Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-
-// Timeout utility wrapper
-const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number, errorMessage: string): Promise<T> => {
-  return Promise.race([
-    promise,
-    new Promise<T>((_, reject) => 
-      setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
-    )
-  ]);
-};
-
-// Retry utility with exponential backoff
-const retryWithBackoff = async <T,>(
-  fn: () => Promise<T>,
-  maxRetries: number = 3,
-  baseDelay: number = 1000
-): Promise<T> => {
-  for (let i = 0; i < maxRetries; i++) {
-    try {
-      return await fn();
-    } catch (error) {
-      if (i === maxRetries - 1) throw error;
-      
-      const delay = baseDelay * Math.pow(2, i);
-      console.log(`[AuthContext] Retry ${i + 1}/${maxRetries} after ${delay}ms`);
-      await new Promise(resolve => setTimeout(resolve, delay));
-    }
-  }
-  throw new Error('Max retries exceeded');
-};
 
 export interface AuthUser {
   id: string;
@@ -129,25 +99,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const lastValidationTimeRef = useRef<number>(0);
   const { toast } = useToast();
 
-  // Refresh session helper
-  const refreshSession = async (): Promise<boolean> => {
-    console.log('[AuthContext] Refreshing session');
-    try {
-      const { data: { session }, error } = await supabase.auth.refreshSession();
-      if (error || !session) {
-        console.error('[AuthContext] Session refresh failed:', error);
-        await supabase.auth.signOut();
-        return false;
-      }
-      console.log('[AuthContext] Session refreshed successfully');
-      return true;
-    } catch (error) {
-      console.error('[AuthContext] Exception refreshing session:', error);
-      return false;
-    }
-  };
-
-  const fetchUserProfile = async (userId: string): Promise<AuthUser | null> => {
+  const fetchUserProfile = async (userId: string, session?: Session | null): Promise<AuthUser | null> => {
     try {
       // Check cache first
       const cached = getUserProfileFromStorage(userId);
@@ -155,22 +107,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return cached;
       }
 
-      // Fetch user profile with retry and timeout
-      const userResult = await retryWithBackoff(
-        () => withTimeout(
-          Promise.resolve(supabase
-            .from('users')
-            .select('*')
-            .eq('id', userId)
-            .single()),
-          10000,
-          'User profile fetch timeout'
-        ),
-        2,
-        1000
-      );
-      
-      const { data, error } = userResult;
+      // ✅ Check email verification from Supabase session (source of truth)
+      if (session?.user && !session.user.email_confirmed_at) {
+        console.warn('[AuthContext] User email not verified in Supabase session');
+        await supabase.auth.signOut();
+        toast({
+          title: "Email verification required",
+          description: "Please verify your email before signing in",
+          variant: "destructive",
+        });
+        return null;
+      }
+
+      // Fetch user profile - CORRECT: without Promise.resolve wrapper
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', userId)
+        .single();
 
       if (error) {
         console.error('[AuthContext] Error fetching profile:', error);
@@ -182,24 +136,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return null;
       }
 
-      // Check user role with retry and timeout
-      const roleResult = await retryWithBackoff(
-        () => withTimeout(
-          Promise.resolve(supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', userId)
-            .eq('role', 'customer')
-            .eq('is_active', true)
-            .single()),
-          10000,
-          'Role fetch timeout'
-        ),
-        2,
-        1000
-      );
-      
-      const { data: roleData } = roleResult;
+      // Check user role - CORRECT: without Promise.resolve wrapper
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .eq('role', 'customer')
+        .eq('is_active', true)
+        .single();
 
       if (!roleData) {
         console.warn('[AuthContext] No customer role found for user');
@@ -243,8 +187,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       try {
         if (session?.user) {
-          const profile = await fetchUserProfile(session.user.id);
-          
+          const profile = await fetchUserProfile(session.user.id, session);
+
           if (!profile) {
             console.warn('[AuthContext] No profile found for user, signing out');
             await supabase.auth.signOut();
@@ -296,29 +240,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
 
-    // Get initial session with retry and timeout (no Promise.resolve wrapper)
-    retryWithBackoff(
-      () => withTimeout(
-        supabase.auth.getSession(),
-        10000,
-        'Session fetch timeout'
-      ),
-      2,
-      1000
-    )
-      .then(({ data: { session } }) => {
-        if (mounted && !initialSessionProcessedRef.current) {
-          handleAuthChange('INITIAL_SESSION', session);
-        }
-      })
-      .catch(async (error) => {
-        console.error('[AuthContext] Failed to get initial session:', error);
-        if (mounted && !initialSessionProcessedRef.current) {
-          await supabase.auth.signOut();
-          clearUserProfileFromStorage();
-          setAuthState({ user: null, session: null, loading: false });
-        }
-      });
+    // Get initial session - simple and direct
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (mounted) {
+        handleAuthChange('INITIAL_SESSION', session);
+      }
+    });
 
     // Start failsafe timeout only after 1 second (give auth a chance to load)
     const initialTimeoutId = setTimeout(() => {
@@ -357,17 +284,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // 2. More than 30 minutes since last validation
       if (authState.session && timeSinceLastValidation > MIN_VALIDATION_INTERVAL) {
         console.log('[AuthContext] App gained focus, validating session (last validation:', timeSinceLastValidation, 'ms ago)');
-        
+
         try {
-          const { data: { session }, error } = await retryWithBackoff(
-            () => withTimeout(
-              supabase.auth.getSession(),
-              5000,
-              'Session validation timeout'
-            ),
-            2,
-            500
-          );
+          const { data: { session }, error } = await supabase.auth.getSession();
 
           lastValidationTimeRef.current = now;
 

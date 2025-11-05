@@ -14,7 +14,8 @@
       "Bash(npm run cap:sync:*)",
       "Read(//c/**)",
       "Bash(if exist \"c:\\Workspace\\shofz-customer\\src\\hooks\\useIncrementViewCount.ts\" rm \"c:\\Workspace\\shofz-customer\\src\\hooks\\useIncrementViewCount.ts\")",
-      "Bash(del \"c:\\Workspace\\shofz-customer\\src\\hooks\\useIncrementViewCount.ts\")"
+      "Bash(del \"c:\\Workspace\\shofz-customer\\src\\hooks\\useIncrementViewCount.ts\")",
+      "Bash(npm run build:dev:*)"
     ],
     "deny": [],
     "ask": []
