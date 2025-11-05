@@ -60,17 +60,13 @@ const App = () => {
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <LocationProvider>
-            <LocationPermissionGate>
-              <OfflineIndicator />
-              <ConnectionStatus />
-              <Toaster />
-              <Sonner />
-              <BrowserRouter>
-                <AppContent />
-              </BrowserRouter>
-            </LocationPermissionGate>
-          </LocationProvider>
+          <OfflineIndicator />
+          <ConnectionStatus />
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AppContent />
+          </BrowserRouter>
         </TooltipProvider>
       </QueryClientProvider>
     </AuthProvider>
@@ -80,16 +76,7 @@ const App = () => {
 function AppContent() {
   // Track page views automatically
   usePageTracking();
-  const { loading } = useAuth();
   const isMobile = useIsMobile();
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
 
   return (
     <div
@@ -102,12 +89,36 @@ function AppContent() {
     >
       <PWAInstallBanner />
       <Routes>
-        {/* Public Routes */}
-        <Route path="/" element={<Home />} />
-        <Route path="/products" element={<Products />} />
+        {/* Public Routes - with location */}
+        <Route path="/" element={
+          <LocationProvider>
+            <LocationPermissionGate>
+              <Home />
+            </LocationPermissionGate>
+          </LocationProvider>
+        } />
+        <Route path="/products" element={
+          <LocationProvider>
+            <LocationPermissionGate>
+              <Products />
+            </LocationPermissionGate>
+          </LocationProvider>
+        } />
         <Route path="/products/:id" element={<ProductDetail />} />
-        <Route path="/shops" element={<Shops />} />
-        <Route path="/shops/:id" element={<ShopDetail />} />
+        <Route path="/shops" element={
+          <LocationProvider>
+            <LocationPermissionGate>
+              <Shops />
+            </LocationPermissionGate>
+          </LocationProvider>
+        } />
+        <Route path="/shops/:id" element={
+          <LocationProvider>
+            <LocationPermissionGate>
+              <ShopDetail />
+            </LocationPermissionGate>
+          </LocationProvider>
+        } />
         <Route path="/offers" element={<Offers />} />
         <Route path="/offers/:id" element={<OfferDetail />} />
         {/* Auth Routes */}

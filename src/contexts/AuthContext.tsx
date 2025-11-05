@@ -124,27 +124,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     session: null,
     loading: true,
   });
+  
+  const initialSessionProcessedRef = useRef(false);
+  const lastValidationTimeRef = useRef<number>(0);
   const { toast } = useToast();
-  const toastRef = useRef(toast);
 
-  useEffect(() => {
-    toastRef.current = toast;
-  }, [toast]);
-
-  // Global timeout failsafe - force loading to false after 10 seconds
-  useEffect(() => {
-    const timeout = setTimeout(() => {
-      console.warn('[AuthContext] Auth initialization timeout - forcing loading to false');
-      setAuthState(prev => {
-        if (prev.loading) {
-          return { user: null, session: null, loading: false };
-        }
-        return prev;
-      });
-    }, 10000);
-
-    return () => clearTimeout(timeout);
-  }, []);
+  // Refresh session helper
+  const refreshSession = async (): Promise<boolean> => {
+    console.log('[AuthContext] Refreshing session');
+    try {
+      const { data: { session }, error } = await supabase.auth.refreshSession();
+      if (error || !session) {
+        console.error('[AuthContext] Session refresh failed:', error);
+        await supabase.auth.signOut();
+        return false;
+      }
+      console.log('[AuthContext] Session refreshed successfully');
+      return true;
+    } catch (error) {
+      console.error('[AuthContext] Exception refreshing session:', error);
+      return false;
+    }
+  };
 
   const fetchUserProfile = async (userId: string): Promise<AuthUser | null> => {
     try {
@@ -157,13 +158,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // Fetch user profile with retry and timeout
       const userResult = await retryWithBackoff(
         () => withTimeout(
-          Promise.resolve(
-            supabase
-              .from('users')
-              .select('*')
-              .eq('id', userId)
-              .single()
-          ),
+          Promise.resolve(supabase
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .single()),
           10000,
           'User profile fetch timeout'
         ),
@@ -183,30 +182,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return null;
       }
 
-      // Check email verification
-      if (!data.email_verified) {
-        console.warn('[AuthContext] User email not verified');
-        await supabase.auth.signOut();
-        toastRef.current({
-          title: "Email verification required",
-          description: "Please verify your email before signing in",
-          variant: "destructive",
-        });
-        return null;
-      }
-
       // Check user role with retry and timeout
       const roleResult = await retryWithBackoff(
         () => withTimeout(
-          Promise.resolve(
-            supabase
-              .from('user_roles')
-              .select('role')
-              .eq('user_id', userId)
-              .eq('role', 'customer')
-              .eq('is_active', true)
-              .single()
-          ),
+          Promise.resolve(supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', userId)
+            .eq('role', 'customer')
+            .eq('is_active', true)
+            .single()),
           10000,
           'Role fetch timeout'
         ),
@@ -244,11 +229,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.log('[AuthContext] Setting up global auth listener (ONCE)');
     }
     let mounted = true;
+    let globalTimeoutId: NodeJS.Timeout | undefined;
 
     const handleAuthChange = async (event: string, session: Session | null) => {
       if (!mounted) return;
 
       console.log('[AuthContext] handleAuthChange event:', event, 'session:', !!session);
+      
+      // Mark initial session as processed
+      if (event === 'INITIAL_SESSION' || (event === 'SIGNED_IN' && !initialSessionProcessedRef.current)) {
+        initialSessionProcessedRef.current = true;
+      }
 
       try {
         if (session?.user) {
@@ -282,6 +273,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
           }
         }
+        
+        // Clear global timeout since we got a result
+        if (globalTimeoutId) {
+          clearTimeout(globalTimeoutId);
+          globalTimeoutId = undefined;
+        }
       } catch (error) {
         console.error('[AuthContext] Error in handleAuthChange:', error);
         await supabase.auth.signOut();
@@ -299,7 +296,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
 
-    // Get initial session with retry and timeout
+    // Get initial session with retry and timeout (no Promise.resolve wrapper)
     retryWithBackoff(
       () => withTimeout(
         supabase.auth.getSession(),
@@ -310,18 +307,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       1000
     )
       .then(({ data: { session } }) => {
-        if (mounted) {
+        if (mounted && !initialSessionProcessedRef.current) {
           handleAuthChange('INITIAL_SESSION', session);
         }
       })
       .catch(async (error) => {
         console.error('[AuthContext] Failed to get initial session:', error);
-        await supabase.auth.signOut();
-        clearUserProfileFromStorage();
-        if (mounted) {
+        if (mounted && !initialSessionProcessedRef.current) {
+          await supabase.auth.signOut();
+          clearUserProfileFromStorage();
           setAuthState({ user: null, session: null, loading: false });
         }
       });
+
+    // Start failsafe timeout only after 1 second (give auth a chance to load)
+    const initialTimeoutId = setTimeout(() => {
+      globalTimeoutId = setTimeout(() => {
+        console.log('[AuthContext] Auth initialization timeout - forcing loading to false');
+        setAuthState(prev => {
+          if (prev.loading) {
+            return { ...prev, loading: false };
+          }
+          return prev;
+        });
+      }, 9000); // 10s total (1s + 9s)
+    }, 1000);
 
     return () => {
       if (import.meta.env.DEV) {
@@ -329,28 +339,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       mounted = false;
       subscription.unsubscribe();
+      clearTimeout(initialTimeoutId);
+      if (globalTimeoutId) clearTimeout(globalTimeoutId);
     };
   }, []); // ← EMPTY DEPS = RUNS ONCE
 
-  // Validate session when app gains focus (only if session is older than 30 minutes)
+  // Session validation on app focus (better than visibility change)
   useEffect(() => {
-    let lastValidationTime = Date.now();
+    const MIN_VALIDATION_INTERVAL = 30 * 60 * 1000; // 30 minutes
 
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible' && authState.session) {
-        const timeSinceLastValidation = Date.now() - lastValidationTime;
-        const thirtyMinutes = 30 * 60 * 1000;
+    const handleFocus = async () => {
+      const now = Date.now();
+      const timeSinceLastValidation = now - lastValidationTimeRef.current;
 
-        // Only validate if more than 30 minutes have passed
-        if (timeSinceLastValidation < thirtyMinutes) {
-          console.log('[AuthContext] Session recently validated, skipping check');
-          return;
-        }
-
-        console.log('[AuthContext] App gained focus, validating session...');
+      // Only validate if:
+      // 1. We have a session
+      // 2. More than 30 minutes since last validation
+      if (authState.session && timeSinceLastValidation > MIN_VALIDATION_INTERVAL) {
+        console.log('[AuthContext] App gained focus, validating session (last validation:', timeSinceLastValidation, 'ms ago)');
         
         try {
-          const { data: { session } } = await retryWithBackoff(
+          const { data: { session }, error } = await retryWithBackoff(
             () => withTimeout(
               supabase.auth.getSession(),
               5000,
@@ -359,26 +368,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             2,
             500
           );
-          
-          if (!session) {
-            console.log('[AuthContext] Session expired, signing out');
+
+          lastValidationTimeRef.current = now;
+
+          if (error || !session) {
+            console.log('[AuthContext] Session validation failed, signing out');
             await supabase.auth.signOut();
-            setAuthState({ user: null, session: null, loading: false });
+            clearUserProfileFromStorage();
+            setAuthState({
+              user: null,
+              session: null,
+              loading: false,
+            });
           } else {
-            lastValidationTime = Date.now();
-            console.log('[AuthContext] Session validated successfully');
+            console.log('[AuthContext] Session is still valid');
           }
         } catch (error) {
-          console.error('[AuthContext] Session validation failed:', error);
-          await supabase.auth.signOut();
-          setAuthState({ user: null, session: null, loading: false });
+          console.error('[AuthContext] Session validation error:', error);
+          // Don't sign out on validation errors, just log them
         }
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [authState.session]);
+    window.addEventListener('focus', handleFocus);
+
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []); // Remove authState.session from dependencies
 
   const signUpWithEmail = async (email: string, password: string, name: string) => {
     try {
