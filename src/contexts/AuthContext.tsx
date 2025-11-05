@@ -13,6 +13,26 @@ const withTimeout = <T,>(promise: Promise<T>, timeoutMs: number, errorMessage: s
   ]);
 };
 
+// Retry utility with exponential backoff
+const retryWithBackoff = async <T,>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> => {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error) {
+      if (i === maxRetries - 1) throw error;
+      
+      const delay = baseDelay * Math.pow(2, i);
+      console.log(`[AuthContext] Retry ${i + 1}/${maxRetries} after ${delay}ms`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  throw new Error('Max retries exceeded');
+};
+
 export interface AuthUser {
   id: string;
   email: string;
@@ -134,19 +154,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return cached;
       }
 
-      // Fetch from database with timeout
-      const userQueryPromise = supabase
-        .from('users')
-        .select('*')
-        .eq('id', userId)
-        .single();
-      
-      const userResult = await Promise.race([
-        userQueryPromise,
-        new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('User profile fetch timeout')), 5000)
-        )
-      ]);
+      // Fetch user profile with retry and timeout
+      const userResult = await retryWithBackoff(
+        () => withTimeout(
+          Promise.resolve(
+            supabase
+              .from('users')
+              .select('*')
+              .eq('id', userId)
+              .single()
+          ),
+          10000,
+          'User profile fetch timeout'
+        ),
+        2,
+        1000
+      );
       
       const { data, error } = userResult;
 
@@ -156,10 +179,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (!data) {
+        console.warn('[AuthContext] No user data found');
         return null;
       }
 
-      // ✅ FIX 4: Check email verification
+      // Check email verification
       if (!data.email_verified) {
         console.warn('[AuthContext] User email not verified');
         await supabase.auth.signOut();
@@ -171,25 +195,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return null;
       }
 
-      // Check if user has customer role with timeout
-      const roleQueryPromise = supabase
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', userId)
-        .eq('role', 'customer')
-        .eq('is_active', true)
-        .single();
-      
-      const roleResult = await Promise.race([
-        roleQueryPromise,
-        new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('Role fetch timeout')), 5000)
-        )
-      ]);
+      // Check user role with retry and timeout
+      const roleResult = await retryWithBackoff(
+        () => withTimeout(
+          Promise.resolve(
+            supabase
+              .from('user_roles')
+              .select('role')
+              .eq('user_id', userId)
+              .eq('role', 'customer')
+              .eq('is_active', true)
+              .single()
+          ),
+          10000,
+          'Role fetch timeout'
+        ),
+        2,
+        1000
+      );
       
       const { data: roleData } = roleResult;
 
       if (!roleData) {
+        console.warn('[AuthContext] No customer role found for user');
         return null;
       }
 
@@ -271,11 +299,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
 
-    // Get initial session with timeout
-    withTimeout(
-      supabase.auth.getSession(),
-      5000,
-      'Session fetch timeout'
+    // Get initial session with retry and timeout
+    retryWithBackoff(
+      () => withTimeout(
+        supabase.auth.getSession(),
+        10000,
+        'Session fetch timeout'
+      ),
+      2,
+      1000
     )
       .then(({ data: { session } }) => {
         if (mounted) {
@@ -300,23 +332,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []); // ← EMPTY DEPS = RUNS ONCE
 
-  // Validate session when app gains focus
+  // Validate session when app gains focus (only if session is older than 30 minutes)
   useEffect(() => {
+    let lastValidationTime = Date.now();
+
     const handleVisibilityChange = async () => {
       if (document.visibilityState === 'visible' && authState.session) {
+        const timeSinceLastValidation = Date.now() - lastValidationTime;
+        const thirtyMinutes = 30 * 60 * 1000;
+
+        // Only validate if more than 30 minutes have passed
+        if (timeSinceLastValidation < thirtyMinutes) {
+          console.log('[AuthContext] Session recently validated, skipping check');
+          return;
+        }
+
         console.log('[AuthContext] App gained focus, validating session...');
         
         try {
-          const { data: { session } } = await withTimeout(
-            supabase.auth.getSession(),
-            3000,
-            'Session validation timeout'
+          const { data: { session } } = await retryWithBackoff(
+            () => withTimeout(
+              supabase.auth.getSession(),
+              5000,
+              'Session validation timeout'
+            ),
+            2,
+            500
           );
           
           if (!session) {
             console.log('[AuthContext] Session expired, signing out');
             await supabase.auth.signOut();
             setAuthState({ user: null, session: null, loading: false });
+          } else {
+            lastValidationTime = Date.now();
+            console.log('[AuthContext] Session validated successfully');
           }
         } catch (error) {
           console.error('[AuthContext] Session validation failed:', error);
