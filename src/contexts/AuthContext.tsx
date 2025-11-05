@@ -101,12 +101,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     toastRef.current = toast;
   }, [toast]);
 
-  const fetchUserProfile = async (userId: string): Promise<AuthUser | null> => {
+  const fetchUserProfile = async (userId: string, session?: Session | null): Promise<AuthUser | null> => {
     try {
       // Check cache first
       const cached = getUserProfileFromStorage(userId);
       if (cached) {
         return cached;
+      }
+
+      // ✅ Check email verification from Supabase session (source of truth)
+      if (session?.user && !session.user.email_confirmed_at) {
+        console.warn('[AuthContext] User email not verified in Supabase session');
+        await supabase.auth.signOut();
+        toastRef.current({
+          title: "Email verification required",
+          description: "Please verify your email before signing in",
+          variant: "destructive",
+        });
+        return null;
       }
 
       // Fetch from database
@@ -122,18 +134,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
 
       if (!data) {
-        return null;
-      }
-
-      // ✅ FIX 4: Check email verification
-      if (!data.email_verified) {
-        console.warn('[AuthContext] User email not verified');
-        await supabase.auth.signOut();
-        toastRef.current({
-          title: "Email verification required",
-          description: "Please verify your email before signing in",
-          variant: "destructive",
-        });
         return null;
       }
 
@@ -181,41 +181,98 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('[AuthContext] Auth event:', event, 'Session:', !!session);
       }
 
-      if (session?.user) {
-        const profile = await fetchUserProfile(session.user.id);
-        
-        if (mounted) {
-          setAuthState({
-            user: profile,
-            session,
-            loading: false,
-          });
+      try {
+        if (session?.user) {
+          const profile = await fetchUserProfile(session.user.id, session);
+
+          if (!profile) {
+            console.warn('[AuthContext] No profile found for user, signing out');
+            await supabase.auth.signOut();
+            clearUserProfileFromStorage();
+            if (mounted) {
+              setAuthState({ user: null, session: null, loading: false });
+            }
+            return;
+          }
+
+          if (mounted) {
+            setAuthState({
+              user: profile,
+              session,
+              loading: false,
+            });
+          }
+        } else {
+          clearUserProfileFromStorage();
+          if (mounted) {
+            setAuthState({
+              user: null,
+              session: null,
+              loading: false,
+            });
+          }
         }
-      } else {
+      } catch (error) {
+        console.error('[AuthContext] Error in handleAuthChange:', error);
+        // On any error (including expired tokens), sign out and clear state
+        await supabase.auth.signOut();
         clearUserProfileFromStorage();
         if (mounted) {
-          setAuthState({
-            user: null,
-            session: null,
-            loading: false,
-          });
+          setAuthState({ user: null, session: null, loading: false });
         }
       }
     };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
 
-    // Get initial session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (mounted) {
-        handleAuthChange('INITIAL_SESSION', session);
+    // Get initial session with timeout and error handling
+    const sessionTimeout = setTimeout(() => {
+      if (mounted && authState.loading) {
+        console.warn('[AuthContext] Session load timeout - clearing auth state');
+        clearUserProfileFromStorage();
+        setAuthState({
+          user: null,
+          session: null,
+          loading: false,
+        });
       }
-    });
+    }, 5000); // 5 second timeout
+
+    supabase.auth.getSession()
+      .then(({ data: { session }, error }) => {
+        clearTimeout(sessionTimeout);
+
+        if (error) {
+          console.error('[AuthContext] Session fetch error:', error);
+          // Clear expired/invalid session
+          supabase.auth.signOut();
+          clearUserProfileFromStorage();
+          if (mounted) {
+            setAuthState({ user: null, session: null, loading: false });
+          }
+          return;
+        }
+
+        if (mounted) {
+          handleAuthChange('INITIAL_SESSION', session);
+        }
+      })
+      .catch((error) => {
+        clearTimeout(sessionTimeout);
+        console.error('[AuthContext] Session fetch exception:', error);
+        // Clear session on any error
+        supabase.auth.signOut();
+        clearUserProfileFromStorage();
+        if (mounted) {
+          setAuthState({ user: null, session: null, loading: false });
+        }
+      });
 
     return () => {
       if (import.meta.env.DEV) {
         console.log('[AuthContext] Cleaning up global auth listener');
       }
+      clearTimeout(sessionTimeout);
       mounted = false;
       subscription.unsubscribe();
     };
