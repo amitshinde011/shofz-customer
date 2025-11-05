@@ -97,6 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   
   const initialSessionProcessedRef = useRef(false);
   const lastValidationTimeRef = useRef<number>(0);
+  const sessionRef = useRef<Session | null>(null);
   const { toast } = useToast();
 
   const fetchUserProfile = async (userId: string, session?: Session | null): Promise<AuthUser | null> => {
@@ -271,7 +272,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, []); // ← EMPTY DEPS = RUNS ONCE
 
-  // Session validation on app focus (better than visibility change)
+  // Keep session ref updated
+  useEffect(() => {
+    sessionRef.current = authState.session;
+  }, [authState.session]);
+
+  // Session validation on app focus - using ref to avoid stale closure
   useEffect(() => {
     const MIN_VALIDATION_INTERVAL = 30 * 60 * 1000; // 30 minutes
 
@@ -280,9 +286,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const timeSinceLastValidation = now - lastValidationTimeRef.current;
 
       // Only validate if:
-      // 1. We have a session
+      // 1. We have a session (check ref to avoid stale closure)
       // 2. More than 30 minutes since last validation
-      if (authState.session && timeSinceLastValidation > MIN_VALIDATION_INTERVAL) {
+      if (sessionRef.current && timeSinceLastValidation > MIN_VALIDATION_INTERVAL) {
         console.log('[AuthContext] App gained focus, validating session (last validation:', timeSinceLastValidation, 'ms ago)');
 
         try {
@@ -314,7 +320,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       window.removeEventListener('focus', handleFocus);
     };
-  }, []); // Remove authState.session from dependencies
+  }, []); // Empty deps - event listener registered once, uses ref for session
 
   const signUpWithEmail = async (email: string, password: string, name: string) => {
     try {

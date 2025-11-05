@@ -60,13 +60,15 @@ const App = () => {
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <OfflineIndicator />
-          <ConnectionStatus />
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <AppContent />
-          </BrowserRouter>
+          <LocationProvider>
+            <OfflineIndicator />
+            <ConnectionStatus />
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <AppContent />
+            </BrowserRouter>
+          </LocationProvider>
         </TooltipProvider>
       </QueryClientProvider>
     </AuthProvider>
@@ -91,33 +93,25 @@ function AppContent() {
       <Routes>
         {/* Public Routes - with location */}
         <Route path="/" element={
-          <LocationProvider>
-            <LocationPermissionGate>
-              <Home />
-            </LocationPermissionGate>
-          </LocationProvider>
+          <LocationPermissionGate>
+            <Home />
+          </LocationPermissionGate>
         } />
         <Route path="/products" element={
-          <LocationProvider>
-            <LocationPermissionGate>
-              <Products />
-            </LocationPermissionGate>
-          </LocationProvider>
+          <LocationPermissionGate>
+            <Products />
+          </LocationPermissionGate>
         } />
         <Route path="/products/:id" element={<ProductDetail />} />
         <Route path="/shops" element={
-          <LocationProvider>
-            <LocationPermissionGate>
-              <Shops />
-            </LocationPermissionGate>
-          </LocationProvider>
+          <LocationPermissionGate>
+            <Shops />
+          </LocationPermissionGate>
         } />
         <Route path="/shops/:id" element={
-          <LocationProvider>
-            <LocationPermissionGate>
-              <ShopDetail />
-            </LocationPermissionGate>
-          </LocationProvider>
+          <LocationPermissionGate>
+            <ShopDetail />
+          </LocationPermissionGate>
         } />
         <Route path="/offers" element={<Offers />} />
         <Route path="/offers/:id" element={<OfferDetail />} />
