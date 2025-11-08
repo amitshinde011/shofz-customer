@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { productService, Product } from '@/services/productService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -144,5 +144,28 @@ export const useRelatedProducts = (productId: string, category: string, limit?: 
     queryKey: ['products', 'related', productId, category, limit],
     queryFn: () => productService.getRelatedProducts(productId, category, limit),
     enabled: !!productId && !!category,
+  });
+};
+
+// Infinite scroll version of useProducts
+export const useInfiniteProducts = (options?: Omit<ProductSearchOptions, 'offset'>) => {
+  return useInfiniteQuery({
+    queryKey: ['products-infinite', options],
+    queryFn: async ({ pageParam = 0 }) => {
+      const result = await productService.searchProducts({
+        ...options,
+        limit: options?.limit || 20,
+        offset: pageParam,
+      });
+      return result;
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      const loadedCount = allPages.reduce((sum, page) => sum + (page.data?.length || 0), 0);
+      const hasMore = lastPage.data && lastPage.data.length === (options?.limit || 20);
+      return hasMore ? loadedCount : undefined;
+    },
+    initialPageParam: 0,
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 };

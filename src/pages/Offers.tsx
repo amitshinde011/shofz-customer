@@ -8,7 +8,9 @@ import { useNavigate, useSearchParams, Link } from "react-router-dom";
 import SearchBar from "@/components/SearchBar";
 import OfferCard from "@/components/OfferCard";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useOffers } from "@/hooks/useOffers";
+import { useInfiniteOffers } from "@/hooks/useOffers";
+import { InfiniteScrollTrigger } from "@/components/InfiniteScrollTrigger";
+import { InfiniteScrollLoader } from "@/components/InfiniteScrollLoader";
 import OfferFilterSheet, { OfferFilterState } from "@/components/OfferFilterSheet";
 import { useUserLocation } from "@/contexts/LocationContext";
 import { useShop } from "@/hooks/useShops";
@@ -37,8 +39,6 @@ export default function Offers() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedShop, setSelectedShop] = useState<string | null>(null);
   const [sortBy, setSortBy] = useState<SortOption>("relevance");
-  const [itemsPerPage, setItemsPerPage] = useState(20);
-  const [currentPage, setCurrentPage] = useState(1);
   const [filters, setFilters] = useState<OfferFilterState>(defaultFilters);
   const { location, loading: locationLoading, requestLocation } = useUserLocation();
   const [featuredOnly, setFeaturedOnly] = useState(false);
@@ -77,17 +77,37 @@ export default function Offers() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Fetch all active offers
-  const { data: offersResponse, isLoading } = useOffers({
+  // Fetch offers using infinite query
+  const {
+    data: infiniteData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+  } = useInfiniteOffers({
     active: true,
     shopId: selectedShop || undefined,
     location: location ? { lat: location.lat, lng: location.lng, radius: 50 } : undefined,
-    limit: 100,
   });
 
   const { data: shopData } = useShop(selectedShop ?? 'NO_SHOP');
 
-  const offers = offersResponse?.data || [];
+  const offers = useMemo(() => {
+    return infiniteData?.pages.flatMap(page => page.data || []) || [];
+  }, [infiniteData]);
+
+  // Calculate active filter count
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (filters.offerTypes.length > 0) count++;
+    if (filters.discountRange[0] > 0 || filters.discountRange[1] < 100) count++;
+    if (filters.categories.length > 0) count++;
+    if (filters.shops.length > 0) count++;
+    if (filters.minDiscount > 0) count++;
+    if (filters.validFrom) count++;
+    if (filters.validUntil) count++;
+    return count;
+  }, [filters]);
 
   // Extract unique categories and shops for filters
   const availableCategories = useMemo(() => {
@@ -226,32 +246,6 @@ export default function Offers() {
 
     return filtered;
   }, [offers, debouncedQuery, sortBy, filters, featuredOnly]);
-
-  // Pagination logic
-  const totalOffers = filteredAndSortedOffers.length;
-  const totalPages = Math.ceil(totalOffers / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedOffers = filteredAndSortedOffers.slice(startIndex, endIndex);
-
-  // Calculate active filter count
-  const activeFilterCount = useMemo(() => {
-    let count = 0;
-    // Don't count isFeatured since it's displayed separately
-    if (filters.offerTypes.length > 0) count++;
-    if (filters.discountRange[0] > 0 || filters.discountRange[1] < 100) count++;
-    if (filters.categories.length > 0) count++;
-    if (filters.shops.length > 0) count++;
-    if (filters.minDiscount > 0) count++;
-    if (filters.validFrom) count++;
-    if (filters.validUntil) count++;
-    return count;
-  }, [filters]);
-
-  // Reset to first page when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, sortBy, filters, featuredOnly]);
 
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -458,36 +452,12 @@ export default function Offers() {
             )}
             <div className="flex items-center gap-2 flex-wrap">
               <p className="text-sm text-muted-foreground font-medium">
-                {isLoading ? "Searching..." : (
-                  <>
-                    <span className="font-bold text-foreground">
-                      {totalOffers} results
-                    </span>
-                  </>
-                )}
+                {isLoading ? "Searching..." : `${filteredAndSortedOffers.length} results`}
               </p>
-              {!isLoading && totalOffers > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  (Page {currentPage} of {totalPages})
-                </span>
-              )}
             </div>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Items Per Page */}
-            <Select value={itemsPerPage.toString()} onValueChange={(value) => setItemsPerPage(parseInt(value))}>
-              <SelectTrigger className="w-[90px] text-xs h-8">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="12">12</SelectItem>
-                <SelectItem value="20">20</SelectItem>
-                <SelectItem value="36">36</SelectItem>
-                <SelectItem value="48">48</SelectItem>
-              </SelectContent>
-            </Select>
-
             <OfferFilterSheet
               filters={filters}
               onFiltersChange={(newFilters) => {
@@ -546,74 +516,40 @@ export default function Offers() {
           </div>
         )}
 
-        {/* Offers Grid */}
-        {!isLoading && paginatedOffers.length > 0 && (
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            className="grid-offers grid-gap"
-          >
-            {paginatedOffers.map((offer, index) => (
-              <motion.div
-                key={offer.id}
-                variants={itemVariants}
-                custom={index}
-              >
-                <OfferCard offer={offer} variant="default" />
-              </motion.div>
-            ))}
-          </motion.div>
-        )}
-
-        {/* Pagination - Amazon Style */}
-        {!isLoading && totalPages > 1 && paginatedOffers.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="flex items-center justify-center gap-2 mt-12"
-          >
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
+        {/* Offers Grid with Infinite Scroll */}
+        {!isLoading && filteredAndSortedOffers.length > 0 && (
+          <>
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="grid-offers grid-gap"
             >
-              Previous
-            </Button>
-
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter(page => {
-                if (page === 1 || page === totalPages) return true;
-                if (Math.abs(page - currentPage) <= 1) return true;
-                return false;
-              })
-              .map((page, index, array) => (
-                <div key={page} className="flex items-center gap-2">
-                  {index > 0 && array[index - 1] !== page - 1 && (
-                    <span className="text-muted-foreground px-2">...</span>
-                  )}
-                  <Button
-                    variant={currentPage === page ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setCurrentPage(page)}
-                    className={currentPage === page ? "bg-primary text-primary-foreground" : ""}
-                  >
-                    {page}
-                  </Button>
-                </div>
+              {filteredAndSortedOffers.map((offer, index) => (
+                <motion.div
+                  key={offer.id}
+                  variants={itemVariants}
+                  custom={index}
+                >
+                  <OfferCard offer={offer} variant="default" />
+                </motion.div>
               ))}
+            </motion.div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-            >
-              Next
-            </Button>
-          </motion.div>
+            <InfiniteScrollTrigger
+              onLoadMore={() => fetchNextPage()}
+              hasMore={hasNextPage}
+              isLoading={isFetchingNextPage}
+              threshold={300}
+            />
+
+            <InfiniteScrollLoader
+              isLoading={isFetchingNextPage}
+              hasMore={hasNextPage}
+              loadingText="Loading more offers..."
+              endText="No more offers to load"
+            />
+          </>
         )}
 
         {/* Location Required State */}

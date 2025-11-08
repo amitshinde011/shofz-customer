@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from "@tanstack/react-query";
 import { reviewDisplayService, ReviewFilters } from "@/services/reviewDisplayService";
 import { useToast } from "@/hooks/use-toast";
 
@@ -162,5 +162,22 @@ export const useUpdateReview = () => {
         variant: "destructive"
       });
     }
+  });
+};
+
+// Infinite scroll version for reviews
+export const useInfiniteShopReviews = (shopId: string, filters: ReviewFilters) => {
+  return useInfiniteQuery({
+    queryKey: ['shop-reviews-infinite', shopId, filters],
+    queryFn: async ({ pageParam = 1 }) => {
+      const { data, error } = await reviewDisplayService.getShopReviews(shopId, filters, pageParam, 10);
+      if (error) throw error;
+      return data || [];
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      return lastPage && lastPage.length === 10 ? allPages.length + 1 : undefined;
+    },
+    initialPageParam: 1,
+    enabled: !!shopId,
   });
 };

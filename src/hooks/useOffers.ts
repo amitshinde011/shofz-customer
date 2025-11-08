@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface Offer {
@@ -230,5 +230,123 @@ export const useActiveOffers = (limit?: number, location?: { lat: number; lng: n
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
     enabled: !!location,
+  });
+};
+
+// Infinite scroll version
+export const useInfiniteOffers = (options?: {
+  shopId?: string;
+  active?: boolean;
+  location?: { lat: number; lng: number; radius?: number };
+}) => {
+  return useInfiniteQuery({
+    queryKey: ['offers-infinite', options],
+    queryFn: async ({ pageParam = 0 }) => {
+      // If shopId is provided without location, query directly
+      if (options?.shopId && !options?.location) {
+        let query = (supabase as any)
+          .from('offers')
+          .select(`
+            *,
+            shops (
+              id,
+              name,
+              address,
+              logo_url
+            )
+          `)
+          .eq('shop_id', options.shopId)
+          .eq('is_active', true)
+          .gte('valid_until', new Date().toISOString())
+          .order('is_featured', { ascending: false })
+          .order('created_at', { ascending: false })
+          .range(pageParam, pageParam + 19);
+
+        const { data: offers, error } = await query;
+        if (error) throw error;
+
+        const offersWithProducts = await Promise.all(
+          (offers || []).map(async (offer: any) => {
+            if (offer.applicable_products && offer.applicable_products.length > 0) {
+              const { data: products } = await (supabase as any)
+                .from('products')
+                .select('id, name, price, images')
+                .in('id', offer.applicable_products);
+              return { ...offer, products: products || [] };
+            }
+            return { ...offer, products: [] };
+          })
+        );
+
+        return { data: offersWithProducts, error: null };
+      }
+
+      // If location is provided, filter by nearby shops
+      if (options?.location) {
+        const { data: nearbyShops, error: shopsError } = await (supabase as any).rpc('get_nearby_shops', {
+          user_lat: options.location.lat,
+          user_lng: options.location.lng,
+          radius_km: options.location.radius || 50
+        });
+
+        if (shopsError) throw shopsError;
+
+        const nearbyShopIds = nearbyShops?.map((s: any) => s.id) || [];
+        
+        if (nearbyShopIds.length === 0) {
+          return { data: [], error: null };
+        }
+
+        let query = (supabase as any)
+          .from('offers')
+          .select(`
+            *,
+            shops (
+              id,
+              name,
+              address,
+              logo_url
+            )
+          `)
+          .eq('is_active', true)
+          .in('shop_id', nearbyShopIds)
+          .gte('valid_until', new Date().toISOString())
+          .order('is_featured', { ascending: false })
+          .order('created_at', { ascending: false })
+          .range(pageParam, pageParam + 19);
+
+        if (options?.shopId) {
+          query = query.eq('shop_id', options.shopId);
+        }
+
+        const { data: offers, error } = await query;
+        if (error) throw error;
+
+        const offersWithProducts = await Promise.all(
+          (offers || []).map(async (offer: any) => {
+            if (offer.applicable_products && offer.applicable_products.length > 0) {
+              const { data: products } = await (supabase as any)
+                .from('products')
+                .select('id, name, price, images')
+                .in('id', offer.applicable_products);
+              return { ...offer, products: products || [] };
+            }
+            return { ...offer, products: [] };
+          })
+        );
+
+        return { data: offersWithProducts, error: null };
+      }
+
+      return { data: [], error: null };
+    },
+    getNextPageParam: (lastPage, allPages) => {
+      const loadedCount = allPages.reduce((sum, page) => sum + (page.data?.length || 0), 0);
+      const hasMore = lastPage.data && lastPage.data.length === 20;
+      return hasMore ? loadedCount : undefined;
+    },
+    initialPageParam: 0,
+    staleTime: 10 * 60 * 1000,
+    enabled: !!(options?.location || options?.shopId),
   });
 };
