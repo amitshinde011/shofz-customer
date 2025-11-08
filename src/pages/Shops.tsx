@@ -17,6 +17,8 @@ import FilterSheet, { FilterState } from "@/components/FilterSheet";
 import ShopMap from "@/components/ShopMap";
 import { calculateDistance, formatDistance } from "@/lib/distanceCalculation";
 import { calculateShopStatus } from "@/lib/businessHours";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -87,9 +89,19 @@ export default function Shops() {
     limit: 50,
   }), [debouncedQuery, location?.lat, location?.lng, filters.distance]);
 
-  const { data: shopsResponse, isLoading } = useShops(shopSearchOptions);
+  const { data: shopsResponse, isLoading, refetch } = useShops(shopSearchOptions);
   const { data: favoritesResponse } = useUserFavoriteShops();
   const toggleFavoriteMutation = useToggleShopFavorite();
+
+  // Pull to refresh
+  const handleRefresh = async () => {
+    await refetch();
+  };
+
+  const pullToRefresh = usePullToRefresh({
+    onRefresh: handleRefresh,
+    enabled: true,
+  });
 
   const shops = shopsResponse?.data || [];
   const favoriteShopIds = favoritesResponse?.data?.map(fav => fav.shop_id) || [];
@@ -222,7 +234,17 @@ export default function Shops() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20 overflow-x-hidden w-full max-w-full">
+    <div 
+      ref={pullToRefresh.scrollContainerRef}
+      className="min-h-screen bg-background pb-20 overflow-x-hidden overflow-y-auto w-full max-w-full"
+    >
+      <PullToRefreshIndicator
+        isPulling={pullToRefresh.isPulling}
+        isRefreshing={pullToRefresh.isRefreshing}
+        pullDistance={pullToRefresh.pullDistance}
+        isReady={pullToRefresh.isReady}
+      />
+      
       {/* Breadcrumbs - Amazon Style */}
       <div className="bg-background border-b border-border px-4 sm:px-6 lg:px-8 py-3">
         <div className="max-w-screen-2xl mx-auto">

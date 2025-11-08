@@ -14,6 +14,8 @@ import { InfiniteScrollLoader } from "@/components/InfiniteScrollLoader";
 import OfferFilterSheet, { OfferFilterState } from "@/components/OfferFilterSheet";
 import { useUserLocation } from "@/contexts/LocationContext";
 import { useShop } from "@/hooks/useShops";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -84,10 +86,21 @@ export default function Offers() {
     hasNextPage,
     isFetchingNextPage,
     isLoading,
+    refetch,
   } = useInfiniteOffers({
     active: true,
     shopId: selectedShop || undefined,
     location: location ? { lat: location.lat, lng: location.lng, radius: 50 } : undefined,
+  });
+
+  // Pull to refresh
+  const handleRefresh = async () => {
+    await refetch();
+  };
+
+  const pullToRefresh = usePullToRefresh({
+    onRefresh: handleRefresh,
+    enabled: true,
   });
 
   const { data: shopData } = useShop(selectedShop ?? 'NO_SHOP');
@@ -263,7 +276,17 @@ export default function Offers() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20 overflow-x-hidden w-full max-w-full">
+    <div 
+      ref={pullToRefresh.scrollContainerRef}
+      className="min-h-screen bg-background pb-20 overflow-x-hidden overflow-y-auto w-full max-w-full"
+    >
+      <PullToRefreshIndicator
+        isPulling={pullToRefresh.isPulling}
+        isRefreshing={pullToRefresh.isRefreshing}
+        pullDistance={pullToRefresh.pullDistance}
+        isReady={pullToRefresh.isReady}
+      />
+      
       {/* Breadcrumbs - Amazon Style */}
       <div className="bg-background border-b border-border px-4 sm:px-6 lg:px-8 py-3">
         <div className="max-w-screen-2xl mx-auto">
