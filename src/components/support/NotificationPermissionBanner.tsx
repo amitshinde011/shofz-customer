@@ -11,16 +11,17 @@ export const NotificationPermissionBanner = () => {
     const shouldShow = 
       'Notification' in window &&
       Notification.permission === 'default' &&
-      !localStorage.getItem('notification_permission_dismissed');
+      !localStorage.getItem('notification_permission_dismissed') &&
+      !localStorage.getItem('notification_permission_requested');
     
     setShow(shouldShow);
   }, []);
 
   const handleEnable = async () => {
     const permission = await Notification.requestPermission();
-    if (permission === 'granted') {
-      setShow(false);
-    }
+    // Store the interaction regardless of outcome to prevent repeated prompts
+    localStorage.setItem('notification_permission_requested', 'true');
+    setShow(false);
   };
 
   const handleDismiss = () => {

@@ -97,6 +97,7 @@ export function useLocation() {
         setLoading(false);
 
         localStorage.setItem('userLocation', JSON.stringify(newLocation));
+        localStorage.setItem('location_permission_granted', 'true');
       } else {
         // Use browser Geolocation API on web
         console.log('[useLocation] Using browser Geolocation API');
@@ -117,6 +118,7 @@ export function useLocation() {
             setLoading(false);
 
             localStorage.setItem('userLocation', JSON.stringify(newLocation));
+            localStorage.setItem('location_permission_granted', 'true');
           },
           (error) => {
             let errorMsg = 'Failed to get your location';
@@ -165,6 +167,11 @@ export function useLocation() {
       console.error('[useLocation] Geolocation error:', error);
       setError(errorMsg);
       setLoading(false);
+      
+      // Clear permission flag if explicitly denied
+      if (errorMessage.includes('PERMISSION_DENIED') || error.code === 'PERMISSION_DENIED') {
+        localStorage.removeItem('location_permission_granted');
+      }
       // Toast removed - LocationPermissionGate will show the error
     }
   };
