@@ -37,7 +37,7 @@ export default function Products() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedShop, setSelectedShop] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<SortOption>("relevance");
+  const [sortBy, setSortBy] = useState<SortOption>("distance");
   const { toast } = useToast();
   const { location, loading: locationLoading, requestLocation } = useUserLocation();
   const [featuredOnly, setFeaturedOnly] = useState(false);
@@ -263,14 +263,32 @@ export default function Products() {
           });
         }
         break;
-      default: // relevance
-        filtered.sort((a, b) => {
-          // Featured first for relevance
-          if (a.is_featured !== b.is_featured) {
-            return a.is_featured ? -1 : 1;
-          }
-          return 0;
-        });
+      default: // relevance (with distance priority when available)
+        if (location) {
+          filtered.sort((a, b) => {
+            // Featured first
+            if (a.is_featured !== b.is_featured) {
+              return a.is_featured ? -1 : 1;
+            }
+            // Then by shop distance
+            const aShopLocation = (a.shops as any)?.location;
+            const bShopLocation = (b.shops as any)?.location;
+            
+            if (!aShopLocation || !bShopLocation) return 0;
+            
+            const distA = calculateDistance(location, aShopLocation);
+            const distB = calculateDistance(location, bShopLocation);
+            return distA - distB;
+          });
+        } else {
+          // No location: just featured first, keep rest as-is
+          filtered.sort((a, b) => {
+            if (a.is_featured !== b.is_featured) {
+              return a.is_featured ? -1 : 1;
+            }
+            return 0;
+          });
+        }
         break;
     }
 

@@ -16,6 +16,7 @@ import { useUserLocation } from "@/contexts/LocationContext";
 import { useShop } from "@/hooks/useShops";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
+import { calculateDistance } from "@/lib/distanceCalculation";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -25,7 +26,7 @@ import {
   BreadcrumbSeparator,
 } from "@/components/ui/breadcrumb";
 
-type SortOption = "relevance" | "newest" | "ending-soon" | "discount-high" | "discount-low";
+type SortOption = "nearest" | "newest" | "ending-soon" | "discount-high" | "discount-low";
 
 const defaultFilters: OfferFilterState = {
   offerTypes: [],
@@ -40,7 +41,7 @@ export default function Offers() {
   const [searchParams] = useSearchParams();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedShop, setSelectedShop] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<SortOption>("relevance");
+  const [sortBy, setSortBy] = useState<SortOption>("nearest");
   const [filters, setFilters] = useState<OfferFilterState>(defaultFilters);
   const { location, loading: locationLoading, requestLocation } = useUserLocation();
   const [featuredOnly, setFeaturedOnly] = useState(false);
@@ -246,14 +247,32 @@ export default function Offers() {
           return a.discount_value - b.discount_value;
         });
         break;
-      default: // relevance
-        filtered.sort((a, b) => {
-          // Featured first for relevance
-          if (a.is_featured !== b.is_featured) {
-            return a.is_featured ? -1 : 1;
-          }
-          return 0;
-        });
+      default: // nearest (with featured priority)
+        if (location) {
+          filtered.sort((a, b) => {
+            // Featured first
+            if (a.is_featured !== b.is_featured) {
+              return a.is_featured ? -1 : 1;
+            }
+            // Then by shop distance
+            const aShopLocation = (a.shops as any)?.location;
+            const bShopLocation = (b.shops as any)?.location;
+            
+            if (!aShopLocation || !bShopLocation) return 0;
+            
+            const distA = calculateDistance(location, aShopLocation);
+            const distB = calculateDistance(location, bShopLocation);
+            return distA - distB;
+          });
+        } else {
+          // No location: just featured first, keep rest as-is
+          filtered.sort((a, b) => {
+            if (a.is_featured !== b.is_featured) {
+              return a.is_featured ? -1 : 1;
+            }
+            return 0;
+          });
+        }
         break;
     }
 
@@ -514,7 +533,7 @@ export default function Offers() {
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="relevance">Relevance</SelectItem>
+                <SelectItem value="nearest">Nearest First</SelectItem>
                 <SelectItem value="newest">Newest First</SelectItem>
                 <SelectItem value="ending-soon">Ending Soon</SelectItem>
                 <SelectItem value="discount-high">Discount: High to Low</SelectItem>

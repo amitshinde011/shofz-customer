@@ -26,6 +26,7 @@ export interface Offer {
     name: string;
     address?: string;
     logo_url?: string;
+    location?: { lat: number; lng: number };
   };
   products?: {
     id: string;
@@ -55,7 +56,8 @@ export const useOffers = (options?: {
               id,
               name,
               address,
-              logo_url
+              logo_url,
+              location
             )
           `)
           .eq('shop_id', options.shopId)
@@ -118,7 +120,8 @@ export const useOffers = (options?: {
               id,
               name,
               address,
-              logo_url
+              logo_url,
+              location
             )
           `)
           .eq('is_active', true)
@@ -196,7 +199,8 @@ export const useActiveOffers = (limit?: number, location?: { lat: number; lng: n
               id,
               name,
               address,
-              logo_url
+              logo_url,
+              location
             )
           `)
           .eq('is_active', true)
@@ -252,7 +256,8 @@ export const useInfiniteOffers = (options?: {
               id,
               name,
               address,
-              logo_url
+              logo_url,
+              location
             )
           `)
           .eq('shop_id', options.shopId)
@@ -305,7 +310,8 @@ export const useInfiniteOffers = (options?: {
               id,
               name,
               address,
-              logo_url
+              logo_url,
+              location
             )
           `)
           .eq('is_active', true)
