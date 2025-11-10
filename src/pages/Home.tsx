@@ -94,6 +94,13 @@ export default function Home() {
         isFavorite: false,
         coordinates: shop.latitude && shop.longitude ? { lat: shop.latitude, lng: shop.longitude } : null,
         phone: shop.phone_number || '',
+        reviewCount: shop.total_reviews || 0,
+        delivery_available: shop.delivery_available,
+        delivery_coverage_km: shop.delivery_coverage_km,
+        delivery_charge_per_km: shop.delivery_charge_per_km,
+        free_delivery_above: shop.free_delivery_above,
+        delivery_notes: shop.delivery_notes,
+        distance_km: shop.distance_km,
       };
     });
 
