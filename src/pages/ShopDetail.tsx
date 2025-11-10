@@ -493,6 +493,36 @@ export default function ShopDetail() {
               </Card>
             )}
 
+            {/* Offers from this shop - Grid Layout */}
+            {sortedShopOffers.length > 0 && (
+              <Card>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between mb-4">
+                    <h2 className="text-lg font-bold text-foreground">Offers from this shop</h2>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => navigate(`/offers?shop=${shop.id}`)}
+                      className="text-xs"
+                    >
+                      View All
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                    {sortedShopOffers.slice(0, 6).map((offer) => (
+                      <OfferCard
+                        key={offer.id}
+                        offer={offer}
+                        variant="default"
+                        hideButton={false}
+                      />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Products Grid */}
             {sortedShopProducts.length > 0 && (
               <Card>
