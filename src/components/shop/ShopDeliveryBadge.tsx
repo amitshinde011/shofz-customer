@@ -14,16 +14,9 @@ export function ShopDeliveryBadge({
   distanceKm,
   variant = 'compact'
 }: ShopDeliveryBadgeProps) {
+  // Don't show anything if delivery is not available
   if (!deliveryAvailable) {
-    return (
-      <Badge 
-        variant="secondary" 
-        className="text-xs bg-muted text-muted-foreground"
-      >
-        <Truck className="w-3 h-3 mr-1" />
-        Pickup only
-      </Badge>
-    );
+    return null;
   }
 
   // Check if customer is within delivery range
