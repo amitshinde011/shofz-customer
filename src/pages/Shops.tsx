@@ -17,6 +17,9 @@ import FilterSheet, { FilterState } from "@/components/FilterSheet";
 import ShopMap from "@/components/ShopMap";
 import { calculateDistance, formatDistance } from "@/lib/distanceCalculation";
 import { calculateShopStatus } from "@/lib/businessHours";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
+import { isWithinDeliveryRadius } from "@/lib/deliveryCalculations";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -27,7 +30,7 @@ import {
 } from "@/components/ui/breadcrumb";
 
 type ViewMode = "grid" | "map";
-type SortOption = "distance" | "rating" | "newest" | "name";
+type SortOption = "distance" | "rating" | "newest" | "name" | "nearestDelivery";
 
 const defaultFilters: FilterState = {
   categories: [],
@@ -36,6 +39,7 @@ const defaultFilters: FilterState = {
   rating: 0,
   inStockOnly: false,
   hasDelivery: false,
+  deliversToMe: false,
   isOpen: false,
   minReviews: 0,
 };
@@ -87,9 +91,19 @@ export default function Shops() {
     limit: 50,
   }), [debouncedQuery, location?.lat, location?.lng, filters.distance]);
 
-  const { data: shopsResponse, isLoading } = useShops(shopSearchOptions);
+  const { data: shopsResponse, isLoading, refetch } = useShops(shopSearchOptions);
   const { data: favoritesResponse } = useUserFavoriteShops();
   const toggleFavoriteMutation = useToggleShopFavorite();
+
+  // Pull to refresh
+  const handleRefresh = async () => {
+    await refetch();
+  };
+
+  const pullToRefresh = usePullToRefresh({
+    onRefresh: handleRefresh,
+    enabled: true,
+  });
 
   const shops = shopsResponse?.data || [];
   const favoriteShopIds = favoritesResponse?.data?.map(fav => fav.shop_id) || [];
@@ -102,6 +116,7 @@ export default function Shops() {
     if (filters.distance < 50) count++;
     if (filters.rating > 0) count++;
     if (filters.hasDelivery) count++;
+    if (filters.deliversToMe) count++;
     if (filters.isOpen) count++;
     if (filters.minReviews && filters.minReviews > 0) count++;
     return count;
@@ -138,6 +153,24 @@ export default function Shops() {
         if (!shop.location) return false;
         const distance = calculateDistance(location, shop.location);
         return distance <= filters.distance;
+      });
+    }
+
+    // Apply delivery filters
+    if (filters.hasDelivery) {
+      filtered = filtered.filter(shop => shop.delivery_available === true);
+    }
+
+    if (filters.deliversToMe && location) {
+      filtered = filtered.filter(shop => {
+        if (!shop.delivery_available || !shop.location || !shop.delivery_coverage_km) {
+          return false;
+        }
+        return isWithinDeliveryRadius(
+          shop.location,
+          location,
+          shop.delivery_coverage_km
+        );
       });
     }
 
@@ -181,6 +214,36 @@ export default function Shops() {
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         });
         break;
+      case "nearestDelivery":
+        // Filter only shops with delivery that deliver to user's location
+        if (location) {
+          filtered = filtered.filter(shop => {
+            // Must have delivery enabled
+            if (!shop.delivery_available) return false;
+            // Must have location and coverage configured
+            if (!shop.location || !shop.delivery_coverage_km) return false;
+            // Must be within delivery radius
+            return isWithinDeliveryRadius(
+              shop.location,
+              location,
+              shop.delivery_coverage_km
+            );
+          });
+          
+          // Sort by distance
+          filtered.sort((a, b) => {
+            // Featured first
+            if (a.is_featured !== b.is_featured) {
+              return a.is_featured ? -1 : 1;
+            }
+            // Then by distance
+            if (!a.location || !b.location) return 0;
+            const distA = calculateDistance(location, a.location);
+            const distB = calculateDistance(location, b.location);
+            return distA - distB;
+          });
+        }
+        break;
       case "distance":
         if (location) {
           filtered.sort((a, b) => {
@@ -222,7 +285,17 @@ export default function Shops() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20 overflow-x-hidden w-full max-w-full">
+    <div 
+      ref={pullToRefresh.scrollContainerRef}
+      className="min-h-screen bg-background pb-20 overflow-x-hidden overflow-y-auto w-full max-w-full"
+    >
+      <PullToRefreshIndicator
+        isPulling={pullToRefresh.isPulling}
+        isRefreshing={pullToRefresh.isRefreshing}
+        pullDistance={pullToRefresh.pullDistance}
+        isReady={pullToRefresh.isReady}
+      />
+      
       {/* Breadcrumbs - Amazon Style */}
       <div className="bg-background border-b border-border px-4 sm:px-6 lg:px-8 py-3">
         <div className="max-w-screen-2xl mx-auto">
@@ -378,6 +451,15 @@ export default function Shops() {
                 </Badge>
               )}
 
+              {filters.deliversToMe && (
+                <Badge variant="secondary" className="flex items-center gap-1.5 rounded-full px-3 py-1 font-medium bg-success/10 text-success">
+                  Delivers to Me
+                  <X className="w-3.5 h-3.5 cursor-pointer hover:text-destructive transition-colors" onClick={() => {
+                    setFilters(prev => ({ ...prev, deliversToMe: false }));
+                  }} />
+                </Badge>
+              )}
+
               {filters.isOpen && (
                 <Badge variant="secondary" className="flex items-center gap-1.5 rounded-full px-3 py-1 font-medium">
                   Open Now
@@ -462,12 +544,13 @@ export default function Shops() {
           />
 
             <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
-              <SelectTrigger className="w-[140px] rounded-full font-medium text-xs h-8">
+              <SelectTrigger className="w-[180px] rounded-full font-medium text-xs h-8">
                 <ArrowUpDown className="w-3.5 h-3.5 mr-1.5" />
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="distance">Distance</SelectItem>
+                <SelectItem value="nearestDelivery">Nearest with Delivery</SelectItem>
                 <SelectItem value="rating">Rating</SelectItem>
                 <SelectItem value="name">Name A-Z</SelectItem>
                 <SelectItem value="newest">Newest</SelectItem>
@@ -509,8 +592,12 @@ export default function Shops() {
             className="grid-shops grid-gap"
           >
             {filteredAndSortedShops.map((shop) => {
-              const distance = location && shop.location
-                ? formatDistance(calculateDistance(location, shop.location))
+              const distanceKm = location && shop.location
+                ? calculateDistance(location, shop.location)
+                : undefined;
+              
+              const distance = distanceKm !== undefined
+                ? formatDistance(distanceKm)
                 : 'N/A';
 
               const shopStatus = calculateShopStatus(shop.business_hours as any);
@@ -527,16 +614,22 @@ export default function Shops() {
                     rating: shop.rating || 0,
                     reviewCount: shop.total_reviews || 0,
                     distance,
+                    distance_km: distanceKm,
                     address: shop.address || '',
                     isOpen: shopStatus.isOpen,
                     nextStatusChange: shopStatus.nextStatusChange,
-                    delivery: false,
+                    
                     deliveryTime: '30-45 min',
                     establishedYear: 2020,
                     phone: shop.phone_number,
                     coordinates: shop.location,
                     isVerified: shop.is_verified,
                     is_featured: shop.is_featured,
+                    delivery_available: shop.delivery_available,
+                    delivery_coverage_km: shop.delivery_coverage_km,
+                    delivery_charge_per_km: shop.delivery_charge_per_km,
+                    free_delivery_above: shop.free_delivery_above,
+                    delivery_notes: shop.delivery_notes,
                   }}
                     variant="grid"
                     onToggleFavorite={toggleFavorite}

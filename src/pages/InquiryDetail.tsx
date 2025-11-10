@@ -14,7 +14,9 @@ import {
   CheckCircle2, 
   Loader2,
   Paperclip,
-  ChevronRight
+  ChevronRight,
+  Truck,
+  MapPin
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useRealtimeChat } from "@/hooks/useRealtimeChat";
@@ -28,6 +30,7 @@ import { inquiryService } from "@/services/inquiryService";
 import { parseMessage, isQuoteMessage, isPaymentRequestMessage } from '@/lib/messageParser';
 import { QuoteMessageBubble } from '@/components/chat/QuoteMessageBubble';
 import { PaymentRequestBubble } from '@/components/chat/PaymentRequestBubble';
+import { checkDeliveryAvailability } from '@/lib/deliveryCalculations';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -299,6 +302,119 @@ export default function InquiryDetail() {
                   <div>
                     <span className="text-sm text-muted-foreground">Description:</span>
                     <p className="text-sm mt-1 leading-relaxed">{inquiry.description}</p>
+                  </div>
+                </>
+              )}
+
+              {/* Delivery Information Section */}
+              {inquiry.order_type && (
+                <>
+                  <Separator />
+                  <div className="space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Truck className="w-4 h-4 text-primary" />
+                      <span className="text-sm font-semibold text-foreground">Order Type</span>
+                    </div>
+                    
+                    <div className="space-y-2">
+                      {/* Order Type Badge */}
+                      <div className="flex items-center gap-2">
+                        <Badge 
+                          variant="secondary"
+                          className={inquiry.order_type === 'delivery' 
+                            ? 'bg-primary/10 text-primary' 
+                            : 'bg-muted text-muted-foreground'
+                          }
+                        >
+                          {inquiry.order_type === 'delivery' ? (
+                            <>
+                              <Truck className="w-3 h-3 mr-1" />
+                              Delivery
+                            </>
+                          ) : (
+                            'Pickup'
+                          )}
+                        </Badge>
+                      </div>
+
+                      {/* Delivery Address */}
+                      {inquiry.order_type === 'delivery' && inquiry.delivery_address && (
+                        <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                          <div className="flex items-start gap-2">
+                            <MapPin className="w-4 h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+                            <div className="flex-1">
+                              <span className="text-xs font-medium text-muted-foreground">Delivery Address:</span>
+                              <p className="text-sm text-foreground mt-1">{inquiry.delivery_address}</p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Delivery Charge Information */}
+                      {inquiry.order_type === 'delivery' && inquiry.shops && inquiry.delivery_location && (
+                        <div className="p-3 rounded-lg bg-primary/5 border border-primary/20">
+                          {(() => {
+                            const deliveryInfo = inquiry.shops.delivery_available && 
+                                                 inquiry.shops.location && 
+                                                 inquiry.delivery_location
+                              ? checkDeliveryAvailability(
+                                  { lat: inquiry.shops.location.lat, lng: inquiry.shops.location.lng },
+                                  { lat: inquiry.delivery_location.lat, lng: inquiry.delivery_location.lng },
+                                  inquiry.shops.delivery_coverage_km || 5,
+                                  inquiry.shops.delivery_charge_per_km,
+                                  inquiry.shops.free_delivery_above,
+                                  inquiry.budget_max
+                                )
+                              : null;
+
+                            return deliveryInfo ? (
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs text-muted-foreground">Distance:</span>
+                                  <span className="text-xs font-medium">{deliveryInfo.formattedDistance}</span>
+                                </div>
+                                
+                                {deliveryInfo.deliveryCharge !== undefined && (
+                                  <div className="flex items-center justify-between pt-2 border-t border-border/50">
+                                    <span className="text-xs font-medium text-foreground">Estimated Delivery Charge:</span>
+                                    <span className="text-sm font-bold text-primary">
+                                      {deliveryInfo.isFreeDelivery ? (
+                                        <span className="text-success">FREE</span>
+                                      ) : (
+                                        `₹${deliveryInfo.deliveryCharge}`
+                                      )}
+                                    </span>
+                                  </div>
+                                )}
+
+                                {!deliveryInfo.isAvailable && (
+                                  <div className="pt-2 text-xs text-destructive">
+                                    ⚠️ Location is outside shop's delivery coverage
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              inquiry.shops.delivery_notes && (
+                                <div className="text-xs text-muted-foreground italic">
+                                  <span className="font-medium text-foreground">Note:</span> {inquiry.shops.delivery_notes}
+                                </div>
+                              )
+                            );
+                          })()}
+                        </div>
+                      )}
+
+                      {/* Delivery Notes from Shop */}
+                      {inquiry.order_type === 'delivery' && 
+                       inquiry.shops?.delivery_notes && 
+                       !inquiry.delivery_location && (
+                        <div className="p-3 rounded-lg bg-muted/50 border border-border">
+                          <p className="text-xs text-muted-foreground italic">
+                            <span className="font-medium text-foreground">Delivery Note:</span> {inquiry.shops.delivery_notes}
+                          </p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </>
               )}

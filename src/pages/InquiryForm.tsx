@@ -9,11 +9,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Plus, Minus, Send, Store, ChevronRight } from "lucide-react";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { ArrowLeft, Plus, Minus, Send, Store, ChevronRight, Truck, CheckCircle2, AlertCircle, XCircle } from "lucide-react";
 import { useCreateInquiry } from "@/hooks/useInquiries";
 import { useShop } from "@/hooks/useShops";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserLocation } from "@/contexts/LocationContext";
+import { checkDeliveryAvailability, DeliveryAvailability } from "@/lib/deliveryCalculations";
 import { z } from "zod";
 import ShopSelector from "@/components/ShopSelector";
 import { AttachmentUpload } from "@/components/AttachmentUpload";
@@ -31,7 +34,9 @@ const inquirySchema = z.object({
   quantity: z.number().min(1, "Quantity must be at least 1").max(100, "Quantity too high"),
   budget_min: z.number().min(0, "Budget must be positive").optional(),
   budget_max: z.number().min(0, "Budget must be positive").optional(),
-  preferred_contact: z.enum(["chat", "call", "both"])
+  preferred_contact: z.enum(["chat", "call", "both"]),
+  order_type: z.enum(["pickup", "delivery"]).optional(),
+  delivery_address: z.string().optional(),
 });
 
 type InquiryFormData = z.infer<typeof inquirySchema>;
@@ -55,6 +60,7 @@ export default function InquiryForm() {
   const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const { user } = useAuth();
+  const { location } = useUserLocation();
   
   const shopId = searchParams.get("shopId") || searchParams.get("shop_id");
   const offerId = searchParams.get("offer_id");
@@ -70,15 +76,17 @@ export default function InquiryForm() {
     quantity: 1,
     budget_min: 0,
     budget_max: 5000,
-    preferred_contact: "chat"
+    preferred_contact: "chat",
+    order_type: "pickup",
+    delivery_address: "",
   });
 
   const [budgetRange, setBudgetRange] = useState<[number, number]>([0, 5000]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [selectedShops, setSelectedShops] = useState<ShopWithDistance[]>([]);
-  const [userLocation, setUserLocation] = useState<{ lat: number; lng: number } | null>(null);
   const [attachmentPath, setAttachmentPath] = useState<string | null>(null);
+  const [deliveryAvailability, setDeliveryAvailability] = useState<DeliveryAvailability | null>(null);
 
   // Update form data when URL parameters change
   useEffect(() => {
@@ -99,6 +107,28 @@ export default function InquiryForm() {
       setSelectedShops([shopWithDistance]);
     }
   }, [shop]);
+
+  // Check delivery availability when order type or location changes
+  useEffect(() => {
+    if (
+      formData.order_type === "delivery" &&
+      shop?.delivery_available &&
+      shop?.location &&
+      location
+    ) {
+      const availability = checkDeliveryAvailability(
+        { lat: shop.location.lat, lng: shop.location.lng },
+        location,
+        shop.delivery_coverage_km || 5,
+        shop.delivery_charge_per_km,
+        shop.free_delivery_above,
+        formData.budget_max
+      );
+      setDeliveryAvailability(availability);
+    } else {
+      setDeliveryAvailability(null);
+    }
+  }, [formData.order_type, shop, location, formData.budget_max]);
 
   const handleQuantityChange = (delta: number) => {
     const newQuantity = Math.max(1, Math.min(100, formData.quantity + delta));
@@ -178,6 +208,12 @@ export default function InquiryForm() {
           preferred_contact: formData.preferred_contact,
           image_url: attachmentPath ? `customer-uploads/${attachmentPath}` : undefined,
           attachment_urls: attachmentPath ? [attachmentPath] : [],
+          order_type: formData.order_type || 'pickup',
+          delivery_address: formData.order_type === 'delivery' ? formData.delivery_address : undefined,
+          delivery_location: formData.order_type === 'delivery' && location ? {
+            lat: location.lat,
+            lng: location.lng
+          } : undefined,
         };
         return createInquiry.mutateAsync(inquiryData);
       });
@@ -262,7 +298,7 @@ export default function InquiryForm() {
               <ShopSelector
                 selectedShops={selectedShops}
                 onShopsChange={setSelectedShops}
-                userLocation={userLocation}
+                userLocation={location}
               />
               {errors.shops && (
                 <p className="text-sm text-destructive mt-2">{errors.shops}</p>
@@ -375,6 +411,94 @@ export default function InquiryForm() {
                     disabled={isSubmitting}
                   />
                 </div>
+
+                {/* Order Type Selection */}
+                {shop?.delivery_available && (
+                  <div className="space-y-3">
+                    <Label>Order Type</Label>
+                    <RadioGroup
+                      value={formData.order_type}
+                      onValueChange={(value) => setFormData(prev => ({ ...prev, order_type: value as any }))}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="pickup" id="pickup" />
+                        <Label htmlFor="pickup" className="cursor-pointer">Pickup from shop</Label>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <RadioGroupItem value="delivery" id="delivery" />
+                        <Label htmlFor="delivery" className="cursor-pointer flex items-center gap-2">
+                          <Truck className="w-4 h-4" />
+                          Delivery
+                        </Label>
+                      </div>
+                    </RadioGroup>
+                  </div>
+                )}
+
+                {/* Delivery Details */}
+                {formData.order_type === "delivery" && shop?.delivery_available && (
+                  <div className="space-y-4 p-4 border border-border rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-2">
+                      <Truck className="w-4 h-4 text-primary" />
+                      <h4 className="text-sm font-semibold text-foreground">Delivery Information</h4>
+                    </div>
+
+                    {/* Delivery Availability Alert */}
+                    {deliveryAvailability && (
+                      <Alert variant={deliveryAvailability.isAvailable ? "default" : "destructive"}>
+                        {deliveryAvailability.isAvailable ? (
+                          <CheckCircle2 className="h-4 w-4 text-success" />
+                        ) : (
+                          <XCircle className="h-4 w-4" />
+                        )}
+                        <AlertTitle className="text-sm">
+                          {deliveryAvailability.isAvailable 
+                            ? "✅ This shop delivers to your location"
+                            : "⚠️ Outside delivery coverage area"
+                          }
+                        </AlertTitle>
+                        <AlertDescription className="text-xs">
+                          {deliveryAvailability.message}
+                          {deliveryAvailability.isAvailable && deliveryAvailability.deliveryCharge !== undefined && (
+                            <div className="mt-2 pt-2 border-t border-border/50">
+                              <span className="font-medium">Estimated delivery charge: </span>
+                              {deliveryAvailability.isFreeDelivery ? (
+                                <span className="text-success font-bold">FREE</span>
+                              ) : (
+                                <span className="text-primary font-bold">₹{deliveryAvailability.deliveryCharge}</span>
+                              )}
+                            </div>
+                          )}
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    {!location && (
+                      <Alert>
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle className="text-sm">Location required</AlertTitle>
+                        <AlertDescription className="text-xs">
+                          Please enable location access or enter your delivery address to check availability.
+                        </AlertDescription>
+                      </Alert>
+                    )}
+
+                    {/* Delivery Address Input */}
+                    <div className="space-y-2">
+                      <Label htmlFor="delivery_address">Delivery Address (Optional)</Label>
+                      <Textarea
+                        id="delivery_address"
+                        value={formData.delivery_address}
+                        onChange={(e) => setFormData(prev => ({ ...prev, delivery_address: e.target.value }))}
+                        placeholder="Enter your complete delivery address"
+                        className="min-h-[80px]"
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        Add your complete delivery address including landmarks for accurate delivery.
+                      </p>
+                    </div>
+                  </div>
+                )}
 
                 {/* Contact Preference */}
                 <div className="space-y-3">

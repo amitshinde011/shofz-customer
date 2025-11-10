@@ -10,12 +10,16 @@ import ProductCard from "@/components/ProductCard";
 import FilterSheet, { FilterState } from "@/components/FilterSheet";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { useProducts, useProductCategories, useUserFavoriteProducts, useToggleProductFavorite } from "@/hooks/useProducts";
+import { useInfiniteProducts, useProductCategories, useUserFavoriteProducts, useToggleProductFavorite } from "@/hooks/useProducts";
+import { InfiniteScrollTrigger } from "@/components/InfiniteScrollTrigger";
+import { InfiniteScrollLoader } from "@/components/InfiniteScrollLoader";
 import { Product } from "@/services/productService";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserLocation } from "@/contexts/LocationContext";
 import { useShop } from "@/hooks/useShops";
 import { calculateDistance } from "@/lib/distanceCalculation";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -33,9 +37,7 @@ export default function Products() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("all");
   const [selectedShop, setSelectedShop] = useState<string | null>(null);
-  const [sortBy, setSortBy] = useState<SortOption>("relevance");
-  const [itemsPerPage, setItemsPerPage] = useState(20);
-  const [currentPage, setCurrentPage] = useState(1);
+  const [sortBy, setSortBy] = useState<SortOption>("distance");
   const { toast } = useToast();
   const { location, loading: locationLoading, requestLocation } = useUserLocation();
   const [featuredOnly, setFeaturedOnly] = useState(false);
@@ -90,7 +92,7 @@ export default function Products() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Fetch products with real-time search
+  // Fetch products with real-time search using infinite query
   const productSearchOptions = useMemo(() => ({
     query: debouncedQuery || undefined,
     category: selectedCategory !== "all" ? selectedCategory : undefined,
@@ -100,19 +102,38 @@ export default function Products() {
     location: location ? { 
       lat: location.lat, 
       lng: location.lng, 
-      radius: filters.distance // Use filter value instead of hardcoded 50
+      radius: filters.distance
     } : undefined,
-    limit: 50,
+    limit: 20,
   }), [debouncedQuery, selectedCategory, filters, location, selectedShop]);
 
-  const { data: productsResponse, isLoading, error } = useProducts(productSearchOptions);
+  const {
+    data: infiniteData,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+    isLoading,
+    refetch,
+  } = useInfiniteProducts(productSearchOptions);
+
+  // Pull to refresh
+  const handleRefresh = async () => {
+    await refetch();
+  };
+
+  const pullToRefresh = usePullToRefresh({
+    onRefresh: handleRefresh,
+    enabled: true,
+  });
   const { data: categoriesResponse } = useProductCategories();
   const { data: favoriteProductsResponse } = useUserFavoriteProducts();
   const toggleProductFavoriteMutation = useToggleProductFavorite();
   const { user, isAuthenticated  } = useAuth();
   const { data: shopData } = useShop(selectedShop ?? 'NO_SHOP');
 
-  const products = productsResponse?.data || [];
+  const products = useMemo(() => {
+    return infiniteData?.pages.flatMap(page => page.data || []) || [];
+  }, [infiniteData]);
   const categories = categoriesResponse?.data || [];
   
   const favoriteProductIds = new Set(
@@ -242,31 +263,37 @@ export default function Products() {
           });
         }
         break;
-      default: // relevance
-        filtered.sort((a, b) => {
-          // Featured first for relevance
-          if (a.is_featured !== b.is_featured) {
-            return a.is_featured ? -1 : 1;
-          }
-          return 0;
-        });
+      default: // relevance (with distance priority when available)
+        if (location) {
+          filtered.sort((a, b) => {
+            // Featured first
+            if (a.is_featured !== b.is_featured) {
+              return a.is_featured ? -1 : 1;
+            }
+            // Then by shop distance
+            const aShopLocation = (a.shops as any)?.location;
+            const bShopLocation = (b.shops as any)?.location;
+            
+            if (!aShopLocation || !bShopLocation) return 0;
+            
+            const distA = calculateDistance(location, aShopLocation);
+            const distB = calculateDistance(location, bShopLocation);
+            return distA - distB;
+          });
+        } else {
+          // No location: just featured first, keep rest as-is
+          filtered.sort((a, b) => {
+            if (a.is_featured !== b.is_featured) {
+              return a.is_featured ? -1 : 1;
+            }
+            return 0;
+          });
+        }
         break;
     }
 
     return filtered;
   }, [products, filters, sortBy, location, featuredOnly]);
-
-  // Pagination logic
-  const totalProducts = filteredAndSortedProducts.length;
-  const totalPages = Math.ceil(totalProducts / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const paginatedProducts = filteredAndSortedProducts.slice(startIndex, endIndex);
-
-  // Reset to first page when filters change
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [searchQuery, selectedCategory, filters, sortBy, featuredOnly]);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -327,7 +354,17 @@ export default function Products() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20 overflow-x-hidden w-full max-w-full">
+    <div 
+      ref={pullToRefresh.scrollContainerRef}
+      className="min-h-screen bg-background pb-20 overflow-x-hidden overflow-y-auto w-full max-w-full"
+    >
+      <PullToRefreshIndicator
+        isPulling={pullToRefresh.isPulling}
+        isRefreshing={pullToRefresh.isRefreshing}
+        pullDistance={pullToRefresh.pullDistance}
+        isReady={pullToRefresh.isReady}
+      />
+      
       {/* Breadcrumbs - Amazon Style */}
       <div className="bg-background border-b border-border px-4 sm:px-6 lg:px-8 py-3">
         <div className="max-w-screen-2xl mx-auto">
@@ -580,61 +617,28 @@ export default function Products() {
             )}
             <div className="flex items-center gap-2 flex-wrap">
               <p className="text-sm text-muted-foreground font-medium">
-                {isLoading ? "Searching..." : (
-                  <>
-                    <span className="font-bold text-foreground">
-                      {totalProducts} results
-                    </span>
-                    {selectedCategory !== "all" && ` in ${selectedCategory}`}
-                  </>
-                )}
+                {isLoading ? "Searching..." : `${filteredAndSortedProducts.length} results`}
               </p>
-              {!isLoading && totalProducts > 0 && (
-                <span className="text-xs text-muted-foreground">
-                  (Page {currentPage} of {totalPages})
-                </span>
-              )}
             </div>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
-            {/* Items Per Page */}
-            <Select value={itemsPerPage.toString()} onValueChange={(value) => setItemsPerPage(parseInt(value))}>
-              <SelectTrigger className="w-[90px] text-xs h-8">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="12">12</SelectItem>
-                <SelectItem value="20">20</SelectItem>
-                <SelectItem value="36">36</SelectItem>
-                <SelectItem value="48">48</SelectItem>
-              </SelectContent>
-            </Select>
-
-          <FilterSheet
-            filters={filters}
-            onFiltersChange={(newFilters) => {
-              setFilters(newFilters);
-              
-              // Sync featured filter
-              if (newFilters.isFeatured !== featuredOnly) {
-                setFeaturedOnly(newFilters.isFeatured || false);
-                
-                // Update URL
-                const newParams = new URLSearchParams(searchParams);
-                if (newFilters.isFeatured) {
-                  newParams.set('featured', 'true');
-                } else {
-                  newParams.delete('featured');
+            <FilterSheet
+              filters={filters}
+              onFiltersChange={(newFilters) => {
+                setFilters(newFilters);
+                if (newFilters.isFeatured !== filters.isFeatured) {
+                  const newParams = new URLSearchParams(searchParams);
+                  if (newFilters.isFeatured) {
+                    newParams.set('featured', 'true');
+                  } else {
+                    newParams.delete('featured');
+                  }
+                  navigate(newParams.toString() ? `/products?${newParams.toString()}` : '/products', { replace: true });
                 }
-                
-                const newSearch = newParams.toString();
-                const newPath = newSearch ? `/products?${newSearch}` : '/products';
-                navigate(newPath, { replace: true });
-              }
-            }}
-            activeFilterCount={activeFilterCount}
-          />
+              }}
+              activeFilterCount={activeFilterCount}
+            />
 
             <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
               <SelectTrigger className="w-[140px] rounded-full font-medium text-xs h-8">
@@ -645,7 +649,6 @@ export default function Products() {
                 <SelectItem value="relevance">Relevance</SelectItem>
                 <SelectItem value="price-low">Price: Low to High</SelectItem>
                 <SelectItem value="price-high">Price: High to Low</SelectItem>
-                {/*<SelectItem value="rating">Customer Rating</SelectItem>*/}
                 <SelectItem value="distance">Distance</SelectItem>
                 <SelectItem value="newest">Newest First</SelectItem>
               </SelectContent>
@@ -678,85 +681,49 @@ export default function Products() {
           </div>
         )}
 
-        {/* Products Grid/List - Amazon-style responsive grid */}
-        {!isLoading && paginatedProducts.length > 0 && (
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            className="grid-products grid-gap"
-          >
-            {paginatedProducts.map((product, index) => (
-              <motion.div
-                key={product.id}
-                variants={itemVariants}
-                custom={index}
-              >
-                <ProductCard
-                  product={product}
-                  onClick={() => navigate(`/products/${product.id}`)}
-                  onInquire={() => handleInquire(product)}
-                  isFavorite={favoriteProductIds.has(product.id)}
-                  onToggleFavorite={(productId) => {
-                    const isFavorited = favoriteProductIds.has(productId);
-                    toggleProductFavoriteMutation.mutate({ productId, isFavorited });
-                  }}
-                />
-              </motion.div>
-            ))}
-          </motion.div>
-        )}
-
-        {/* Pagination - Amazon Style */}
-        {!isLoading && totalPages > 1 && paginatedProducts.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.5 }}
-            className="flex items-center justify-center gap-2 mt-12"
-          >
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
-              disabled={currentPage === 1}
+        {/* Products Grid with Infinite Scroll */}
+        {!isLoading && filteredAndSortedProducts.length > 0 && (
+          <>
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="grid-products grid-gap"
             >
-              Previous
-            </Button>
-
-            {Array.from({ length: totalPages }, (_, i) => i + 1)
-              .filter(page => {
-                // Show first page, last page, current page, and pages around current
-                if (page === 1 || page === totalPages) return true;
-                if (Math.abs(page - currentPage) <= 1) return true;
-                return false;
-              })
-              .map((page, index, array) => (
-                <div key={page} className="flex items-center gap-2">
-                  {/* Add ellipsis if there's a gap */}
-                  {index > 0 && array[index - 1] !== page - 1 && (
-                    <span className="text-muted-foreground px-2">...</span>
-                  )}
-                  <Button
-                    variant={currentPage === page ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setCurrentPage(page)}
-                    className={currentPage === page ? "bg-primary text-primary-foreground" : ""}
-                  >
-                    {page}
-                  </Button>
-                </div>
+              {filteredAndSortedProducts.map((product, index) => (
+                <motion.div
+                  key={product.id}
+                  variants={itemVariants}
+                  custom={index}
+                >
+                  <ProductCard
+                    product={product}
+                    onClick={() => navigate(`/products/${product.id}`)}
+                    onInquire={() => handleInquire(product)}
+                    isFavorite={favoriteProductIds.has(product.id)}
+                    onToggleFavorite={(productId) => {
+                      const isFavorited = favoriteProductIds.has(productId);
+                      toggleProductFavoriteMutation.mutate({ productId, isFavorited });
+                    }}
+                  />
+                </motion.div>
               ))}
+            </motion.div>
 
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
-              disabled={currentPage === totalPages}
-            >
-              Next
-            </Button>
-          </motion.div>
+            <InfiniteScrollTrigger
+              onLoadMore={() => fetchNextPage()}
+              hasMore={hasNextPage}
+              isLoading={isFetchingNextPage}
+              threshold={300}
+            />
+
+            <InfiniteScrollLoader
+              isLoading={isFetchingNextPage}
+              hasMore={hasNextPage}
+              loadingText="Loading more products..."
+              endText="No more products to load"
+            />
+          </>
         )}
 
         {/* Location Required State */}

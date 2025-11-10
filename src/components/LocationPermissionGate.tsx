@@ -15,6 +15,12 @@ export function LocationPermissionGate({ children }: LocationPermissionGateProps
     return <>{children}</>;
   }
 
+  // If permission was previously granted, don't block the UI - let the app load with cached/loading location
+  const permissionGranted = localStorage.getItem('location_permission_granted') === 'true';
+  if (permissionGranted && !error) {
+    return <>{children}</>;
+  }
+
   // Show loading state while requesting location
   if (loading) {
     return (

@@ -9,6 +9,7 @@ import { calculateShopStatus } from "@/lib/businessHours";
 import { calculateDistance, formatDistance } from "@/lib/distanceCalculation";
 import { useUserLocation } from "@/contexts/LocationContext";
 import DirectionsButton from "./DirectionsButton";
+import { ShopDeliveryBadge } from "./shop/ShopDeliveryBadge";
 
 interface FeaturedShopCardProps {
   shop: any;
@@ -19,9 +20,11 @@ export const FeaturedShopCard = ({ shop }: FeaturedShopCardProps) => {
   const { location } = useUserLocation();
 
   // Calculate distance from user location
-  const distance = location && shop.location
-    ? formatDistance(calculateDistance(location, { lat: shop.location.lat, lng: shop.location.lng }))
-    : 'N/A';
+  const distanceKm = location && shop.location
+    ? calculateDistance(location, { lat: shop.location.lat, lng: shop.location.lng })
+    : undefined;
+  
+  const distance = distanceKm !== undefined ? formatDistance(distanceKm) : 'N/A';
 
   // Calculate shop status (open/closed, hours)
   const shopStatus = calculateShopStatus(shop.business_hours as any);
@@ -59,7 +62,7 @@ export const FeaturedShopCard = ({ shop }: FeaturedShopCardProps) => {
             {shop.name}
           </h3>
 
-          {/* Categories */}
+          {/* Categories & Delivery */}
           <div className="flex flex-wrap gap-1 mb-2">
             {shop.categories?.slice(0, 2).map((category, index) => (
               <Badge
@@ -70,6 +73,12 @@ export const FeaturedShopCard = ({ shop }: FeaturedShopCardProps) => {
                 {category}
               </Badge>
             ))}
+            <ShopDeliveryBadge
+              deliveryAvailable={shop.delivery_available}
+              deliveryCoverageKm={shop.delivery_coverage_km}
+              distanceKm={distanceKm}
+              variant="compact"
+            />
           </div>
 
           {/* Rating & Reviews */}

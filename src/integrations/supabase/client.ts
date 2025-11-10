@@ -5,56 +5,6 @@ import type { Database } from './types';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-// Track ongoing refresh to prevent concurrent refresh attempts
-let isRefreshing = false;
-let refreshPromise: Promise<any> | null = null;
-
-// Custom fetch with 403 interceptor for token refresh
-const customFetch = async (url: RequestInfo | URL, options: RequestInit = {}) => {
-  const response = await fetch(url, options);
-
-  // Handle 403 errors on /auth/v1/user endpoint
-  if (response.status === 403 && url.toString().includes('/auth/v1/user')) {
-    console.log('[Supabase] 403 error on /auth/v1/user - attempting token refresh');
-
-    // If already refreshing, wait for that to complete
-    if (isRefreshing && refreshPromise) {
-      await refreshPromise;
-      // Retry the original request with new token
-      return fetch(url, options);
-    }
-
-    // Start refresh process
-    isRefreshing = true;
-    refreshPromise = supabase.auth.refreshSession()
-      .then(({ data, error }) => {
-        if (error) {
-          console.error('[Supabase] Token refresh failed:', error);
-          // Sign out on refresh failure
-          supabase.auth.signOut();
-          throw error;
-        }
-        console.log('[Supabase] Token refreshed successfully');
-        return data;
-      })
-      .finally(() => {
-        isRefreshing = false;
-        refreshPromise = null;
-      });
-
-    try {
-      await refreshPromise;
-      // Retry the original request with refreshed token
-      return fetch(url, options);
-    } catch (error) {
-      console.error('[Supabase] Failed to refresh and retry request:', error);
-      return response; // Return original 403 response
-    }
-  }
-
-  return response;
-};
-
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
@@ -63,9 +13,5 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true,
-  },
-  global: {
-    fetch: customFetch,
   }
 });

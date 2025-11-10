@@ -23,6 +23,12 @@ export interface Shop {
   subscription_expires_at?: string;
   created_at: string;
   updated_at: string;
+  // Delivery information
+  delivery_available?: boolean;
+  delivery_coverage_km?: number;
+  delivery_charge_per_km?: number;
+  free_delivery_above?: number;
+  delivery_notes?: string;
 }
 
 export const shopService = {
@@ -113,11 +119,10 @@ export const shopService = {
 
     console.log('shopService.getShopById raw result:', result);
 
-    // If shop found and has location, use RPC to extract coordinates
-    if (result.data && result.data.location) {
+    // Always try to extract coordinates using RPC
+    if (result.data) {
       try {
-        // Call get_nearby_shops with the shop's approximate location to get formatted data
-        // This is a workaround - we'll use a large radius to ensure we get this shop
+        // Call get_nearby_shops to get formatted data with coordinates
         const { data: nearbyData } = await (supabase as any).rpc('get_nearby_shops', {
           user_lat: 18.5204,  // Pune approximate coordinates
           user_lng: 73.8567,
@@ -127,10 +132,18 @@ export const shopService = {
         // Find our shop in the results
         const shopWithCoords = nearbyData?.find((s: any) => s.id === id);
         if (shopWithCoords && shopWithCoords.latitude && shopWithCoords.longitude) {
+          // Transform coordinates into location object
           result.data.location = {
             lat: shopWithCoords.latitude,
             lng: shopWithCoords.longitude
           };
+          
+          // Also ensure delivery fields are included from RPC response
+          result.data.delivery_available = shopWithCoords.delivery_available ?? result.data.delivery_available;
+          result.data.delivery_coverage_km = shopWithCoords.delivery_coverage_km ?? result.data.delivery_coverage_km;
+          result.data.delivery_charge_per_km = shopWithCoords.delivery_charge_per_km ?? result.data.delivery_charge_per_km;
+          result.data.free_delivery_above = shopWithCoords.free_delivery_above ?? result.data.free_delivery_above;
+          result.data.delivery_notes = shopWithCoords.delivery_notes ?? result.data.delivery_notes;
         } else {
           result.data.location = null;
         }

@@ -112,7 +112,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // ✅ Check email verification from Supabase session (source of truth)
       if (session?.user && !session.user.email_confirmed_at) {
         console.warn('[AuthContext] User email not verified in Supabase session');
-        await supabase.auth.signOut();
+        // Don't sign out here - just return null and let the auth flow handle it
         toastRef.current({
           title: "Email verification required",
           description: "Please verify your email before signing in",
@@ -181,13 +181,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('[AuthContext] Auth event:', event, 'Session:', !!session);
       }
 
+      // Handle explicit sign out
+      if (event === 'SIGNED_OUT') {
+        clearUserProfileFromStorage();
+        if (mounted) {
+          setAuthState({ user: null, session: null, loading: false });
+        }
+        return;
+      }
+
+      // Handle session updates (SIGNED_IN, TOKEN_REFRESHED, INITIAL_SESSION)
       try {
         if (session?.user) {
           const profile = await fetchUserProfile(session.user.id, session);
 
           if (!profile) {
-            console.warn('[AuthContext] No profile found for user, signing out');
-            await supabase.auth.signOut();
+            console.warn('[AuthContext] No profile found for user');
+            // Don't sign out - just clear local state
+            // Profile might be temporarily unavailable due to token refresh
             clearUserProfileFromStorage();
             if (mounted) {
               setAuthState({ user: null, session: null, loading: false });
@@ -203,6 +214,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
           }
         } else {
+          // No session - clear state but don't force sign out
           clearUserProfileFromStorage();
           if (mounted) {
             setAuthState({
@@ -214,8 +226,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch (error) {
         console.error('[AuthContext] Error in handleAuthChange:', error);
-        // On any error (including expired tokens), sign out and clear state
-        await supabase.auth.signOut();
+        // Don't sign out - token might be in the process of refreshing
+        // Just clear local state and let the auth flow handle it
         clearUserProfileFromStorage();
         if (mounted) {
           setAuthState({ user: null, session: null, loading: false });
@@ -228,7 +240,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Get initial session with timeout and error handling
     const sessionTimeout = setTimeout(() => {
       if (mounted && authState.loading) {
-        console.warn('[AuthContext] Session load timeout - clearing auth state');
+        console.warn('[AuthContext] Session load timeout - clearing loading state');
         clearUserProfileFromStorage();
         setAuthState({
           user: null,
@@ -244,8 +256,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (error) {
           console.error('[AuthContext] Session fetch error:', error);
-          // Clear expired/invalid session
-          supabase.auth.signOut();
+          // Don't sign out - just clear local state
+          // Supabase will handle token refresh automatically
           clearUserProfileFromStorage();
           if (mounted) {
             setAuthState({ user: null, session: null, loading: false });
@@ -260,8 +272,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .catch((error) => {
         clearTimeout(sessionTimeout);
         console.error('[AuthContext] Session fetch exception:', error);
-        // Clear session on any error
-        supabase.auth.signOut();
+        // Don't sign out - just clear local state
         clearUserProfileFromStorage();
         if (mounted) {
           setAuthState({ user: null, session: null, loading: false });
