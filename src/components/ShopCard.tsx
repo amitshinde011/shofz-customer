@@ -23,7 +23,7 @@ interface Shop {
   distance: string;
   address: string;
   isOpen: boolean;
-  delivery: boolean;
+  delivery?: boolean;
   deliveryTime?: string;
   establishedYear?: number;
   phone?: string;
@@ -34,6 +34,9 @@ interface Shop {
   is_featured?: boolean;
   delivery_available?: boolean;
   delivery_coverage_km?: number;
+  delivery_charge_per_km?: number;
+  free_delivery_above?: number;
+  delivery_notes?: string;
   distance_km?: number; // Numeric distance for delivery calculation
 }
 

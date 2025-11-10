@@ -618,7 +618,7 @@ export default function Shops() {
                     address: shop.address || '',
                     isOpen: shopStatus.isOpen,
                     nextStatusChange: shopStatus.nextStatusChange,
-                    delivery: false,
+                    
                     deliveryTime: '30-45 min',
                     establishedYear: 2020,
                     phone: shop.phone_number,
@@ -627,6 +627,9 @@ export default function Shops() {
                     is_featured: shop.is_featured,
                     delivery_available: shop.delivery_available,
                     delivery_coverage_km: shop.delivery_coverage_km,
+                    delivery_charge_per_km: shop.delivery_charge_per_km,
+                    free_delivery_above: shop.free_delivery_above,
+                    delivery_notes: shop.delivery_notes,
                   }}
                     variant="grid"
                     onToggleFavorite={toggleFavorite}
