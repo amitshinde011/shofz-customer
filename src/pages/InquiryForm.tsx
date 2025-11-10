@@ -208,6 +208,12 @@ export default function InquiryForm() {
           preferred_contact: formData.preferred_contact,
           image_url: attachmentPath ? `customer-uploads/${attachmentPath}` : undefined,
           attachment_urls: attachmentPath ? [attachmentPath] : [],
+          order_type: formData.order_type || 'pickup',
+          delivery_address: formData.order_type === 'delivery' ? formData.delivery_address : undefined,
+          delivery_location: formData.order_type === 'delivery' && location ? {
+            lat: location.lat,
+            lng: location.lng
+          } : undefined,
         };
         return createInquiry.mutateAsync(inquiryData);
       });
