@@ -30,7 +30,7 @@ import {
 } from "@/components/ui/breadcrumb";
 
 type ViewMode = "grid" | "map";
-type SortOption = "distance" | "rating" | "newest" | "name";
+type SortOption = "distance" | "rating" | "newest" | "name" | "nearestDelivery";
 
 const defaultFilters: FilterState = {
   categories: [],
@@ -213,6 +213,36 @@ export default function Shops() {
           // Then by newest
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         });
+        break;
+      case "nearestDelivery":
+        // Filter only shops with delivery that deliver to user's location
+        if (location) {
+          filtered = filtered.filter(shop => {
+            // Must have delivery enabled
+            if (!shop.delivery_available) return false;
+            // Must have location and coverage configured
+            if (!shop.location || !shop.delivery_coverage_km) return false;
+            // Must be within delivery radius
+            return isWithinDeliveryRadius(
+              shop.location,
+              location,
+              shop.delivery_coverage_km
+            );
+          });
+          
+          // Sort by distance
+          filtered.sort((a, b) => {
+            // Featured first
+            if (a.is_featured !== b.is_featured) {
+              return a.is_featured ? -1 : 1;
+            }
+            // Then by distance
+            if (!a.location || !b.location) return 0;
+            const distA = calculateDistance(location, a.location);
+            const distB = calculateDistance(location, b.location);
+            return distA - distB;
+          });
+        }
         break;
       case "distance":
         if (location) {
@@ -514,12 +544,13 @@ export default function Shops() {
           />
 
             <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
-              <SelectTrigger className="w-[140px] rounded-full font-medium text-xs h-8">
+              <SelectTrigger className="w-[180px] rounded-full font-medium text-xs h-8">
                 <ArrowUpDown className="w-3.5 h-3.5 mr-1.5" />
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="distance">Distance</SelectItem>
+                <SelectItem value="nearestDelivery">Nearest with Delivery</SelectItem>
                 <SelectItem value="rating">Rating</SelectItem>
                 <SelectItem value="name">Name A-Z</SelectItem>
                 <SelectItem value="newest">Newest</SelectItem>
