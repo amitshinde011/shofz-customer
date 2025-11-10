@@ -34,6 +34,8 @@ import { useEntityViewCounts } from "@/hooks/useEntityViewCounts";
 import { useShop, useToggleShopFavorite, useUserFavoriteShops } from "@/hooks/useShops";
 import { ShopReviewsList } from "@/components/reviews/ShopReviewsList";
 import { ShopReviewButton } from "@/components/reviews/ShopReviewButton";
+import { DeliveryDetailsCard } from "@/components/shop/DeliveryDetailsCard";
+import { DeliveryCoverageChecker } from "@/components/shop/DeliveryCoverageChecker";
 import { useProducts } from "@/hooks/useProducts";
 import { useOffers } from "@/hooks/useOffers";
 import OfferCard from "@/components/OfferCard";
@@ -463,6 +465,30 @@ export default function ShopDetail() {
                       />
                     ))}
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Delivery Information Section */}
+            {shop.delivery_available && shop.location && (
+              <Card>
+                <CardContent className="p-4 sm:p-6 space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Truck className="w-5 h-5 text-primary" />
+                    <h2 className="text-lg font-bold text-foreground">Delivery Information</h2>
+                  </div>
+                  
+                  {/* Delivery Details Card */}
+                  <DeliveryDetailsCard 
+                    shop={shop} 
+                    customerLocation={location} 
+                  />
+                  
+                  {/* Interactive Coverage Checker */}
+                  <DeliveryCoverageChecker
+                    shop={shop}
+                    customerLocation={location}
+                  />
                 </CardContent>
               </Card>
             )}
