@@ -2,7 +2,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Star, MapPin, Heart, MessageCircleHeart, Eye } from "lucide-react";
+import { Star, MapPin, Heart, MessageCircleHeart, Eye, Truck } from "lucide-react";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Product } from "@/services/productService";
@@ -167,18 +167,31 @@ export default function ProductCard({
 
             {/* Shop Name and Views */}
             {variant === "default" && (
-              <div className="flex items-center justify-between text-meta text-muted-foreground">
-                <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                  <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" />
-                  <span className="line-clamp-1 font-medium">{shopName}</span>
-                </div>
-                {viewCounts && viewCounts.view_count > 0 && (
-                  <div className="flex items-center gap-1 flex-shrink-0 ml-2">
-                    <Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-                    <span className="font-medium">{viewCounts.view_count}</span>
+              <>
+                <div className="flex items-center justify-between text-meta text-muted-foreground">
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" />
+                    <span className="line-clamp-1 font-medium">{shopName}</span>
                   </div>
+                  {viewCounts && viewCounts.view_count > 0 && (
+                    <div className="flex items-center gap-1 flex-shrink-0 ml-2">
+                      <Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                      <span className="font-medium">{viewCounts.view_count}</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Delivery Badge */}
+                {product.shops?.delivery_available && (
+                  <Badge 
+                    variant="secondary" 
+                    className="text-xs bg-success/10 text-success w-fit"
+                  >
+                    <Truck className="w-3 h-3 mr-1" />
+                    Delivery available
+                  </Badge>
                 )}
-              </div>
+              </>
             )}
 
             {/* Price Section */}

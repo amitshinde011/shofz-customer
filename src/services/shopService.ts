@@ -23,6 +23,12 @@ export interface Shop {
   subscription_expires_at?: string;
   created_at: string;
   updated_at: string;
+  // Delivery information
+  delivery_available?: boolean;
+  delivery_coverage_km?: number;
+  delivery_charge_per_km?: number;
+  free_delivery_above?: number;
+  delivery_notes?: string;
 }
 
 export const shopService = {

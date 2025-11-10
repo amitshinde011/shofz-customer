@@ -29,6 +29,11 @@ export interface Product {
     is_verified?: boolean;
     rating?: number;
     location?: { lat: number; lng: number };
+    delivery_available?: boolean;
+    delivery_coverage_km?: number;
+    delivery_charge_per_km?: number;
+    free_delivery_above?: number;
+    delivery_notes?: string;
   };
 }
 

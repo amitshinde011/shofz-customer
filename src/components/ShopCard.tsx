@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useEntityViewCounts } from "@/hooks/useEntityViewCounts";
 import { useUserLocation } from "@/contexts/LocationContext";
 import { FeaturedBadge } from "@/components/FeaturedBadge";
+import { ShopDeliveryBadge } from "@/components/shop/ShopDeliveryBadge";
 
 interface Shop {
   id: string;
@@ -31,6 +32,9 @@ interface Shop {
   reviewCount?: number;
   nextStatusChange?: string;
   is_featured?: boolean;
+  delivery_available?: boolean;
+  delivery_coverage_km?: number;
+  distance_km?: number; // Numeric distance for delivery calculation
 }
 
 interface ShopCardProps {
@@ -154,6 +158,16 @@ export default function ShopCard({ shop, variant = "grid", onToggleFavorite, isF
                     <span className="text-xs text-muted-foreground line-clamp-1">
                       {shop.distance} • {shop.address}
                     </span>
+                  </div>
+
+                  {/* Delivery Badge */}
+                  <div className="mb-2">
+                    <ShopDeliveryBadge
+                      deliveryAvailable={shop.delivery_available}
+                      deliveryCoverageKm={shop.delivery_coverage_km}
+                      distanceKm={shop.distance_km}
+                      variant="compact"
+                    />
                   </div>
 
                   <div className="flex items-center space-x-1 mb-3">
@@ -300,7 +314,16 @@ export default function ShopCard({ shop, variant = "grid", onToggleFavorite, isF
                   <Clock className="w-3 h-3 sm:w-3.5 sm:h-3.5 flex-shrink-0" />
                   <span className="line-clamp-1 font-medium">{shop.nextStatusChange}</span>
                 </div>
+              </div>
 
+              {/* Delivery Badge */}
+              <div>
+                <ShopDeliveryBadge
+                  deliveryAvailable={shop.delivery_available}
+                  deliveryCoverageKm={shop.delivery_coverage_km}
+                  distanceKm={shop.distance_km}
+                  variant={isCompact ? 'compact' : 'detailed'}
+                />
               </div>
 
               {/* Action Buttons - Always render container for layout, conditionally show buttons */}
