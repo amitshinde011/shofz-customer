@@ -19,6 +19,7 @@ import { calculateDistance, formatDistance } from "@/lib/distanceCalculation";
 import { calculateShopStatus } from "@/lib/businessHours";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
+import { isWithinDeliveryRadius } from "@/lib/deliveryCalculations";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -38,6 +39,7 @@ const defaultFilters: FilterState = {
   rating: 0,
   inStockOnly: false,
   hasDelivery: false,
+  deliversToMe: false,
   isOpen: false,
   minReviews: 0,
 };
@@ -114,6 +116,7 @@ export default function Shops() {
     if (filters.distance < 50) count++;
     if (filters.rating > 0) count++;
     if (filters.hasDelivery) count++;
+    if (filters.deliversToMe) count++;
     if (filters.isOpen) count++;
     if (filters.minReviews && filters.minReviews > 0) count++;
     return count;
@@ -150,6 +153,24 @@ export default function Shops() {
         if (!shop.location) return false;
         const distance = calculateDistance(location, shop.location);
         return distance <= filters.distance;
+      });
+    }
+
+    // Apply delivery filters
+    if (filters.hasDelivery) {
+      filtered = filtered.filter(shop => shop.delivery_available === true);
+    }
+
+    if (filters.deliversToMe && location) {
+      filtered = filtered.filter(shop => {
+        if (!shop.delivery_available || !shop.location || !shop.delivery_coverage_km) {
+          return false;
+        }
+        return isWithinDeliveryRadius(
+          shop.location,
+          location,
+          shop.delivery_coverage_km
+        );
       });
     }
 
@@ -400,6 +421,15 @@ export default function Shops() {
                 </Badge>
               )}
 
+              {filters.deliversToMe && (
+                <Badge variant="secondary" className="flex items-center gap-1.5 rounded-full px-3 py-1 font-medium bg-success/10 text-success">
+                  Delivers to Me
+                  <X className="w-3.5 h-3.5 cursor-pointer hover:text-destructive transition-colors" onClick={() => {
+                    setFilters(prev => ({ ...prev, deliversToMe: false }));
+                  }} />
+                </Badge>
+              )}
+
               {filters.isOpen && (
                 <Badge variant="secondary" className="flex items-center gap-1.5 rounded-full px-3 py-1 font-medium">
                   Open Now
@@ -531,8 +561,12 @@ export default function Shops() {
             className="grid-shops grid-gap"
           >
             {filteredAndSortedShops.map((shop) => {
-              const distance = location && shop.location
-                ? formatDistance(calculateDistance(location, shop.location))
+              const distanceKm = location && shop.location
+                ? calculateDistance(location, shop.location)
+                : undefined;
+              
+              const distance = distanceKm !== undefined
+                ? formatDistance(distanceKm)
                 : 'N/A';
 
               const shopStatus = calculateShopStatus(shop.business_hours as any);
@@ -549,6 +583,7 @@ export default function Shops() {
                     rating: shop.rating || 0,
                     reviewCount: shop.total_reviews || 0,
                     distance,
+                    distance_km: distanceKm,
                     address: shop.address || '',
                     isOpen: shopStatus.isOpen,
                     nextStatusChange: shopStatus.nextStatusChange,
@@ -559,6 +594,8 @@ export default function Shops() {
                     coordinates: shop.location,
                     isVerified: shop.is_verified,
                     is_featured: shop.is_featured,
+                    delivery_available: shop.delivery_available,
+                    delivery_coverage_km: shop.delivery_coverage_km,
                   }}
                     variant="grid"
                     onToggleFavorite={toggleFavorite}

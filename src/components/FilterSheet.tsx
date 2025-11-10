@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Slider } from "@/components/ui/slider";
 import { Separator } from "@/components/ui/separator";
-import { Filter, X, Star } from "lucide-react";
+import { Filter, X, Star, Truck } from "lucide-react";
 import { useShopCategories } from "@/hooks/useShops";
 
 export interface FilterState {
@@ -16,6 +16,7 @@ export interface FilterState {
   inStockOnly: boolean;
   isVerified?: boolean;
   hasDelivery?: boolean;
+  deliversToMe?: boolean;
   isOpen?: boolean;
   minReviews?: number;
   brands?: string[];
@@ -36,6 +37,7 @@ const defaultFilters: FilterState = {
   rating: 0,
   inStockOnly: false,
   hasDelivery: false,
+  deliversToMe: false,
   isOpen: false,
   minReviews: 0,
   brands: [],
@@ -262,9 +264,27 @@ export default function FilterSheet({ filters, onFiltersChange, activeFilterCoun
               />
               <label
                 htmlFor="hasDelivery"
-                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-2"
               >
+                <Truck className="w-4 h-4 text-primary" />
                 Delivery Available
+              </label>
+            </div>
+
+            <div className="flex items-center space-x-3">
+              <Checkbox
+                id="deliversToMe"
+                checked={localFilters.deliversToMe}
+                onCheckedChange={(checked) =>
+                  setLocalFilters({ ...localFilters, deliversToMe: checked as boolean })
+                }
+              />
+              <label
+                htmlFor="deliversToMe"
+                className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer flex items-center gap-2"
+              >
+                <Truck className="w-4 h-4 text-success" />
+                Delivers to My Location
               </label>
             </div>
 
