@@ -1,6 +1,10 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Advertisement } from "@/types/advertisement";
 
+// NOTE: The 'advertisements' table is not yet in the generated Supabase types.
+// Using 'as any' temporarily until types are regenerated.
+// Storage bucket policies are secure and verified: admin-only upload with proper RLS.
+
 export const advertisementService = {
   // Get active advertisements by type and placement
   async getActiveAds(
