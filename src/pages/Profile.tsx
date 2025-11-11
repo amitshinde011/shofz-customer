@@ -8,6 +8,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ReferralCodeSettings } from "@/components/profile/ReferralCodeSettings";
+import { CustomerReferralCard } from "@/components/profile/CustomerReferralCard";
+import { UpiIdSettings } from "@/components/profile/UpiIdSettings";
 import {
   User,
   MapPin,
@@ -424,7 +426,13 @@ export default function Profile() {
               </CardContent>
             </Card>
 
-            {/* Referral Code Section */}
+            {/* Customer Referral Section */}
+            {!isEditing && <CustomerReferralCard />}
+
+            {/* UPI ID Settings */}
+            {!isEditing && <UpiIdSettings />}
+
+            {/* Shop Referral Code Section */}
             {!isEditing && <ReferralCodeSettings />}
 
             {/* Mobile Menu Sections */}
