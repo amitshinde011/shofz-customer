@@ -36,7 +36,7 @@ export const customerReferralService = {
     try {
       console.log('[CustomerReferralService] Generating referral code for customer:', customerId);
 
-      const { data, error } = await supabase.rpc('generate_customer_referral_code', {
+      const { data, error } = await supabase.rpc('generate_customer_referral_code' as any, {
         p_customer_id: customerId
       });
 
@@ -46,7 +46,7 @@ export const customerReferralService = {
       }
 
       console.log('[CustomerReferralService] Code generated:', data);
-      return { code: data };
+      return { code: String(data) };
     } catch (error: any) {
       console.error('[CustomerReferralService] Exception generating code:', error);
       return { code: '', error: error.message || 'Failed to generate referral code' };
@@ -60,8 +60,8 @@ export const customerReferralService = {
     try {
       console.log('[CustomerReferralService] Fetching referral data for customer:', customerId);
 
-      const { data, error } = await supabase
-        .from('customer_profiles')
+      const { data, error } = await (supabase
+        .from('customer_profiles') as any)
         .select('referral_code, upi_id, total_referral_earnings')
         .eq('user_id', customerId)
         .single();
@@ -72,9 +72,9 @@ export const customerReferralService = {
       }
 
       return {
-        referral_code: data.referral_code || '',
-        upi_id: data.upi_id,
-        total_referral_earnings: data.total_referral_earnings || 0
+        referral_code: data?.referral_code || '',
+        upi_id: data?.upi_id,
+        total_referral_earnings: data?.total_referral_earnings || 0
       };
     } catch (error) {
       console.error('[CustomerReferralService] Exception fetching data:', error);
@@ -89,7 +89,7 @@ export const customerReferralService = {
     try {
       console.log('[CustomerReferralService] Fetching referral stats for customer:', customerId);
 
-      const { data, error } = await supabase.rpc('get_customer_referral_stats', {
+      const { data, error } = await supabase.rpc('get_customer_referral_stats' as any, {
         p_customer_id: customerId
       });
 
@@ -112,8 +112,8 @@ export const customerReferralService = {
     try {
       console.log('[CustomerReferralService] Updating UPI ID for customer:', customerId);
 
-      const { error } = await supabase
-        .from('customer_profiles')
+      const { error } = await (supabase
+        .from('customer_profiles') as any)
         .update({ upi_id: upiId })
         .eq('user_id', customerId);
 
@@ -137,8 +137,8 @@ export const customerReferralService = {
     try {
       console.log('[CustomerReferralService] Fetching referral history for customer:', customerId);
 
-      const { data, error } = await supabase
-        .from('customer_referral_earnings')
+      const { data, error }: any = await supabase
+        .from('customer_referral_earnings' as any)
         .select(`
           id,
           shop_id,
