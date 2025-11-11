@@ -36,18 +36,29 @@ export const AdBanner = ({ placement, className = "" }: AdBannerProps) => {
   return (
     <div className={`w-full max-w-screen-xl mx-auto px-4 ${className}`}>
       <div
-        className={`relative aspect-[16/4] sm:aspect-[21/4] rounded-lg overflow-hidden bg-primary ${
+        className={`relative aspect-[16/4] sm:aspect-[21/4] rounded-lg overflow-hidden ${
           ad.link_url ? 'cursor-pointer hover:opacity-95 transition-opacity' : ''
         }`}
         onClick={handleAdClick}
       >
+        {/* Blurred background layer */}
+        <div 
+          className="absolute inset-0 bg-cover bg-center blur-xl scale-110"
+          style={{ 
+            backgroundImage: `url(${ad.image_url})`,
+            filter: 'blur(20px) brightness(0.7)'
+          }}
+        />
+        
+        {/* Main image on top */}
         <img
           src={ad.image_url}
           alt={ad.title}
-          className="w-full h-full object-contain"
+          className="relative w-full h-full object-contain z-10"
         />
+        
         {ad.title && (
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3 z-20">
             <h3 className="text-white font-semibold">{ad.title}</h3>
             {ad.description && (
               <p className="text-white/90 text-sm">{ad.description}</p>
