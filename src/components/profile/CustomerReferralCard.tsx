@@ -28,19 +28,13 @@ export function CustomerReferralCard() {
       referralData && 
       !referralData.referral_code && 
       !generateCode.isPending &&
-      !hasAttemptedGeneration.current
+      !hasAttemptedGeneration.current &&
+      !isLoading
     ) {
       hasAttemptedGeneration.current = true;
       handleGenerateCode();
     }
-  }, [user?.id, referralData?.referral_code, generateCode.isPending]);
-
-  // Reset attempt flag when code is successfully generated
-  useEffect(() => {
-    if (referralData?.referral_code) {
-      hasAttemptedGeneration.current = false;
-    }
-  }, [referralData?.referral_code]);
+  }, [user?.id, referralData?.referral_code, generateCode.isPending, isLoading]);
 
   const handleCopyCode = async () => {
     if (!referralData?.referral_code) return;

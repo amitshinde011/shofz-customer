@@ -12,7 +12,7 @@ export function useCustomerReferral(customerId: string | undefined) {
     queryFn: () => customerReferralService.getCustomerReferralData(customerId!),
     enabled: !!customerId,
     staleTime: 1000 * 60 * 5, // 5 minutes
-    refetchOnMount: 'always', // Always refetch on mount to get latest data
+    refetchOnMount: true, // Only refetch if stale
   });
 
   // Fetch referral statistics
