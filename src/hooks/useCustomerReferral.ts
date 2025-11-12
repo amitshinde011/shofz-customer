@@ -12,6 +12,7 @@ export function useCustomerReferral(customerId: string | undefined) {
     queryFn: () => customerReferralService.getCustomerReferralData(customerId!),
     enabled: !!customerId,
     staleTime: 1000 * 60 * 5, // 5 minutes
+    refetchOnMount: 'always', // Always refetch on mount to get latest data
   });
 
   // Fetch referral statistics
@@ -33,9 +34,12 @@ export function useCustomerReferral(customerId: string | undefined) {
   // Generate referral code mutation
   const generateCode = useMutation({
     mutationFn: () => customerReferralService.generateReferralCode(customerId!),
-    onSuccess: (result) => {
+    onSuccess: async (result) => {
       if (result.code) {
-        queryClient.invalidateQueries({ queryKey: ['customer-referral', customerId] });
+        // Small delay to ensure DB has committed the transaction
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await queryClient.invalidateQueries({ queryKey: ['customer-referral', customerId] });
+        await queryClient.refetchQueries({ queryKey: ['customer-referral', customerId] });
         toast({
           title: "Referral Code Generated",
           description: `Your referral code is: ${result.code}`,

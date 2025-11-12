@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -24,11 +24,11 @@ export function CustomerReferralCard() {
   };
 
   // Generate code on mount if needed
-  useState(() => {
-    if (user?.id && referralData && !referralData.referral_code) {
+  useEffect(() => {
+    if (user?.id && referralData && !referralData.referral_code && !generateCode.isPending) {
       handleGenerateCode();
     }
-  });
+  }, [user?.id, referralData?.referral_code, generateCode.isPending]);
 
   const handleCopyCode = async () => {
     if (!referralData?.referral_code) return;
