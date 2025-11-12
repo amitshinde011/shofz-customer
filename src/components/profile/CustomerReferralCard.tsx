@@ -2,17 +2,19 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Gift, Copy, Share2, TrendingUp, Store, CheckCircle, Clock } from "lucide-react";
+import { Gift, Copy, Share2, TrendingUp, Store, CheckCircle, Clock, QrCode } from "lucide-react";
 import { useCustomerReferral } from "@/hooks/useCustomerReferral";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ReferralQRCodeModal } from "./ReferralQRCodeModal";
 
 export function CustomerReferralCard() {
   const { user } = useAuth();
   const { referralData, stats, isLoading, generateCode } = useCustomerReferral(user?.id);
   const { toast } = useToast();
   const [isCopying, setIsCopying] = useState(false);
+  const [showQRModal, setShowQRModal] = useState(false);
 
   // Auto-generate code if it doesn't exist
   const handleGenerateCode = async () => {
@@ -144,6 +146,15 @@ export function CustomerReferralCard() {
             <Share2 className="w-4 h-4 mr-2" />
             Share Code
           </Button>
+          <Button
+            onClick={() => setShowQRModal(true)}
+            disabled={!referralData?.referral_code}
+            variant="outline"
+            className="flex-1"
+          >
+            <QrCode className="w-4 h-4 mr-2" />
+            QR Code
+          </Button>
         </div>
 
         {/* Earnings Summary */}
@@ -213,6 +224,13 @@ export function CustomerReferralCard() {
           </div>
         </div>
       </CardContent>
+
+      {/* QR Code Modal */}
+      <ReferralQRCodeModal
+        open={showQRModal}
+        onOpenChange={setShowQRModal}
+        referralCode={referralData?.referral_code || ""}
+      />
     </Card>
   );
 }
