@@ -4,14 +4,17 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Wallet, Edit, Save, X, AlertCircle } from "lucide-react";
+import { Wallet, Edit, Save, X, AlertCircle, ChevronRight } from "lucide-react";
 import { useCustomerReferral } from "@/hooks/useCustomerReferral";
 import { customerReferralService } from "@/services/customerReferralService";
 import { useAuth } from "@/contexts/AuthContext";
 import { Skeleton } from "@/components/ui/skeleton";
+import { formatDistance } from "date-fns";
+import { useNavigate } from "react-router-dom";
 
 export function UpiIdSettings() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const { referralData, stats, isLoading, updateUpi } = useCustomerReferral(user?.id);
   const [isEditing, setIsEditing] = useState(false);
   const [upiId, setUpiId] = useState("");
@@ -105,9 +108,16 @@ export function UpiIdSettings() {
                 </Button>
               </div>
               {referralData?.upi_id ? (
-                <p className="text-base font-mono text-foreground">
-                  {maskUpiId(referralData.upi_id)}
-                </p>
+                <>
+                  <p className="text-base font-mono text-foreground">
+                    {maskUpiId(referralData.upi_id)}
+                  </p>
+                  {referralData.updated_at && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Last updated: {formatDistance(new Date(referralData.updated_at), new Date(), { addSuffix: true })}
+                    </p>
+                  )}
+                </>
               ) : (
                 <p className="text-sm text-muted-foreground italic">
                   No UPI ID added yet
@@ -118,9 +128,20 @@ export function UpiIdSettings() {
             {/* Earnings Display */}
             {hasEarnings && (
               <div className="bg-emerald-500/5 rounded-lg p-4 border border-emerald-500/20">
-                <h4 className="text-sm font-semibold text-emerald-600 mb-3">
-                  Earnings Summary
-                </h4>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold text-emerald-600">
+                    Earnings Summary
+                  </h4>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => navigate('/referral-history')}
+                    className="text-xs h-auto py-1 px-2"
+                  >
+                    View Details
+                    <ChevronRight className="w-3 h-3 ml-1" />
+                  </Button>
+                </div>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Total Earnings</span>

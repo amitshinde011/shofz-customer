@@ -4,6 +4,7 @@ export interface CustomerReferralData {
   referral_code: string;
   upi_id: string | null;
   total_referral_earnings: number;
+  updated_at: string;
 }
 
 export interface ReferralStats {
@@ -62,7 +63,7 @@ export const customerReferralService = {
 
       const { data, error } = await (supabase
         .from('customer_profiles') as any)
-        .select('referral_code, upi_id, total_referral_earnings')
+        .select('referral_code, upi_id, total_referral_earnings, updated_at')
         .eq('user_id', customerId)
         .single();
 
@@ -74,7 +75,8 @@ export const customerReferralService = {
       return {
         referral_code: data?.referral_code || '',
         upi_id: data?.upi_id,
-        total_referral_earnings: data?.total_referral_earnings || 0
+        total_referral_earnings: data?.total_referral_earnings || 0,
+        updated_at: data?.updated_at
       };
     } catch (error) {
       console.error('[CustomerReferralService] Exception fetching data:', error);
@@ -187,7 +189,7 @@ export const customerReferralService = {
     const trimmedUpiId = upiId.trim();
 
     // Basic UPI ID format: user@bank
-    const upiRegex = /^[a-zA-Z0-9._-]{3,}@[a-zA-Z]{3,}$/;
+    const upiRegex = /^[a-zA-Z0-9._-]{4,}@[a-zA-Z]{3,}$/;
 
     if (!upiRegex.test(trimmedUpiId)) {
       return { valid: false, error: 'Invalid UPI ID format (e.g., username@paytm)' };
@@ -195,8 +197,8 @@ export const customerReferralService = {
 
     // Check minimum length before @
     const [username] = trimmedUpiId.split('@');
-    if (username.length < 3) {
-      return { valid: false, error: 'Username must be at least 3 characters' };
+    if (username.length < 4) {
+      return { valid: false, error: 'Username must be at least 4 characters' };
     }
 
     return { valid: true };
