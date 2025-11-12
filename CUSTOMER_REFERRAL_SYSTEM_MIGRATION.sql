@@ -22,6 +22,14 @@ ON customer_profiles(referral_code) WHERE referral_code IS NOT NULL;
 CREATE INDEX IF NOT EXISTS idx_customer_profiles_upi_id 
 ON customer_profiles(upi_id) WHERE upi_id IS NOT NULL;
 
+-- Add UNIQUE constraint to prevent duplicate referral codes
+ALTER TABLE customer_profiles
+DROP CONSTRAINT IF EXISTS customer_profiles_referral_code_unique;
+
+ALTER TABLE customer_profiles
+ADD CONSTRAINT customer_profiles_referral_code_unique 
+UNIQUE (referral_code);
+
 -- Add referral tracking columns to shops
 ALTER TABLE shops
 ADD COLUMN IF NOT EXISTS referred_by_customer_id UUID REFERENCES users(id) ON DELETE SET NULL,
@@ -126,7 +134,7 @@ CREATE TRIGGER update_referral_payout_config_updated_at
 -- SECTION 4: DATABASE FUNCTIONS
 -- =====================================================
 
--- Function to generate unique customer referral code
+-- Function to generate unique customer referral code (idempotent)
 CREATE OR REPLACE FUNCTION generate_customer_referral_code(p_customer_id UUID)
 RETURNS TEXT
 LANGUAGE plpgsql
@@ -139,15 +147,30 @@ DECLARE
     v_counter INTEGER := 0;
     v_max_attempts INTEGER := 100;
     v_customer_name TEXT;
+    v_existing_code TEXT;
 BEGIN
-    -- Get customer name for personalized code
+    -- FIRST: Check if customer already has a referral code
+    SELECT referral_code INTO v_existing_code
+    FROM customer_profiles
+    WHERE user_id = p_customer_id
+    AND referral_code IS NOT NULL
+    AND referral_code != '';
+    
+    -- If code exists, return it (idempotent)
+    IF v_existing_code IS NOT NULL THEN
+        RETURN v_existing_code;
+    END IF;
+    
+    -- Get customer name from users table for personalization
     SELECT COALESCE(name, email) INTO v_customer_name
     FROM users
     WHERE id = p_customer_id
     LIMIT 1;
     
-    -- Generate code based on name (first 4 chars) + random 4 digits
+    -- Generate a unique code
     LOOP
+        -- Format: First 4 chars of name (uppercase, alphanumeric only) + 4 random digits
+        -- Example: JOHN1234, JANE5678
         v_code := UPPER(
             REGEXP_REPLACE(
                 LEFT(COALESCE(v_customer_name, 'CUST'), 4), 
@@ -157,19 +180,31 @@ BEGIN
             )
         ) || LPAD(FLOOR(RANDOM() * 10000)::TEXT, 4, '0');
         
-        -- Check if code exists
+        -- Check if code already exists
         SELECT EXISTS(
             SELECT 1 FROM customer_profiles WHERE referral_code = v_code
         ) INTO v_exists;
         
+        -- Exit loop if code is unique or max attempts reached
         EXIT WHEN NOT v_exists OR v_counter >= v_max_attempts;
         
         v_counter := v_counter + 1;
     END LOOP;
     
-    -- If couldn't generate unique code, use UUID-based fallback
+    -- If still not unique after max attempts, use UUID-based fallback
     IF v_exists THEN
         v_code := 'CUST' || UPPER(SUBSTRING(REPLACE(gen_random_uuid()::TEXT, '-', ''), 1, 8));
+    END IF;
+    
+    -- CRITICAL: Update the customer_profiles table with the new code
+    UPDATE customer_profiles
+    SET referral_code = v_code,
+        updated_at = NOW()
+    WHERE user_id = p_customer_id;
+    
+    -- Verify update was successful
+    IF NOT FOUND THEN
+        RAISE EXCEPTION 'Failed to update customer profile with referral code for user %', p_customer_id;
     END IF;
     
     RETURN v_code;

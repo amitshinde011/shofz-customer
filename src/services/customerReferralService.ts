@@ -37,6 +37,14 @@ export const customerReferralService = {
     try {
       console.log('[CustomerReferralService] Generating referral code for customer:', customerId);
 
+      // Check if code already exists (client-side optimization)
+      const existing = await this.getCustomerReferralData(customerId);
+      if (existing?.referral_code) {
+        console.log('[CustomerReferralService] Code already exists:', existing.referral_code);
+        return { code: existing.referral_code };
+      }
+
+      // Call RPC (now idempotent and persists to DB)
       const { data, error } = await supabase.rpc('generate_customer_referral_code' as any, {
         p_customer_id: customerId
       });
@@ -46,7 +54,7 @@ export const customerReferralService = {
         return { code: '', error: error.message };
       }
 
-      console.log('[CustomerReferralService] Code generated:', data);
+      console.log('[CustomerReferralService] Code generated and saved:', data);
       return { code: String(data) };
     } catch (error: any) {
       console.error('[CustomerReferralService] Exception generating code:', error);

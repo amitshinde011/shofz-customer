@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -15,20 +15,32 @@ export function CustomerReferralCard() {
   const { toast } = useToast();
   const [isCopying, setIsCopying] = useState(false);
   const [showQRModal, setShowQRModal] = useState(false);
+  const hasAttemptedGeneration = useRef(false);
 
-  // Auto-generate code if it doesn't exist
-  const handleGenerateCode = async () => {
-    if (!referralData?.referral_code && !generateCode.isPending) {
-      await generateCode.mutateAsync();
-    }
+  const handleGenerateCode = () => {
+    generateCode.mutate();
   };
 
-  // Generate code on mount if needed
+  // Generate code on mount if needed (with race condition protection)
   useEffect(() => {
-    if (user?.id && referralData && !referralData.referral_code && !generateCode.isPending) {
+    if (
+      user?.id && 
+      referralData && 
+      !referralData.referral_code && 
+      !generateCode.isPending &&
+      !hasAttemptedGeneration.current
+    ) {
+      hasAttemptedGeneration.current = true;
       handleGenerateCode();
     }
   }, [user?.id, referralData?.referral_code, generateCode.isPending]);
+
+  // Reset attempt flag when code is successfully generated
+  useEffect(() => {
+    if (referralData?.referral_code) {
+      hasAttemptedGeneration.current = false;
+    }
+  }, [referralData?.referral_code]);
 
   const handleCopyCode = async () => {
     if (!referralData?.referral_code) return;

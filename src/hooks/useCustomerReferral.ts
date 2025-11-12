@@ -34,12 +34,11 @@ export function useCustomerReferral(customerId: string | undefined) {
   // Generate referral code mutation
   const generateCode = useMutation({
     mutationFn: () => customerReferralService.generateReferralCode(customerId!),
+    retry: false, // Prevent multiple simultaneous calls
     onSuccess: async (result) => {
       if (result.code) {
-        // Small delay to ensure DB has committed the transaction
-        await new Promise(resolve => setTimeout(resolve, 500));
+        // No delay needed - DB function is now atomic
         await queryClient.invalidateQueries({ queryKey: ['customer-referral', customerId] });
-        await queryClient.refetchQueries({ queryKey: ['customer-referral', customerId] });
         toast({
           title: "Referral Code Generated",
           description: `Your referral code is: ${result.code}`,
