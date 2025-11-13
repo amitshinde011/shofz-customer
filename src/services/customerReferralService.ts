@@ -27,6 +27,8 @@ export interface ReferralEarning {
   created_at: string;
   shop_verified_at: string | null;
   paid_at: string | null;
+  payment_reference: string | null;
+  notes: string | null;
 }
 
 export const customerReferralService = {
@@ -158,6 +160,8 @@ export const customerReferralService = {
           created_at,
           shop_verified_at,
           paid_at,
+          payment_reference,
+          notes,
           shops(name, logo_url)
         `)
         .eq('customer_id', customerId)
@@ -178,7 +182,9 @@ export const customerReferralService = {
         status: item.status,
         created_at: item.created_at,
         shop_verified_at: item.shop_verified_at,
-        paid_at: item.paid_at
+        paid_at: item.paid_at,
+        payment_reference: item.payment_reference,
+        notes: item.notes
       }));
     } catch (error) {
       console.error('[CustomerReferralService] Exception fetching history:', error);
