@@ -425,15 +425,15 @@ DECLARE
     v_total_referred INTEGER;
     v_verified_count INTEGER;
     v_pending_count INTEGER;
-    v_total_earnings NUMERIC;
+    v_total_all_earnings NUMERIC;
     v_pending_amount NUMERIC;
     v_approved_amount NUMERIC;
     v_referral_code TEXT;
     v_upi_id TEXT;
 BEGIN
     -- Get referral code and UPI ID
-    SELECT referral_code, upi_id, total_referral_earnings
-    INTO v_referral_code, v_upi_id, v_total_earnings
+    SELECT referral_code, upi_id
+    INTO v_referral_code, v_upi_id
     FROM customer_profiles
     WHERE user_id = p_customer_id;
     
@@ -463,15 +463,21 @@ BEGIN
     WHERE customer_id = p_customer_id
     AND status = 'approved';
     
+    -- Calculate total earnings (sum of ALL earnings: pending + approved + paid)
+    SELECT COALESCE(SUM(amount), 0) INTO v_total_all_earnings
+    FROM customer_referral_earnings
+    WHERE customer_id = p_customer_id;
+    
+    -- Return with field names matching TypeScript interface
     RETURN json_build_object(
         'referral_code', v_referral_code,
         'upi_id', v_upi_id,
-        'total_referred', v_total_referred,
-        'verified_count', v_verified_count,
+        'total_shops_referred', v_total_referred,
+        'verified_shops', v_verified_count,
         'pending_verification', v_pending_count,
-        'total_earnings_paid', COALESCE(v_total_earnings, 0),
+        'total_earnings', v_total_all_earnings,
         'pending_earnings', v_pending_amount,
-        'approved_not_paid', v_approved_amount,
+        'approved_earnings', v_approved_amount,
         'has_upi_id', v_upi_id IS NOT NULL
     );
 END;
