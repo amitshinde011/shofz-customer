@@ -71,28 +71,28 @@ export default function ReferralHistory() {
 
       <div className="container max-w-4xl mx-auto px-4 py-6 space-y-6">
         {/* Summary Cards */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-3 gap-2 sm:gap-4">
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-4 px-3 sm:pt-6 sm:px-6">
               <div className="text-center">
-                <p className="text-sm text-muted-foreground mb-1">Total Earned</p>
-                <p className="text-2xl font-bold text-foreground">₹{totalEarnings.toFixed(2)}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground mb-1">Total Earned</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-foreground">₹{totalEarnings.toFixed(2)}</p>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-4 px-3 sm:pt-6 sm:px-6">
               <div className="text-center">
-                <p className="text-sm text-muted-foreground mb-1">Paid Out</p>
-                <p className="text-2xl font-bold text-success">₹{paidEarnings.toFixed(2)}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground mb-1">Paid Out</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-success">₹{paidEarnings.toFixed(2)}</p>
               </div>
             </CardContent>
           </Card>
           <Card>
-            <CardContent className="pt-6">
+            <CardContent className="pt-4 px-3 sm:pt-6 sm:px-6">
               <div className="text-center">
-                <p className="text-sm text-muted-foreground mb-1">Pending</p>
-                <p className="text-2xl font-bold text-primary">₹{pendingEarnings.toFixed(2)}</p>
+                <p className="text-xs sm:text-sm text-muted-foreground mb-1">Pending</p>
+                <p className="text-lg sm:text-xl md:text-2xl font-bold text-primary">₹{pendingEarnings.toFixed(2)}</p>
               </div>
             </CardContent>
           </Card>
