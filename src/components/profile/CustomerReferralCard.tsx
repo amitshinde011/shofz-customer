@@ -15,11 +15,12 @@ import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useNavigate } from "react-router-dom";
 import { format } from "date-fns";
+import { ReferralEarningsChart } from "./ReferralEarningsChart";
 
 export function CustomerReferralCard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { referralData, stats, recentReferrals, isLoading, generateCode } = useCustomerReferral(user?.id);
+  const { referralData, stats, recentReferrals, history, isLoading, generateCode } = useCustomerReferral(user?.id);
   const { toast } = useToast();
   const [isCopying, setIsCopying] = useState(false);
   const [isCopyingLink, setIsCopyingLink] = useState(false);
@@ -310,6 +311,9 @@ export function CustomerReferralCard() {
             </div>
           </div>
         </div>
+
+        {/* Earnings Trend Chart */}
+        <ReferralEarningsChart history={history} />
 
         {/* Recent Referral History Preview */}
         {recentReferrals && recentReferrals.length > 0 && (
