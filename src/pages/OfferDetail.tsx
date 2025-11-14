@@ -287,15 +287,15 @@ export default function OfferDetail() {
                           <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary shrink-0" />
                         )}
                       </div>
-                      {shop.rating && (
+                      {(shop.rating && shop.rating > 0) && (
                         <div className="flex items-center gap-1.5 text-xs sm:text-sm">
                           <div className="flex items-center gap-0.5">
                             <Star className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-warning text-warning" />
-                            <span className="font-medium text-foreground">{shop.rating}</span>
+                            <span className="font-medium text-foreground">{shop.rating.toFixed(1)}</span>
                           </div>
-                          {shop.total_reviews && (
+                          {(shop.total_reviews && shop.total_reviews > 0) && (
                             <span className="text-muted-foreground">
-                              ({shop.total_reviews} reviews)
+                              ({shop.total_reviews} {shop.total_reviews === 1 ? 'review' : 'reviews'})
                             </span>
                           )}
                         </div>

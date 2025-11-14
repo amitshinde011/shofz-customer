@@ -315,10 +315,14 @@ export default function OfferStoriesViewer({
               <p
                 style={{
                   color: "white",
-                  fontSize: "16px",
+                  fontSize: "14px",
                   fontWeight: 600,
                   margin: 0,
                   textShadow: "0 2px 4px rgba(0,0,0,0.8)",
+                  maxWidth: "200px",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
                 }}
               >
                 {shopName}
@@ -329,18 +333,21 @@ export default function OfferStoriesViewer({
           <button
             onClick={onClose}
             style={{
-              width: "40px",
-              height: "40px",
+              width: "36px",
+              height: "36px",
               borderRadius: "50%",
-              backgroundColor: "rgba(0, 0, 0, 0.5)",
-              border: "none",
+              backgroundColor: "rgba(0, 0, 0, 0.6)",
+              backdropFilter: "blur(8px)",
+              border: "2px solid rgba(255, 255, 255, 0.9)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               cursor: "pointer",
+              zIndex: 20,
+              flexShrink: 0,
             }}
           >
-            <X color="white" size={24} />
+            <X color="white" size={20} strokeWidth={3} />
           </button>
         </div>
 
@@ -354,15 +361,17 @@ export default function OfferStoriesViewer({
             bottom: 0,
             left: 0,
             right: 0,
-            padding: "16px",
+            padding: "12px",
+            paddingBottom: "16px",
             zIndex: 10,
           }}
         >
           <div
             style={{
               background: "rgba(128, 128, 128, 0.5)",
-              borderRadius: "20px",
-              padding: "24px",
+              borderRadius: "16px",
+              padding: "16px",
+              backdropFilter: "blur(12px)",
               border: "1px solid rgba(255, 255, 255, 0.3)",
               boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)",
             }}
@@ -370,11 +379,12 @@ export default function OfferStoriesViewer({
             <h2
               style={{
                 color: "white",
-                fontSize: "28px",
-                fontWeight: 900,
-                margin: "0 0 8px 0",
+                fontSize: "20px",
+                fontWeight: 800,
+                margin: "0 0 6px 0",
                 textShadow: "0 2px 6px rgba(0,0,0,0.8)",
-                letterSpacing: "0.02em",
+                letterSpacing: "0.01em",
+                lineHeight: "1.2",
               }}
             >
               {currentOffer.title}
@@ -384,23 +394,27 @@ export default function OfferStoriesViewer({
               <p
                 style={{
                   color: "white",
-                  fontSize: "16px",
-                  margin: "0 0 16px 0",
-                  lineHeight: "1.5",
+                  fontSize: "13px",
+                  margin: "0 0 10px 0",
+                  lineHeight: "1.4",
                   textShadow: "0 1px 3px rgba(0,0,0,0.6)",
+                  display: "-webkit-box",
+                  WebkitLineClamp: 2,
+                  WebkitBoxOrient: "vertical",
+                  overflow: "hidden",
                 }}
               >
                 {currentOffer.description}
               </p>
             )}
 
-            <div style={{ marginBottom: "20px" }}>
+            <div style={{ marginBottom: "12px" }}>
               <p
                 style={{
                   color: "white",
-                  fontSize: "36px",
+                  fontSize: "28px",
                   fontWeight: 900,
-                  margin: "0 0 4px 0",
+                  margin: "0 0 2px 0",
                   textShadow: "0 2px 6px rgba(0,0,0,0.8)",
                 }}
               >
@@ -409,7 +423,7 @@ export default function OfferStoriesViewer({
               <p
                 style={{
                   color: "rgba(255, 255, 255, 0.9)",
-                  fontSize: "14px",
+                  fontSize: "12px",
                   margin: 0,
                   textShadow: "0 1px 3px rgba(0,0,0,0.6)",
                 }}
@@ -425,13 +439,13 @@ export default function OfferStoriesViewer({
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                gap: "8px",
-                padding: "14px 24px",
-                borderRadius: "12px",
+                gap: "6px",
+                padding: "12px 20px",
+                borderRadius: "10px",
                 backgroundColor: "rgba(255, 255, 255, 0.25)",
                 border: "2px solid white",
                 color: "white",
-                fontSize: "16px",
+                fontSize: "14px",
                 fontWeight: 700,
                 cursor: "pointer",
                 textShadow: "0 1px 3px rgba(0,0,0,0.6)",
@@ -447,7 +461,7 @@ export default function OfferStoriesViewer({
               }}
             >
               View Offer Details
-              <ExternalLink size={18} />
+              <ExternalLink size={16} />
             </button>
           </div>
         </motion.div>

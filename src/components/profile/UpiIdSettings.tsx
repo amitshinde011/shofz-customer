@@ -73,17 +73,17 @@ export function UpiIdSettings() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Wallet className="w-5 h-5 text-primary" />
+      <CardHeader className="p-4 sm:p-5 md:p-6">
+        <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+          <Wallet className="w-4 h-4 sm:w-5 sm:h-5 text-primary" />
           Payment Information
         </CardTitle>
-        <p className="text-sm text-muted-foreground mt-1">
+        <p className="text-xs sm:text-sm text-muted-foreground mt-1">
           Required for receiving referral earnings
         </p>
       </CardHeader>
 
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 sm:space-y-4 p-4 sm:p-5 md:p-6 pt-0">
         {showAlert && (
           <Alert variant="destructive">
             <AlertCircle className="h-4 w-4" />
@@ -128,20 +128,9 @@ export function UpiIdSettings() {
             {/* Earnings Display */}
             {hasEarnings && (
               <div className="bg-emerald-500/5 rounded-lg p-4 border border-emerald-500/20">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-semibold text-emerald-600">
-                    Earnings Summary
-                  </h4>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigate('/referral-history')}
-                    className="text-xs h-auto py-1 px-2"
-                  >
-                    View Details
-                    <ChevronRight className="w-3 h-3 ml-1" />
-                  </Button>
-                </div>
+                <h4 className="text-sm font-semibold text-emerald-600 mb-3">
+                  Earnings Summary
+                </h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Total Earnings</span>

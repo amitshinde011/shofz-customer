@@ -61,7 +61,7 @@ export default function Profile() {
   }, [user]);
 
   const handleBack = () => {
-    navigate(-1);
+    navigate('/');
   };
 
   // Real-time subscription for inquiry count updates
@@ -216,11 +216,11 @@ export default function Profile() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-20 overflow-x-hidden w-full max-w-full">
-      <div className="max-w-screen-xl mx-auto">
+    <div className="min-h-screen bg-background pb-20 md:pb-24 lg:pb-6">
+      <div className="max-w-screen-xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-0 lg:gap-6">
           {/* Mobile Header */}
-          <div className="lg:hidden bg-card border-b border-border px-3 sm:px-6 py-4">
+          <div className="lg:hidden bg-card border-b border-border px-4 py-4 sticky top-0 z-50 backdrop-blur-sm bg-card/95">
             <div className="flex items-center gap-3">
               <Button
                 variant="ghost"
@@ -286,7 +286,7 @@ export default function Profile() {
           </div>
 
           {/* Main Content */}
-          <div className="lg:col-span-9 px-3 sm:px-6 py-4 sm:py-6 space-y-4 sm:space-y-6">
+          <div className="lg:col-span-9 py-4 sm:py-6 space-y-4 sm:space-y-5 md:space-y-6">
             {/* Profile Header Card */}
             <Card>
               <CardContent className="p-4 sm:p-6">
@@ -294,7 +294,7 @@ export default function Profile() {
                   <div className="space-y-4">
                     <div className="flex items-start gap-4 sm:gap-6">
                       <div className="relative">
-                        <Avatar className="w-20 h-20 sm:w-24 sm:h-24 border-2 border-border">
+                        <Avatar className="w-16 h-16 sm:w-20 sm:h-20 md:w-24 md:h-24 border-2 border-border">
                           <AvatarImage src={user?.avatar_url} alt={user?.name || 'User'} />
                           <AvatarFallback className="text-xl sm:text-2xl">
                             {user?.name?.charAt(0)?.toUpperCase() || 'U'}
@@ -316,10 +316,10 @@ export default function Profile() {
                             variant="outline"
                             size="sm"
                             onClick={() => setIsEditing(true)}
-                            className="shrink-0"
+                            className="h-9 sm:h-10 shrink-0"
                           >
-                            <Edit className="w-3.5 h-3.5 mr-1.5" />
-                            Edit
+                            <Edit className="w-4 h-4 sm:w-3.5 sm:h-3.5 sm:mr-1.5" />
+                            <span className="hidden sm:inline">Edit</span>
                           </Button>
                         </div>
 
