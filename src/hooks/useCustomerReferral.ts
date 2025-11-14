@@ -31,6 +31,14 @@ export function useCustomerReferral(customerId: string | undefined) {
     staleTime: 1000 * 60 * 5, // 5 minutes
   });
 
+  // Fetch recent referrals (limited to 3)
+  const { data: recentReferrals, isLoading: isLoadingRecent } = useQuery({
+    queryKey: ['customer-referral-recent', customerId],
+    queryFn: () => customerReferralService.getRecentReferrals(customerId!, 3),
+    enabled: !!customerId,
+    staleTime: 1000 * 60 * 2, // 2 minutes
+  });
+
   // Generate referral code mutation
   const generateCode = useMutation({
     mutationFn: () => customerReferralService.generateReferralCode(customerId!),
@@ -91,8 +99,10 @@ export function useCustomerReferral(customerId: string | undefined) {
     referralData,
     stats,
     history,
+    recentReferrals,
     isLoading: isLoadingData || isLoadingStats,
     isLoadingHistory,
+    isLoadingRecent,
     generateCode,
     updateUpi,
   };
