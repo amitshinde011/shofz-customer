@@ -193,6 +193,44 @@ export const customerReferralService = {
   },
 
   /**
+   * Get recent referral history (limited)
+   */
+  async getRecentReferrals(customerId: string, limit: number = 3): Promise<ReferralEarning[]> {
+    try {
+      const { data, error }: any = await supabase
+        .from('customer_referral_earnings')
+        .select(`
+          id, shop_id, referral_code, amount, status,
+          created_at, shop_verified_at, paid_at,
+          payment_reference, notes,
+          shops(name, logo_url)
+        `)
+        .eq('customer_id', customerId)
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (error) return [];
+
+      return (data || []).map((item: any) => ({
+        id: item.id,
+        shop_id: item.shop_id,
+        shop_name: item.shops?.name || 'Unknown Shop',
+        shop_logo_url: item.shops?.logo_url,
+        referral_code: item.referral_code,
+        amount: item.amount,
+        status: item.status,
+        created_at: item.created_at,
+        shop_verified_at: item.shop_verified_at,
+        paid_at: item.paid_at,
+        payment_reference: item.payment_reference,
+        notes: item.notes
+      }));
+    } catch (error) {
+      return [];
+    }
+  },
+
+  /**
    * Validate UPI ID format
    */
   validateUpiId(upiId: string): { valid: boolean; error?: string } {
