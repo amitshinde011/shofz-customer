@@ -1,25 +1,28 @@
 import { useState, useEffect, useRef } from "react";
+import QRCode from "react-qr-code";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Gift, Copy, Share2, TrendingUp, Store, CheckCircle, Clock, QrCode } from "lucide-react";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { 
+  Gift, Copy, Share2, Download, TrendingUp, Store, 
+  CheckCircle, Clock, QrCode, ArrowRight, CreditCard,
+  Users, ShieldCheck
+} from "lucide-react";
 import { useCustomerReferral } from "@/hooks/useCustomerReferral";
 import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ReferralQRCodeModal } from "./ReferralQRCodeModal";
+import { useNavigate } from "react-router-dom";
+import { format } from "date-fns";
 
 export function CustomerReferralCard() {
   const { user } = useAuth();
-  const { referralData, stats, isLoading, generateCode } = useCustomerReferral(user?.id);
+  const navigate = useNavigate();
+  const { referralData, stats, recentReferrals, isLoading, generateCode } = useCustomerReferral(user?.id);
   const { toast } = useToast();
   const [isCopying, setIsCopying] = useState(false);
-  const [showQRModal, setShowQRModal] = useState(false);
   const hasAttemptedGeneration = useRef(false);
-
-  const handleGenerateCode = () => {
-    generateCode.mutate();
-  };
 
   // Generate code on mount if needed (with race condition protection)
   useEffect(() => {
@@ -32,7 +35,7 @@ export function CustomerReferralCard() {
       !isLoading
     ) {
       hasAttemptedGeneration.current = true;
-      handleGenerateCode();
+      generateCode.mutate();
     }
   }, [user?.id, referralData?.referral_code, generateCode.isPending, isLoading]);
 
@@ -60,10 +63,11 @@ export function CustomerReferralCard() {
   const handleShareCode = async () => {
     if (!referralData?.referral_code) return;
 
+    const businessAppUrl = `https://business.shofz.com/auth?ref=${referralData.referral_code}`;
     const shareData = {
-      title: "Join LocalConnect",
-      text: `Join LocalConnect with my referral code ${referralData.referral_code} and help local businesses grow!`,
-      url: window.location.origin,
+      title: "Join Shofz Business",
+      text: `Join Shofz with my referral code ${referralData.referral_code} and grow your business online!`,
+      url: businessAppUrl,
     };
 
     try {
@@ -84,35 +88,84 @@ export function CustomerReferralCard() {
     }
   };
 
+  const handleDownloadQR = async () => {
+    try {
+      const svg = document.getElementById("referral-qr-code");
+      if (!svg) return;
+      
+      const svgData = new XMLSerializer().serializeToString(svg);
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      const img = new Image();
+
+      img.onload = () => {
+        canvas.width = 300;
+        canvas.height = 300;
+        
+        if (ctx) {
+          ctx.fillStyle = "#ffffff";
+          ctx.fillRect(0, 0, 300, 300);
+          ctx.drawImage(img, 0, 0, 300, 300);
+        }
+
+        canvas.toBlob((blob) => {
+          if (!blob) return;
+          const url = URL.createObjectURL(blob);
+          const link = document.createElement("a");
+          link.download = `shofz-referral-${referralData?.referral_code}.png`;
+          link.href = url;
+          link.click();
+          URL.revokeObjectURL(url);
+          
+          toast({
+            title: "Downloaded!",
+            description: "QR code saved to your device",
+          });
+        });
+      };
+
+      img.src = "data:image/svg+xml;base64," + btoa(svgData);
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to download QR code",
+        variant: "destructive",
+      });
+    }
+  };
+
   if (isLoading) {
     return (
       <Card className="bg-gradient-to-br from-primary/10 to-purple-500/10">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Gift className="w-5 h-5" />
-            Refer & Earn
+            Earnings & Payments
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
-          <Skeleton className="h-16 w-full" />
-          <Skeleton className="h-10 w-full" />
+          <Skeleton className="h-64 w-full" />
+          <Skeleton className="h-32 w-full" />
           <Skeleton className="h-24 w-full" />
         </CardContent>
       </Card>
     );
   }
 
+  const businessAppUrl = `https://business.shofz.com/auth?ref=${referralData?.referral_code}`;
+
   return (
-    <Card className="bg-gradient-to-br from-primary/10 to-purple-500/10 border-primary/20">
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Gift className="w-5 h-5 text-primary" />
-          Refer & Earn
-        </CardTitle>
-        <p className="text-sm text-muted-foreground mt-1">
-          Refer businesses and earn money for each verified shop
-        </p>
-      </CardHeader>
+    <div className="space-y-6">
+      <Card className="bg-gradient-to-br from-primary/10 to-purple-500/10 border-primary/20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Gift className="w-5 h-5 text-primary" />
+            Earnings & Payments
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Refer businesses and earn money for each verified shop
+          </p>
+        </CardHeader>
 
       <CardContent className="space-y-6">
         {/* Referral Code Display */}
