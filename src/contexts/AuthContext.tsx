@@ -226,8 +226,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch (error) {
         console.error('[AuthContext] Error in handleAuthChange:', error);
-        // Don't sign out - token might be in the process of refreshing
-        // Just clear local state and let the auth flow handle it
+        // Don't sign out - let Supabase handle token refresh automatically
         clearUserProfileFromStorage();
         if (mounted) {
           setAuthState({ user: null, session: null, loading: false });
@@ -256,8 +255,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (error) {
           console.error('[AuthContext] Session fetch error:', error);
-          // Don't sign out - just clear local state
-          // Supabase will handle token refresh automatically
+          // Don't sign out - Supabase will auto-refresh the token
           clearUserProfileFromStorage();
           if (mounted) {
             setAuthState({ user: null, session: null, loading: false });
@@ -272,7 +270,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .catch((error) => {
         clearTimeout(sessionTimeout);
         console.error('[AuthContext] Session fetch exception:', error);
-        // Don't sign out - just clear local state
+        // Don't sign out - keep session in localStorage for auto-refresh
         clearUserProfileFromStorage();
         if (mounted) {
           setAuthState({ user: null, session: null, loading: false });

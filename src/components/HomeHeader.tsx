@@ -50,7 +50,7 @@ export function HomeHeader() {
           {/* Location (Desktop) */}
           <button className="hidden md:flex items-center gap-1 hover:border border-white/20 p-2 rounded transition-all">
             <div className="text-left">
-              <div className="text-xs text-gray-300">Find Offers Around You</div>
+              <div className="text-xs text-gray-300">Find Offers, Products, Shops, and More Around You</div>
             </div>
           </button>
 

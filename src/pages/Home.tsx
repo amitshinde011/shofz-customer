@@ -20,6 +20,8 @@ import { ResponsiveImage } from "@/components/ResponsiveImage";
 import { useUserLocation } from "@/contexts/LocationContext";
 import { calculateShopStatus } from "@/lib/businessHours";
 import { calculateDistance, formatDistance } from "@/lib/distanceCalculation";
+import { AdBannerCarousel } from "@/components/AdBannerCarousel";
+import { AdBanner } from "@/components/AdBanner";
 
 // Helper function to get icon for category
 const getCategoryIcon = (categoryName: string): keyof typeof Icons => {
@@ -116,6 +118,9 @@ export default function Home() {
         </div>
       )}
 
+      {/* Advertisement Carousel - Top of page */}
+      <AdBannerCarousel placement="home-top" />
+
       <div className="max-w-screen-xl mx-auto page-container section-spacing">
         {/* Featured Shops Grid */}
         {featuredShops.length > 0 && (
@@ -141,6 +146,9 @@ export default function Home() {
           </section>
         )}
 
+        {/* Ad Banner after Featured Shops */}
+        <AdBanner placement="after-featured-shops" className="my-6" />
+
         {/* Featured Offers Grid */}
         {featuredOffers.length > 0 && (
           <section>
@@ -164,6 +172,9 @@ export default function Home() {
             </div>
           </section>
         )}
+
+        {/* Ad Banner after Featured Offers */}
+        <AdBanner placement="after-featured-offers" className="my-6" />
 
         {/* Categories */}
         <section>
@@ -227,6 +238,9 @@ export default function Home() {
             </div>
           </section>
         )}
+
+        {/* Ad Banner after Featured Products */}
+        <AdBanner placement="after-featured-products" className="my-6" />
 
         {/* Featured Offers */}
         {currentOffers.length > 0 && (

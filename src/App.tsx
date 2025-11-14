@@ -33,6 +33,7 @@ import Offers from "./pages/Offers";
 import OfferDetail from "./pages/OfferDetail";
 import ShopDashboard from "./pages/ShopDashboard";
 import CustomerSupport from "./pages/CustomerSupport";
+import ReferralHistory from "./pages/ReferralHistory";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 // Initialize Google Analytics
@@ -122,6 +123,7 @@ function AppContent() {
         <Route path="/inquiries/:id" element={<ProtectedRoute><InquiryDetail /></ProtectedRoute>} />
         <Route path="/favorites" element={<ProtectedRoute><Favorites /></ProtectedRoute>} />
         <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/referral-history" element={<ProtectedRoute><ReferralHistory /></ProtectedRoute>} />
         <Route path="/shop/dashboard" element={<ProtectedRoute><ShopDashboard /></ProtectedRoute>} />
         <Route path="/support" element={<ProtectedRoute><CustomerSupport /></ProtectedRoute>} />
         <Route path="/privacy-policy" element={<PrivacyPolicy />} />
