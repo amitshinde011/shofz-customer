@@ -1,4 +1,4 @@
-﻿export type Json =
+export type Json =
   | string
   | number
   | boolean
@@ -2724,6 +2724,8 @@ export type Database = {
           is_active: boolean | null
           last_login: string | null
           name: string
+          pending_customer_referral_code: string | null
+          pending_referral_code: string | null
           phone: string | null
           phone_number: string | null
           profile_image_url: string | null
@@ -2740,6 +2742,8 @@ export type Database = {
           is_active?: boolean | null
           last_login?: string | null
           name: string
+          pending_customer_referral_code?: string | null
+          pending_referral_code?: string | null
           phone?: string | null
           phone_number?: string | null
           profile_image_url?: string | null
@@ -2756,6 +2760,8 @@ export type Database = {
           is_active?: boolean | null
           last_login?: string | null
           name?: string
+          pending_customer_referral_code?: string | null
+          pending_referral_code?: string | null
           phone?: string | null
           phone_number?: string | null
           profile_image_url?: string | null
@@ -3449,20 +3455,25 @@ export type Database = {
       }
       postgis_version: { Args: never; Returns: string }
       postgis_wagyu_version: { Args: never; Returns: string }
-      process_referral_transaction: {
-        Args: {
-          p_referral_code: string
-          p_referred_customer_id?: string
-          p_referred_entity_type: string
-          p_referred_shop_id?: string
-          p_referrer_shop_id: string
-        }
-        Returns: string
-      }
-      process_shop_referral_earning: {
-        Args: { p_shop_id: string }
-        Returns: Json
-      }
+      process_referral_transaction:
+        | {
+            Args: {
+              p_referral_code: string
+              p_referred_entity_type: string
+              p_referred_shop_id: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_referral_code: string
+              p_referred_customer_id?: string
+              p_referred_entity_type: string
+              p_referred_shop_id?: string
+              p_referrer_shop_id: string
+            }
+            Returns: string
+          }
       send_credit_expiration_warnings: { Args: never; Returns: undefined }
       show_limit: { Args: never; Returns: number }
       show_trgm: { Args: { "": string }; Returns: string[] }
