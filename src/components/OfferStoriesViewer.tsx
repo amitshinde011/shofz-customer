@@ -371,7 +371,6 @@ export default function OfferStoriesViewer({
               background: "rgba(128, 128, 128, 0.5)",
               borderRadius: "16px",
               padding: "16px",
-              backdropFilter: "blur(12px)",
               border: "1px solid rgba(255, 255, 255, 0.3)",
               boxShadow: "0 8px 32px rgba(0, 0, 0, 0.3)",
             }}
