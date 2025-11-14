@@ -128,20 +128,9 @@ export function UpiIdSettings() {
             {/* Earnings Display */}
             {hasEarnings && (
               <div className="bg-emerald-500/5 rounded-lg p-4 border border-emerald-500/20">
-                <div className="flex items-center justify-between mb-3">
-                  <h4 className="text-sm font-semibold text-emerald-600">
-                    Earnings Summary
-                  </h4>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => navigate('/referral-history')}
-                    className="text-xs h-auto py-1 px-2"
-                  >
-                    View Details
-                    <ChevronRight className="w-3 h-3 ml-1" />
-                  </Button>
-                </div>
+                <h4 className="text-sm font-semibold text-emerald-600 mb-3">
+                  Earnings Summary
+                </h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Total Earnings</span>

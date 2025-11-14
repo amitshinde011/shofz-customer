@@ -22,6 +22,7 @@ export function CustomerReferralCard() {
   const { referralData, stats, recentReferrals, isLoading, generateCode } = useCustomerReferral(user?.id);
   const { toast } = useToast();
   const [isCopying, setIsCopying] = useState(false);
+  const [isCopyingLink, setIsCopyingLink] = useState(false);
   const hasAttemptedGeneration = useRef(false);
 
   useEffect(() => {
@@ -48,6 +49,20 @@ export function CustomerReferralCard() {
       toast({ title: "Error", description: "Failed to copy code", variant: "destructive" });
     } finally {
       setTimeout(() => setIsCopying(false), 2000);
+    }
+  };
+
+  const handleCopyLink = async () => {
+    if (!referralData?.referral_code) return;
+    const businessAppUrl = `https://business.shofz.com/auth?ref=${referralData.referral_code}`;
+    setIsCopyingLink(true);
+    try {
+      await navigator.clipboard.writeText(businessAppUrl);
+      toast({ title: "Copied!", description: "Referral link copied to clipboard" });
+    } catch (error) {
+      toast({ title: "Error", description: "Failed to copy link", variant: "destructive" });
+    } finally {
+      setTimeout(() => setIsCopyingLink(false), 2000);
     }
   };
 
@@ -176,8 +191,36 @@ export function CustomerReferralCard() {
               </div>
             </div>
 
+            {/* Referral Link */}
+            <div>
+              <p className="text-xs text-muted-foreground mb-2 uppercase tracking-wide">
+                Your Referral Link
+              </p>
+              <div className="flex items-center gap-2">
+                <div className="flex-1 bg-background rounded-md px-3 py-2 border overflow-x-auto">
+                  <p className="text-xs md:text-sm font-mono text-muted-foreground truncate">
+                    {referralData?.referral_code 
+                      ? `https://business.shofz.com/auth?ref=${referralData.referral_code}`
+                      : "Generating..."}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={handleCopyLink}
+                  disabled={!referralData?.referral_code || isCopyingLink}
+                >
+                  {isCopyingLink ? (
+                    <CheckCircle className="w-4 h-4 text-green-500" />
+                  ) : (
+                    <Copy className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+            </div>
+
             {/* Action Buttons */}
-            <div className="grid grid-cols-3 gap-2">
+            <div className="grid grid-cols-2 gap-2">
               <Button
                 onClick={handleCopyCode}
                 disabled={!referralData?.referral_code}
@@ -185,7 +228,16 @@ export function CustomerReferralCard() {
                 size="sm"
               >
                 <Copy className="w-3 h-3 mr-1" />
-                Copy
+                Copy Code
+              </Button>
+              <Button
+                onClick={handleCopyLink}
+                disabled={!referralData?.referral_code}
+                variant="outline"
+                size="sm"
+              >
+                <Copy className="w-3 h-3 mr-1" />
+                Copy Link
               </Button>
               <Button
                 onClick={handleShareCode}
@@ -203,7 +255,7 @@ export function CustomerReferralCard() {
                 size="sm"
               >
                 <Download className="w-3 h-3 mr-1" />
-                QR
+                QR Code
               </Button>
             </div>
           </div>
