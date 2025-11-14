@@ -226,8 +226,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch (error) {
         console.error('[AuthContext] Error in handleAuthChange:', error);
-        // Clear all auth state on errors - indicates invalid/expired tokens
-        await supabase.auth.signOut();
+        // Don't sign out - let Supabase handle token refresh automatically
         clearUserProfileFromStorage();
         if (mounted) {
           setAuthState({ user: null, session: null, loading: false });
@@ -256,29 +255,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (error) {
           console.error('[AuthContext] Session fetch error:', error);
-          // Clear expired/invalid tokens from localStorage
-          supabase.auth.signOut();
+          // Don't sign out - Supabase will auto-refresh the token
           clearUserProfileFromStorage();
           if (mounted) {
             setAuthState({ user: null, session: null, loading: false });
           }
           return;
-        }
-
-        // Validate session is not expired before using it
-        if (session && session.expires_at) {
-          const expiresAt = session.expires_at * 1000; // Convert to milliseconds
-          const now = Date.now();
-          
-          if (expiresAt < now) {
-            console.warn('[AuthContext] Session expired, clearing auth state');
-            supabase.auth.signOut();
-            clearUserProfileFromStorage();
-            if (mounted) {
-              setAuthState({ user: null, session: null, loading: false });
-            }
-            return;
-          }
         }
 
         if (mounted) {
@@ -288,8 +270,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       .catch((error) => {
         clearTimeout(sessionTimeout);
         console.error('[AuthContext] Session fetch exception:', error);
-        // Clear expired/invalid tokens from localStorage
-        supabase.auth.signOut();
+        // Don't sign out - keep session in localStorage for auto-refresh
         clearUserProfileFromStorage();
         if (mounted) {
           setAuthState({ user: null, session: null, loading: false });
@@ -305,24 +286,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       subscription.unsubscribe();
     };
   }, []); // ← EMPTY DEPS = RUNS ONCE
-
-  // Periodically validate session (every 5 minutes)
-  useEffect(() => {
-    if (!authState.session) return;
-    
-    const interval = setInterval(async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error || !session) {
-        console.warn('[AuthContext] Session validation failed, signing out');
-        await supabase.auth.signOut();
-        clearUserProfileFromStorage();
-        setAuthState({ user: null, session: null, loading: false });
-      }
-    }, 5 * 60 * 1000); // 5 minutes
-    
-    return () => clearInterval(interval);
-  }, [authState.session]);
 
   const signUpWithEmail = async (email: string, password: string, name: string) => {
     try {
