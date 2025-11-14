@@ -61,7 +61,7 @@ export default function Profile() {
   }, [user]);
 
   const handleBack = () => {
-    navigate(-1);
+    navigate('/');
   };
 
   // Real-time subscription for inquiry count updates
