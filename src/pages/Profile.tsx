@@ -316,10 +316,10 @@ export default function Profile() {
                             variant="outline"
                             size="sm"
                             onClick={() => setIsEditing(true)}
-                            className="shrink-0"
+                            className="h-9 sm:h-10 shrink-0"
                           >
-                            <Edit className="w-3.5 h-3.5 mr-1.5" />
-                            Edit
+                            <Edit className="w-4 h-4 sm:w-3.5 sm:h-3.5 sm:mr-1.5" />
+                            <span className="hidden sm:inline">Edit</span>
                           </Button>
                         </div>
 
