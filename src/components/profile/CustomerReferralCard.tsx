@@ -153,17 +153,20 @@ export function CustomerReferralCard() {
 
       <CardContent className="space-y-6">
         {/* Two Column Layout: QR + Code | Stats */}
-        <div className="grid md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5 md:gap-6">
           {/* Left: QR Code + Referral Code */}
           <div className="space-y-4">
             {/* QR Code Display */}
-            <div className="bg-background rounded-lg p-4 flex items-center justify-center border">
-              <QRCode
-                id="referral-qr-code"
-                value={businessAppUrl}
-                size={180}
-                className="w-full max-w-[180px] h-auto md:max-w-[220px]"
-              />
+            <div className="bg-white rounded-lg p-4 sm:p-5 md:p-6 flex items-center justify-center border">
+              <div className="w-40 h-40 sm:w-48 sm:h-48 md:w-56 md:h-56">
+                <QRCode
+                  id="referral-qr-code"
+                  value={businessAppUrl}
+                  size={224}
+                  level="H"
+                  style={{ height: "auto", maxWidth: "100%", width: "100%" }}
+                />
+              </div>
             </div>
 
             {/* Referral Code */}
@@ -172,8 +175,8 @@ export function CustomerReferralCard() {
                 Your Referral Code
               </p>
               <div className="flex items-center gap-2">
-                <div className="flex-1 bg-background rounded-md px-3 py-2 border">
-                  <p className="text-xl md:text-2xl font-mono font-bold tracking-wider">
+                <div className="flex-1 bg-background rounded-lg px-3 sm:px-4 py-2.5 sm:py-3 border">
+                  <p className="text-base sm:text-lg md:text-xl font-mono font-bold tracking-wider text-center">
                     {referralData?.referral_code || "GENERATING..."}
                   </p>
                 </div>
@@ -182,11 +185,12 @@ export function CustomerReferralCard() {
                   size="icon"
                   onClick={handleCopyCode}
                   disabled={!referralData?.referral_code || isCopying}
+                  className="h-10 w-10 sm:h-11 sm:w-11 shrink-0"
                 >
                   {isCopying ? (
-                    <CheckCircle className="w-4 h-4 text-green-500" />
+                    <CheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-green-500" />
                   ) : (
-                    <Copy className="w-4 h-4" />
+                    <Copy className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                   )}
                 </Button>
               </div>

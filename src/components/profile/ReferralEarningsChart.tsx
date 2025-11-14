@@ -88,22 +88,12 @@ export function ReferralEarningsChart({ history }: ReferralEarningsChartProps) {
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2 text-base">
-          <TrendingUp className="w-4 h-4" />
-          Earnings Trend
-        </CardTitle>
-        <p className="text-xs text-muted-foreground">
-          Monthly referral earnings breakdown
-        </p>
-      </CardHeader>
-      <CardContent>
-        <ChartContainer config={chartConfig} className="h-[200px] w-full">
-          <AreaChart
-            data={chartData}
-            margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
-          >
+    <div className="w-full h-full">
+      <ChartContainer config={chartConfig} className="w-full h-full">
+        <AreaChart
+          data={chartData}
+          margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+        >
             <defs>
               <linearGradient id="fillTotal" x1="0" y1="0" x2="0" y2="1">
                 <stop
@@ -172,8 +162,7 @@ export function ReferralEarningsChart({ history }: ReferralEarningsChartProps) {
               strokeWidth={2}
             />
           </AreaChart>
-        </ChartContainer>
-      </CardContent>
-    </Card>
+      </ChartContainer>
+    </div>
   );
 }
