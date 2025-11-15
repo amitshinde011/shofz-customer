@@ -354,10 +354,10 @@ export default function Products() {
   };
 
   return (
-    <div 
-      ref={pullToRefresh.scrollContainerRef}
-      className="min-h-screen bg-background pb-20 overflow-x-hidden overflow-y-auto w-full max-w-full"
-    >
+      <div 
+        ref={pullToRefresh.scrollContainerRef}
+        className="min-h-screen bg-background pb-20 overflow-x-hidden w-full max-w-full"
+      >
       <PullToRefreshIndicator
         isPulling={pullToRefresh.isPulling}
         isRefreshing={pullToRefresh.isRefreshing}
