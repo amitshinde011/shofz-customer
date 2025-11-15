@@ -22,6 +22,9 @@ import { calculateShopStatus } from "@/lib/businessHours";
 import { calculateDistance, formatDistance } from "@/lib/distanceCalculation";
 import { AdBannerCarousel } from "@/components/AdBannerCarousel";
 import { AdBanner } from "@/components/AdBanner";
+import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
+import { useQueryClient } from "@tanstack/react-query";
 
 // Helper function to get icon for category
 const getCategoryIcon = (categoryName: string): keyof typeof Icons => {
@@ -48,6 +51,7 @@ const getCategoryIcon = (categoryName: string): keyof typeof Icons => {
 export default function Home() {
   const { user } = useAuth();
   const { location } = useUserLocation();
+  const queryClient = useQueryClient();
   
   const locationParams = location ? { lat: location.lat, lng: location.lng, radius: 50 } : undefined;
   
@@ -60,6 +64,21 @@ export default function Home() {
   const { data: shopsResponse } = useShops({ 
     location: locationParams,
     limit: 10 
+  });
+
+  // Pull-to-refresh handler
+  const handleRefresh = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['featured-shops'] });
+    await queryClient.invalidateQueries({ queryKey: ['featured-products'] });
+    await queryClient.invalidateQueries({ queryKey: ['featured-offers'] });
+    await queryClient.invalidateQueries({ queryKey: ['offers'] });
+    await queryClient.invalidateQueries({ queryKey: ['shop-categories'] });
+    await queryClient.invalidateQueries({ queryKey: ['shops'] });
+  };
+
+  const pullToRefresh = usePullToRefresh({
+    onRefresh: handleRefresh,
+    enabled: true,
   });
 
   const shopCategories = categoriesResponse?.data || [];
@@ -107,7 +126,16 @@ export default function Home() {
     });
 
   return (
-    <div className="min-h-screen bg-background pb-20 overflow-x-hidden w-full max-w-full">
+    <div 
+      ref={pullToRefresh.scrollContainerRef}
+      className="min-h-screen bg-background pb-20 overflow-x-hidden w-full max-w-full"
+    >
+      <PullToRefreshIndicator
+        isPulling={pullToRefresh.isPulling}
+        isRefreshing={pullToRefresh.isRefreshing}
+        pullDistance={pullToRefresh.pullDistance}
+        isReady={pullToRefresh.isReady}
+      />
       {/* Amazon-Inspired Header */}
       <HomeHeader />
 
