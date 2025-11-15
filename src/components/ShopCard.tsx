@@ -337,19 +337,19 @@ export default function ShopCard({ shop, variant = "grid", onToggleFavorite, isF
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-9 sm:h-10 text-xs sm:text-sm font-semibold rounded-full px-2 touch-target"
+                        className="h-10 text-sm font-semibold rounded-lg px-3 sm:px-4 touch-target border-2"
                         onClick={handleCallShop}
                       >
-                        <Phone className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1" />
+                        <Phone className="w-4 h-4 mr-1.5" />
                         Call
                       </Button>
                       {shop.coordinates?.lat && shop.coordinates?.lng && (
                         <Button
                           size="sm"
-                          className="h-9 sm:h-10 text-xs sm:text-sm font-semibold rounded-full fab-enhanced touch-target px-2"
+                          className="h-10 text-sm font-semibold rounded-lg px-3 sm:px-4 touch-target bg-gradient-to-r from-pink-500 to-rose-500 hover:from-pink-600 hover:to-rose-600 text-white"
                           onClick={handleGetDirections}
                         >
-                          <Navigation className="w-3 h-3 sm:w-3.5 sm:h-3.5 mr-1" />
+                          <Navigation className="w-4 h-4 mr-1.5" />
                           Direct
                         </Button>
                       )}
