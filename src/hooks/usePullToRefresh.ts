@@ -16,7 +16,7 @@ interface PullToRefreshState {
   isReady: boolean;
 }
 
-const SCROLL_TOP_THRESHOLD = 5; // Allow 5px tolerance for "at top"
+const SCROLL_TOP_THRESHOLD = 0; // Only trigger when exactly at top
 
 export const usePullToRefresh = ({
   onRefresh,
@@ -44,7 +44,7 @@ export const usePullToRefresh = ({
     if (!scrollContainer) return;
 
     // Only trigger if at or very near the top (within 5px or negative for overscroll)
-    if (scrollContainer.scrollTop <= SCROLL_TOP_THRESHOLD) {
+    if (scrollContainer.scrollTop === 0) {
       touchStartY.current = e.touches[0].clientY;
     }
   }, [enabled, isNative, state.isRefreshing]);
@@ -55,7 +55,7 @@ export const usePullToRefresh = ({
     const scrollContainer = scrollContainerRef.current;
     
     // Exit if user has scrolled away from top
-    if (!scrollContainer || scrollContainer.scrollTop > SCROLL_TOP_THRESHOLD) {
+    if (!scrollContainer || scrollContainer.scrollTop > 0) {
       // Reset touch tracking if user scrolled away
       touchStartY.current = 0;
       setState({
@@ -71,7 +71,7 @@ export const usePullToRefresh = ({
     const delta = touchY - touchStartY.current;
 
     // Additional safety check: only proceed if truly at the top
-    if (scrollContainer.scrollTop > SCROLL_TOP_THRESHOLD) {
+    if (scrollContainer.scrollTop > 0) {
       touchStartY.current = 0;
       return;
     }
