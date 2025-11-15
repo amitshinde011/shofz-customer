@@ -331,7 +331,7 @@ export default function ShopCard({ shop, variant = "grid", onToggleFavorite, isF
 
               {/* Action Buttons - Always render container for layout, conditionally show buttons */}
               {!isCompact && (
-                <div className="mt-auto grid grid-cols-2 pt-2">
+                <div className="mt-auto grid grid-cols-2 gap-2 pt-2">
                   {showActions && (
                     <>
                       <Button
