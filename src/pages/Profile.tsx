@@ -30,7 +30,8 @@ import {
   Save,
   X,
   ArrowLeft,
-  Volume2
+  Volume2,
+  Database
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -39,6 +40,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useInquiryStats } from "@/hooks/useInquiries";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { Capacitor } from '@capacitor/core';
+import { getStorageInfo, repairStorage, StorageInfo } from '@/lib/storageHealth';
 import { 
   isSoundEnabled, 
   setSoundEnabled,
@@ -70,6 +73,11 @@ export default function Profile() {
     payment: isPaymentSoundEnabled(),
   });
 
+  // Storage info state
+  const [storageInfo, setStorageInfo] = useState<StorageInfo | null>(null);
+  const platform = Capacitor.getPlatform();
+  const isNative = Capacitor.isNativePlatform();
+
   // Sync form data when user data loads
   useEffect(() => {
     if (user) {
@@ -79,6 +87,50 @@ export default function Profile() {
       });
     }
   }, [user]);
+
+  // Load storage info
+  useEffect(() => {
+    loadStorageInfo();
+  }, []);
+
+  const loadStorageInfo = async () => {
+    const info = await getStorageInfo();
+    setStorageInfo(info);
+  };
+
+  const handleClearCache = async () => {
+    if (!confirm('Clear all app data? You will need to sign in again.')) return;
+    
+    const success = await repairStorage();
+    
+    if (success) {
+      toast({ title: '✅ Cache cleared', description: 'App will reload...' });
+      setTimeout(() => window.location.reload(), 1500);
+    } else {
+      toast({ 
+        title: '❌ Clear failed', 
+        description: 'Please clear site data manually in browser settings',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleCheckUpdates = async () => {
+    if (isNative) {
+      toast({ title: 'Updates', description: 'Native app updates via app store' });
+      return;
+    }
+    
+    if ('serviceWorker' in navigator) {
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (registration) {
+        await registration.update();
+        toast({ title: '🔍 Checking for updates...' });
+      } else {
+        toast({ title: 'No service worker registered' });
+      }
+    }
+  };
 
   const handleBack = () => {
     navigate('/');
@@ -538,6 +590,129 @@ export default function Profile() {
                       onCheckedChange={(enabled) => handleToggleSound('payment', enabled)}
                     />
                   </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Location Settings */}
+            {!isEditing && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-5 h-5 text-primary" />
+                    <CardTitle>📍 Location Settings</CardTitle>
+                  </div>
+                  <CardDescription>
+                    Manage location permissions and preferences
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-medium">Location Access</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {(() => {
+                          const loc = localStorage.getItem('userLocation');
+                          if (!loc) return 'No location set';
+                          try {
+                            const parsed = JSON.parse(loc);
+                            return `Current: ${parsed.lat.toFixed(4)}, ${parsed.lng.toFixed(4)}`;
+                          } catch {
+                            return 'Location data corrupted';
+                          }
+                        })()}
+                      </p>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        window.location.reload();
+                      }}
+                    >
+                      Refresh
+                    </Button>
+                  </div>
+
+                  <Separator />
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-medium">Reset Location</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Clear cached location and re-request permission
+                      </p>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => {
+                        localStorage.removeItem('userLocation');
+                        localStorage.removeItem('location_permission_granted');
+                        localStorage.removeItem('skip_location_permission');
+                        toast({ 
+                          title: 'Location reset', 
+                          description: 'Reload the page to re-request location permission' 
+                        });
+                      }}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Storage & Cache Management */}
+            {!isEditing && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Database className="w-5 h-5 text-primary" />
+                    <CardTitle>🗄️ Storage & Cache</CardTitle>
+                  </div>
+                  <CardDescription>
+                    Manage app data and cache (Platform: {platform})
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {storageInfo && (
+                    <div className="text-sm space-y-1 p-3 bg-muted rounded-lg">
+                      <p>📊 Storage: {storageInfo.itemCount} items, {storageInfo.estimatedSizeKB} KB</p>
+                      <p>📦 Caches: {storageInfo.cacheCount}</p>
+                      <p>🏥 Health: {storageInfo.isHealthy ? '✅ Good' : '⚠️ Issues detected'}</p>
+                    </div>
+                  )}
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium">Clear App Cache</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Fix loading issues by clearing all cached data
+                      </p>
+                    </div>
+                    <Button variant="outline" size="sm" onClick={handleClearCache}>
+                      Clear
+                    </Button>
+                  </div>
+                  
+                  {!isNative && (
+                    <>
+                      <Separator />
+                      
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-medium">Check for Updates</h3>
+                          <p className="text-sm text-muted-foreground">
+                            Manually check for app updates
+                          </p>
+                        </div>
+                        <Button variant="outline" size="sm" onClick={handleCheckUpdates}>
+                          Check
+                        </Button>
+                      </div>
+                    </>
+                  )}
                 </CardContent>
               </Card>
             )}

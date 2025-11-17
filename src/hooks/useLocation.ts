@@ -43,19 +43,20 @@ export function useLocation() {
   const [location, setLocation] = useState<UserLocation | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const { user, updateProfile } = useAuth();
   const { toast } = useToast();
 
-  console.log('[useLocation] Hook state - location:', !!location, 'loading:', loading, 'error:', error);
+  const MAX_RETRIES = 3;
+  const LOCATION_TIMEOUT = 15000;
 
-  const requestLocation = async () => {
-    console.log('[useLocation] requestLocation called');
+  console.log('[useLocation] Hook state - location:', !!location, 'loading:', loading, 'error:', error, 'retries:', retryCount);
+
+  const getLocationInternal = async () => {
     const isNative = Capacitor.isNativePlatform();
 
-    console.log('[useLocation] Setting loading to true, requesting position');
-    setLoading(true);
-
     try {
+      console.log('[useLocation] Requesting position...');
       let position;
 
       if (isNative) {
@@ -94,7 +95,7 @@ export function useLocation() {
         console.log('[useLocation] Position received:', newLocation);
         setLocation(newLocation);
         setError(null);
-        setLoading(false);
+        setRetryCount(0);
 
         localStorage.setItem('userLocation', JSON.stringify(newLocation));
         localStorage.setItem('location_permission_granted', 'true');
@@ -115,7 +116,7 @@ export function useLocation() {
 
             setLocation(newLocation);
             setError(null);
-            setLoading(false);
+            setRetryCount(0);
 
             localStorage.setItem('userLocation', JSON.stringify(newLocation));
             localStorage.setItem('location_permission_granted', 'true');
@@ -145,34 +146,56 @@ export function useLocation() {
         );
       }
     } catch (error: any) {
-      let errorMsg = 'Failed to get your location';
-      let toastTitle = "Location Access";
+      console.error('[useLocation] Error getting location:', error);
+      throw error;
+    }
+  };
 
-      const errorMessage = error.message || error.toString();
-
-      if (errorMessage.includes('PERMISSION_DENIED') || error.code === 'PERMISSION_DENIED') {
-        errorMsg = 'Location permission denied. Please enable location access in your device settings.';
-        toastTitle = "Location Permission Required";
-      } else if (errorMessage.includes('POSITION_UNAVAILABLE')) {
-        errorMsg = 'Location services may be disabled. Please turn on location services in your device settings.';
-        toastTitle = "Location Services Disabled";
-      } else if (errorMessage.includes('TIMEOUT')) {
-        errorMsg = 'Location request timed out. Please try again.';
-        toastTitle = "Location Request Timeout";
-      } else if (errorMessage.includes('UNSUPPORTED')) {
-        errorMsg = 'Geolocation is not supported on this device.';
-        toastTitle = "Feature Not Supported";
-      }
-
-      console.error('[useLocation] Geolocation error:', error);
-      setError(errorMsg);
+  const requestLocation = async () => {
+    console.log('[useLocation] requestLocation called, retry:', retryCount);
+    
+    // Check retry limit
+    if (retryCount >= MAX_RETRIES) {
+      setError('Unable to get location after multiple attempts. You can continue without location.');
       setLoading(false);
-      
-      // Clear permission flag if explicitly denied
-      if (errorMessage.includes('PERMISSION_DENIED') || error.code === 'PERMISSION_DENIED') {
-        localStorage.removeItem('location_permission_granted');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    // Add timeout wrapper
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('LOCATION_TIMEOUT')), LOCATION_TIMEOUT);
+    });
+
+    try {
+      await Promise.race([
+        getLocationInternal(),
+        timeoutPromise
+      ]);
+      setLoading(false);
+    } catch (error: any) {
+      console.error('[useLocation] Error getting location:', error);
+      setLoading(false);
+      setRetryCount(prev => prev + 1);
+
+      if (error.message === 'LOCATION_TIMEOUT') {
+        setError('Location request timed out. You can continue without location.');
+      } else if (error.message === 'PERMISSION_DENIED') {
+        const isNative = Capacitor.isNativePlatform();
+        setError(
+          isNative
+            ? 'Location permission denied. Please enable location access in your device settings.'
+            : 'Location permission denied. Please enable location access in your browser settings.'
+        );
+      } else if (error.message === 'POSITION_UNAVAILABLE') {
+        setError('Unable to determine your location. Please check your device settings.');
+      } else if (error.message === 'UNSUPPORTED') {
+        setError('Your browser does not support geolocation.');
+      } else {
+        setError('Failed to get your location. You can continue without location.');
       }
-      // Toast removed - LocationPermissionGate will show the error
     }
   };
 
