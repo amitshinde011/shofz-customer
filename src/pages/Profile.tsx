@@ -594,6 +594,75 @@ export default function Profile() {
               </Card>
             )}
 
+            {/* Location Settings */}
+            {!isEditing && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-5 h-5 text-primary" />
+                    <CardTitle>📍 Location Settings</CardTitle>
+                  </div>
+                  <CardDescription>
+                    Manage location permissions and preferences
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-medium">Location Access</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {(() => {
+                          const loc = localStorage.getItem('userLocation');
+                          if (!loc) return 'No location set';
+                          try {
+                            const parsed = JSON.parse(loc);
+                            return `Current: ${parsed.lat.toFixed(4)}, ${parsed.lng.toFixed(4)}`;
+                          } catch {
+                            return 'Location data corrupted';
+                          }
+                        })()}
+                      </p>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        window.location.reload();
+                      }}
+                    >
+                      Refresh
+                    </Button>
+                  </div>
+
+                  <Separator />
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <h3 className="font-medium">Reset Location</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Clear cached location and re-request permission
+                      </p>
+                    </div>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => {
+                        localStorage.removeItem('userLocation');
+                        localStorage.removeItem('location_permission_granted');
+                        localStorage.removeItem('skip_location_permission');
+                        toast({ 
+                          title: 'Location reset', 
+                          description: 'Reload the page to re-request location permission' 
+                        });
+                      }}
+                    >
+                      Reset
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Storage & Cache Management */}
             {!isEditing && (
               <Card>
