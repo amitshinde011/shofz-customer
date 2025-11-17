@@ -9,6 +9,7 @@ import { CheckCircle2, XCircle, ExternalLink, Upload, Loader2 } from 'lucide-rea
 import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { uploadPaymentScreenshot } from '@/services/paymentService';
+import { playNotificationSound, initializeSoundNotifications } from '@/lib/soundNotifications';
 
 interface PendingPayment {
   id: string;
@@ -41,6 +42,7 @@ export function ShopPaymentConfirmation({ shopId }: ShopPaymentConfirmationProps
   const [shopScreenshots, setShopScreenshots] = useState<Record<string, string>>({});
 
   useEffect(() => {
+    initializeSoundNotifications();
     loadPendingPayments();
 
     // Subscribe to real-time updates
@@ -54,7 +56,26 @@ export function ShopPaymentConfirmation({ shopId }: ShopPaymentConfirmationProps
           table: 'payment_requests',
           filter: `shop_id=eq.${shopId}`
         },
-        () => {
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const newPayment = payload.new as any;
+            
+            // High priority for new payments
+            playNotificationSound('high', 'payment');
+            
+            toast.success('💰 New Payment Received', {
+              description: `Amount: ₹${newPayment.amount?.toLocaleString('en-IN')}`,
+            });
+            
+            if ('Notification' in window && Notification.permission === 'granted') {
+              new Notification('New Payment', {
+                body: `Amount: ₹${newPayment.amount?.toLocaleString('en-IN')}`,
+                icon: '/shofz-logo.png',
+                tag: `shop-payment-${newPayment.id}`,
+              });
+            }
+          }
+          
           loadPendingPayments();
         }
       )

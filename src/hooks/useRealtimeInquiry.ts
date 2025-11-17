@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useInquiry } from './useInquiries';
 import { useToast } from './use-toast';
+import { playNotificationSound, initializeSoundNotifications } from '@/lib/soundNotifications';
 
 interface UseRealtimeInquiryOptions {
   inquiryId: string;
@@ -30,6 +31,7 @@ export const useRealtimeInquiry = ({ inquiryId, enabled = true }: UseRealtimeInq
   useEffect(() => {
     if (!inquiryId || !enabled) return;
 
+    initializeSoundNotifications();
     console.log('[Real-time Inquiry] Setting up subscription for:', inquiryId);
 
     const channel = supabase
@@ -53,11 +55,21 @@ export const useRealtimeInquiry = ({ inquiryId, enabled = true }: UseRealtimeInq
           
           // Show toast notification if status changed
           if (oldStatus && newStatus && oldStatus !== newStatus) {
+            // Determine priority
+            let priority: 'low' | 'medium' | 'high' = 'medium';
+            if (newStatus === 'completed') {
+              priority = 'high';
+            } else if (newStatus === 'in_progress') {
+              priority = 'medium';
+            }
+            
+            playNotificationSound(priority, 'inquiry');
+            
             const statusMessages: Record<string, string> = {
-              'pending': 'Inquiry sent to shop',
-              'in_progress': 'Shop has responded to your inquiry',
-              'completed': 'Inquiry completed',
-              'expired': 'Inquiry expired'
+              'pending': '⏳ Inquiry sent to shop',
+              'in_progress': '📝 Shop has responded to your inquiry',
+              'completed': '✅ Inquiry completed',
+              'expired': '⏰ Inquiry expired'
             };
 
             toast({

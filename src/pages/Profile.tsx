@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Switch } from "@/components/ui/switch";
 import { ReferralCodeSettings } from "@/components/profile/ReferralCodeSettings";
 import { CustomerReferralCard } from "@/components/profile/CustomerReferralCard";
 import { UpiIdSettings } from "@/components/profile/UpiIdSettings";
@@ -28,7 +29,8 @@ import {
   CheckCircle2,
   Save,
   X,
-  ArrowLeft
+  ArrowLeft,
+  Volume2
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -37,6 +39,16 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useInquiryStats } from "@/hooks/useInquiries";
 import { supabase } from "@/integrations/supabase/client";
 import { useQueryClient } from "@tanstack/react-query";
+import { 
+  isSoundEnabled, 
+  setSoundEnabled,
+  isInquirySoundEnabled,
+  setInquirySoundEnabled,
+  isNotificationSoundEnabled,
+  setNotificationSoundEnabled,
+  isPaymentSoundEnabled,
+  setPaymentSoundEnabled
+} from '@/lib/soundNotifications';
 
 export default function Profile() {
   const navigate = useNavigate();
@@ -48,6 +60,14 @@ export default function Profile() {
   const [formData, setFormData] = useState({
     name: user?.name || "",
     email: user?.email || ""
+  });
+  
+  // Sound settings state
+  const [soundSettings, setSoundSettings] = useState({
+    support: isSoundEnabled(),
+    inquiry: isInquirySoundEnabled(),
+    notification: isNotificationSoundEnabled(),
+    payment: isPaymentSoundEnabled(),
   });
 
   // Sync form data when user data loads
@@ -62,6 +82,29 @@ export default function Profile() {
 
   const handleBack = () => {
     navigate('/');
+  };
+  
+  const handleToggleSound = (category: string, enabled: boolean) => {
+    setSoundSettings(prev => ({ ...prev, [category]: enabled }));
+    
+    switch (category) {
+      case 'support':
+        setSoundEnabled(enabled);
+        break;
+      case 'inquiry':
+        setInquirySoundEnabled(enabled);
+        break;
+      case 'notification':
+        setNotificationSoundEnabled(enabled);
+        break;
+      case 'payment':
+        setPaymentSoundEnabled(enabled);
+        break;
+    }
+    
+    toast({
+      title: `${category.charAt(0).toUpperCase() + category.slice(1)} Sounds ${enabled ? 'Enabled' : 'Disabled'}`,
+    });
   };
 
   // Real-time subscription for inquiry count updates
@@ -434,6 +477,70 @@ export default function Profile() {
 
             {/* Shop Referral Code Section */}
             {!isEditing && <ReferralCodeSettings />}
+            
+            {/* Sound Notification Settings */}
+            {!isEditing && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Volume2 className="w-5 h-5 text-primary" />
+                    <CardTitle>🔊 Sound Notifications</CardTitle>
+                  </div>
+                  <CardDescription>Control sound alerts for different activities</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium">Support Messages</h3>
+                      <p className="text-sm text-muted-foreground">Customer support chat sounds</p>
+                    </div>
+                    <Switch
+                      checked={soundSettings.support}
+                      onCheckedChange={(enabled) => handleToggleSound('support', enabled)}
+                    />
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium">Inquiry Messages</h3>
+                      <p className="text-sm text-muted-foreground">Shop responses and quotes</p>
+                    </div>
+                    <Switch
+                      checked={soundSettings.inquiry}
+                      onCheckedChange={(enabled) => handleToggleSound('inquiry', enabled)}
+                    />
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium">General Notifications</h3>
+                      <p className="text-sm text-muted-foreground">App notifications and updates</p>
+                    </div>
+                    <Switch
+                      checked={soundSettings.notification}
+                      onCheckedChange={(enabled) => handleToggleSound('notification', enabled)}
+                    />
+                  </div>
+                  
+                  <Separator />
+                  
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-medium">Payment Alerts</h3>
+                      <p className="text-sm text-muted-foreground">Payment requests and confirmations</p>
+                    </div>
+                    <Switch
+                      checked={soundSettings.payment}
+                      onCheckedChange={(enabled) => handleToggleSound('payment', enabled)}
+                    />
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {/* Mobile Menu Sections */}
             {!isEditing && (

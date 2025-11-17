@@ -2,6 +2,14 @@
 let audioContext: AudioContext | null = null;
 let notificationSound: AudioBuffer | null = null;
 
+// Sound notification categories
+export const SOUND_KEYS = {
+  SUPPORT: 'support_sound_enabled',
+  INQUIRY: 'inquiry_sound_enabled',
+  NOTIFICATION: 'notification_sound_enabled',
+  PAYMENT: 'payment_sound_enabled',
+};
+
 export const initializeSoundNotifications = async () => {
   if (typeof window === 'undefined') return;
   
@@ -26,8 +34,28 @@ export const initializeSoundNotifications = async () => {
   }
 };
 
-export const playNotificationSound = (priority: 'low' | 'medium' | 'high' = 'medium') => {
-  if (!audioContext || !notificationSound || !isSoundEnabled()) return;
+export const playNotificationSound = (
+  priority: 'low' | 'medium' | 'high' = 'medium',
+  category: 'support' | 'inquiry' | 'notification' | 'payment' = 'notification'
+) => {
+  // Check if sound is enabled for this category
+  let isEnabled = false;
+  switch (category) {
+    case 'support':
+      isEnabled = isSoundEnabled();
+      break;
+    case 'inquiry':
+      isEnabled = isInquirySoundEnabled();
+      break;
+    case 'notification':
+      isEnabled = isNotificationSoundEnabled();
+      break;
+    case 'payment':
+      isEnabled = isPaymentSoundEnabled();
+      break;
+  }
+
+  if (!audioContext || !notificationSound || !isEnabled) return;
   
   try {
     const source = audioContext.createBufferSource();
@@ -62,9 +90,33 @@ export const playNotificationSound = (priority: 'low' | 'medium' | 'high' = 'med
 };
 
 export const isSoundEnabled = (): boolean => {
-  return localStorage.getItem('support_sound_enabled') !== 'false';
+  return localStorage.getItem(SOUND_KEYS.SUPPORT) !== 'false';
 };
 
 export const setSoundEnabled = (enabled: boolean) => {
-  localStorage.setItem('support_sound_enabled', enabled ? 'true' : 'false');
+  localStorage.setItem(SOUND_KEYS.SUPPORT, enabled ? 'true' : 'false');
+};
+
+export const isInquirySoundEnabled = (): boolean => {
+  return localStorage.getItem(SOUND_KEYS.INQUIRY) !== 'false';
+};
+
+export const setInquirySoundEnabled = (enabled: boolean) => {
+  localStorage.setItem(SOUND_KEYS.INQUIRY, enabled ? 'true' : 'false');
+};
+
+export const isNotificationSoundEnabled = (): boolean => {
+  return localStorage.getItem(SOUND_KEYS.NOTIFICATION) !== 'false';
+};
+
+export const setNotificationSoundEnabled = (enabled: boolean) => {
+  localStorage.setItem(SOUND_KEYS.NOTIFICATION, enabled ? 'true' : 'false');
+};
+
+export const isPaymentSoundEnabled = (): boolean => {
+  return localStorage.getItem(SOUND_KEYS.PAYMENT) !== 'false';
+};
+
+export const setPaymentSoundEnabled = (enabled: boolean) => {
+  localStorage.setItem(SOUND_KEYS.PAYMENT, enabled ? 'true' : 'false');
 };
