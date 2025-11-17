@@ -180,7 +180,15 @@ export type Database = {
           metadata?: Json | null
           user_agent?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "audit_logs_actor_id_fkey"
+            columns: ["actor_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       contact_requests: {
         Row: {
@@ -2199,7 +2207,8 @@ export type Database = {
       shop_verification_documents: {
         Row: {
           created_at: string | null
-          document_type: string
+          document_category: Database["public"]["Enums"]["document_category"]
+          document_name: string | null
           document_url: string
           id: string
           metadata: Json | null
@@ -2207,12 +2216,14 @@ export type Database = {
           shop_id: string | null
           status: Database["public"]["Enums"]["verification_status"] | null
           updated_at: string | null
+          uploaded_at: string
           verified_at: string | null
           verified_by: string | null
         }
         Insert: {
           created_at?: string | null
-          document_type: string
+          document_category: Database["public"]["Enums"]["document_category"]
+          document_name?: string | null
           document_url: string
           id?: string
           metadata?: Json | null
@@ -2220,12 +2231,14 @@ export type Database = {
           shop_id?: string | null
           status?: Database["public"]["Enums"]["verification_status"] | null
           updated_at?: string | null
+          uploaded_at?: string
           verified_at?: string | null
           verified_by?: string | null
         }
         Update: {
           created_at?: string | null
-          document_type?: string
+          document_category?: Database["public"]["Enums"]["document_category"]
+          document_name?: string | null
           document_url?: string
           id?: string
           metadata?: Json | null
@@ -2233,10 +2246,19 @@ export type Database = {
           shop_id?: string | null
           status?: Database["public"]["Enums"]["verification_status"] | null
           updated_at?: string | null
+          uploaded_at?: string
           verified_at?: string | null
           verified_by?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "shop_verification_documents_shop_id_fkey"
+            columns: ["shop_id"]
+            isOneToOne: false
+            referencedRelation: "shops"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       shops: {
         Row: {
@@ -2252,6 +2274,8 @@ export type Database = {
           delivery_coverage_km: number | null
           delivery_notes: string | null
           description: string | null
+          document_submission_deadline: string | null
+          documents_verified: boolean | null
           email: string | null
           featured_until: string | null
           free_delivery_above: number | null
@@ -2259,6 +2283,7 @@ export type Database = {
           id: string
           is_active: boolean | null
           is_featured: boolean | null
+          is_suspended: boolean | null
           is_verified: boolean | null
           location: unknown
           logo_url: string | null
@@ -2278,6 +2303,7 @@ export type Database = {
           subscription_tier:
             | Database["public"]["Enums"]["subscription_tier"]
             | null
+          suspension_reason: string | null
           total_reviews: number | null
           updated_at: string | null
         }
@@ -2294,6 +2320,8 @@ export type Database = {
           delivery_coverage_km?: number | null
           delivery_notes?: string | null
           description?: string | null
+          document_submission_deadline?: string | null
+          documents_verified?: boolean | null
           email?: string | null
           featured_until?: string | null
           free_delivery_above?: number | null
@@ -2301,6 +2329,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_featured?: boolean | null
+          is_suspended?: boolean | null
           is_verified?: boolean | null
           location?: unknown
           logo_url?: string | null
@@ -2320,6 +2349,7 @@ export type Database = {
           subscription_tier?:
             | Database["public"]["Enums"]["subscription_tier"]
             | null
+          suspension_reason?: string | null
           total_reviews?: number | null
           updated_at?: string | null
         }
@@ -2336,6 +2366,8 @@ export type Database = {
           delivery_coverage_km?: number | null
           delivery_notes?: string | null
           description?: string | null
+          document_submission_deadline?: string | null
+          documents_verified?: boolean | null
           email?: string | null
           featured_until?: string | null
           free_delivery_above?: number | null
@@ -2343,6 +2375,7 @@ export type Database = {
           id?: string
           is_active?: boolean | null
           is_featured?: boolean | null
+          is_suspended?: boolean | null
           is_verified?: boolean | null
           location?: unknown
           logo_url?: string | null
@@ -2362,6 +2395,7 @@ export type Database = {
           subscription_tier?:
             | Database["public"]["Enums"]["subscription_tier"]
             | null
+          suspension_reason?: string | null
           total_reviews?: number | null
           updated_at?: string | null
         }
@@ -3039,6 +3073,10 @@ export type Database = {
         Args: { p_customer_id: string; p_shop_id: string }
         Returns: boolean
       }
+      check_documents_complete: {
+        Args: { p_shop_id: string }
+        Returns: boolean
+      }
       check_featured_items_integrity: {
         Args: never
         Returns: {
@@ -3266,6 +3304,7 @@ export type Database = {
           transaction_count: number
         }[]
       }
+      get_document_deadline_days: { Args: never; Returns: number }
       get_entity_view_count: {
         Args: { p_entity_id: string; p_entity_type: string }
         Returns: {
@@ -4125,6 +4164,15 @@ export type Database = {
         | "bonus"
         | "expiry"
         | "adjustment"
+      document_category:
+        | "shop_establishment_certificate"
+        | "gst_certificate"
+        | "trade_license"
+        | "udyam_registration"
+        | "aadhaar_card"
+        | "pan_card"
+        | "electricity_bill"
+        | "rent_agreement"
       featured_item_status: "active" | "paused" | "completed" | "cancelled"
       inquiry_status:
         | "pending"
@@ -4352,6 +4400,16 @@ export const Constants = {
         "bonus",
         "expiry",
         "adjustment",
+      ],
+      document_category: [
+        "shop_establishment_certificate",
+        "gst_certificate",
+        "trade_license",
+        "udyam_registration",
+        "aadhaar_card",
+        "pan_card",
+        "electricity_bill",
+        "rent_agreement",
       ],
       featured_item_status: ["active", "paused", "completed", "cancelled"],
       inquiry_status: [

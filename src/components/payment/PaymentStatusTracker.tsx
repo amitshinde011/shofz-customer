@@ -13,6 +13,8 @@ import {
   ExternalLink 
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useToast } from '@/hooks/use-toast';
+import { playNotificationSound, initializeSoundNotifications } from '@/lib/soundNotifications';
 
 interface PaymentStatusTrackerProps {
   paymentRequestId: string;
@@ -32,6 +34,7 @@ export function PaymentStatusTracker({ paymentRequestId }: PaymentStatusTrackerP
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
+    initializeSoundNotifications();
     loadPaymentRequest();
 
     const channel = supabase
@@ -45,6 +48,39 @@ export function PaymentStatusTracker({ paymentRequestId }: PaymentStatusTrackerP
           filter: `id=eq.${paymentRequestId}`
         },
         (payload) => {
+          const oldRequest = payload.old as any;
+          const newRequest = payload.new as any;
+
+          if (oldRequest.request_status !== newRequest.request_status) {
+            playNotificationSound('high', 'payment');
+            
+            const statusMessages: Record<string, string> = {
+              pending: '⏳ Payment pending',
+              customer_claimed_success: '✅ Payment claimed by customer',
+              shop_confirmed: '🎉 Payment confirmed by shop',
+              verified: '🎉 Payment verified',
+              disputed: '⚠️ Payment disputed',
+              refunded: '↩️ Payment refunded'
+            };
+
+            const { toast } = useToast();
+            toast({
+              title: "Payment Status Updated",
+              description: statusMessages[newRequest.request_status] || `Status: ${newRequest.request_status}`,
+            });
+            
+            // Browser notification for critical statuses
+            if (['customer_claimed_success', 'shop_confirmed', 'verified', 'disputed', 'refunded'].includes(newRequest.request_status)) {
+              if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Payment Update', {
+                  body: statusMessages[newRequest.request_status],
+                  icon: '/shofz-logo.png',
+                  tag: `payment-${newRequest.id}`,
+                });
+              }
+            }
+          }
+
           setPaymentRequest(payload.new);
         }
       )

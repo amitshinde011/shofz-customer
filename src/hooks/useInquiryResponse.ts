@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { playNotificationSound, initializeSoundNotifications } from '@/lib/soundNotifications';
 
 export interface InquiryResponse {
   id: string;
@@ -58,6 +59,7 @@ export function useInquiryResponse({ inquiryId }: UseInquiryResponseProps) {
       }
     };
 
+    initializeSoundNotifications();
     loadResponse();
 
     // Subscribe to real-time updates
@@ -76,14 +78,20 @@ export function useInquiryResponse({ inquiryId }: UseInquiryResponseProps) {
           setResponse(newResponse);
           setIsNew(true);
           
+          playNotificationSound('medium', 'inquiry');
+          
           toast({
-            title: "New Quote Received!",
-            description: `Shop quoted ₹${newResponse.quoted_price.toLocaleString('en-IN')}`,
+            title: "📬 Shop Response Received",
+            description: newResponse.response_text?.substring(0, 100) || `Quote: ₹${newResponse.quoted_price.toLocaleString('en-IN')}`,
           });
 
-          // Play notification sound
-          const audio = new Audio('/notification.mp3');
-          audio.play().catch(() => {});
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification('Shop Response', {
+              body: `Quote: ₹${newResponse.quoted_price.toLocaleString('en-IN')}`,
+              icon: '/shofz-logo.png',
+              tag: `inquiry-response-${newResponse.id}`,
+            });
+          }
         }
       )
       .on(
