@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { playNotificationSound, initializeSoundNotifications } from '@/lib/soundNotifications';
 
 export interface RealtimeNotification {
   id: string;
@@ -157,6 +158,18 @@ export function useRealtimeNotifications({ userId }: UseRealtimeNotificationsPro
           console.log('New notification received:', payload);
           const newNotification = payload.new as RealtimeNotification;
           
+          // Determine priority based on notification type
+          let priority: 'low' | 'medium' | 'high' = 'medium';
+          if (newNotification.type === 'payment_request' || newNotification.type === 'payment_completed') {
+            priority = 'high';
+          } else if (newNotification.type === 'inquiry_response' || newNotification.type === 'quote_received') {
+            priority = 'medium';
+          } else {
+            priority = 'low';
+          }
+          
+          playNotificationSound(priority, 'notification');
+          
           setNotifications(prev => [newNotification, ...prev.slice(0, 49)]); // Keep only last 50
           setUnreadCount(prev => prev + 1);
 
@@ -170,7 +183,8 @@ export function useRealtimeNotifications({ userId }: UseRealtimeNotificationsPro
           if ('Notification' in window && Notification.permission === 'granted') {
             new Notification(newNotification.title, {
               body: newNotification.message,
-              icon: '/favicon.ico',
+              icon: '/shofz-logo.png',
+              tag: `notification-${newNotification.id}`,
             });
           }
         }
@@ -203,16 +217,27 @@ export function useRealtimeNotifications({ userId }: UseRealtimeNotificationsPro
           
           // Check if status changed
           if (oldInquiry.status !== newInquiry.status) {
+            // Play sound based on status
+            let priority: 'low' | 'medium' | 'high' = 'medium';
+            if (newInquiry.status === 'completed') {
+              priority = 'high';
+            } else if (newInquiry.status === 'in_progress') {
+              priority = 'medium';
+            }
+            
+            playNotificationSound(priority, 'inquiry');
+            
             const statusMessages = {
               pending: 'Your inquiry is being processed',
               responded: 'You have a new response to your inquiry',
+              in_progress: 'Shop is working on your inquiry',
               completed: 'Your inquiry has been completed',
               expired: 'Your inquiry has expired',
             };
 
             toast({
-              title: "Inquiry Update",
-              description: `${newInquiry.product_name}: ${statusMessages[newInquiry.status as keyof typeof statusMessages]}`,
+              title: "📋 Inquiry Update",
+              description: `${newInquiry.product_name}: ${statusMessages[newInquiry.status as keyof typeof statusMessages] || newInquiry.status}`,
             });
           }
         }
@@ -246,6 +271,7 @@ export function useRealtimeNotifications({ userId }: UseRealtimeNotificationsPro
   // Initialize
   useEffect(() => {
     if (userId) {
+      initializeSoundNotifications();
       loadNotifications();
       setupRealtimeConnection();
       clearOldNotifications();

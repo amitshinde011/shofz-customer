@@ -48,14 +48,15 @@ export function HomeHeader() {
           </Link>
 
           {/* Location (Desktop) */}
-          <button className="hidden md:flex items-center gap-1 hover:border border-white/20 p-2 rounded transition-all">
-            <div className="text-left">
-              <div className="text-xs text-gray-300">Find Offers, Products, Shops, and More Around You</div>
+          <button className="hidden md:flex items-center gap-1 hover:border border-white/20 p-2 rounded transition-all flex-shrink-0">
+            <div className="text-left max-w-[220px]">
+              <div className="text-xs text-gray-300">Find Offers, Products,</div>
+              <div className="text-xs text-gray-300">Shops, and More Around You</div>
             </div>
           </button>
 
           {/* Search Bar */}
-          <form onSubmit={handleSearch} className="flex-1 max-w-3xl">
+          <form onSubmit={handleSearch} className="flex-1 max-w-4xl">
             <div className="flex items-center bg-white rounded-md overflow-hidden shadow-sm">
               <Input
                 type="text"

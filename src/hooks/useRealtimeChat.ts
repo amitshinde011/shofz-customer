@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { parseMessage, isQuoteMessage, isPaymentRequestMessage } from '@/lib/messageParser';
+import { playNotificationSound, initializeSoundNotifications } from '@/lib/soundNotifications';
 
 export interface ChatMessage {
   id: string;
@@ -220,17 +221,48 @@ export function useRealtimeChat({ inquiryId, userId }: UseRealtimeChatProps) {
           // Parse message to check if it's special
           const parsed = parseMessage(newMessage.message_text || '');
           
-          // Show appropriate toast
-          if (isQuoteMessage(parsed)) {
-            toast({
-              title: "New Quote Received",
-              description: `₹${parsed.data.quoted_price.toLocaleString('en-IN')}`,
-            });
-          } else if (isPaymentRequestMessage(parsed)) {
-            toast({
-              title: "Payment Request Received",
-              description: `₹${parsed.data.amount.toLocaleString('en-IN')}`,
-            });
+          // Only play sound and show notifications for messages from others
+          if (userId && newMessage.sender_id !== userId) {
+            if (isPaymentRequestMessage(parsed)) {
+              playNotificationSound('high', 'payment');
+              toast({
+                title: "💰 Payment Request Received",
+                description: `₹${parsed.data.amount.toLocaleString('en-IN')}`,
+              });
+              
+              // Browser notification
+              if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('Payment Request', {
+                  body: `Amount: ₹${parsed.data.amount.toLocaleString('en-IN')}`,
+                  icon: '/shofz-logo.png',
+                  tag: `inquiry-payment-${newMessage.id}`,
+                });
+              }
+            } else if (isQuoteMessage(parsed)) {
+              playNotificationSound('medium', 'inquiry');
+              toast({
+                title: "💼 New Quote Received",
+                description: `₹${parsed.data.quoted_price.toLocaleString('en-IN')}`,
+              });
+              
+              if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('New Quote', {
+                  body: `Price: ₹${parsed.data.quoted_price.toLocaleString('en-IN')}`,
+                  icon: '/shofz-logo.png',
+                  tag: `inquiry-quote-${newMessage.id}`,
+                });
+              }
+            } else {
+              playNotificationSound('medium', 'inquiry');
+              
+              if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification('New Inquiry Message', {
+                  body: newMessage.message_text?.substring(0, 100) || 'New message',
+                  icon: '/shofz-logo.png',
+                  tag: `inquiry-message-${newMessage.id}`,
+                });
+              }
+            }
           }
           
           setMessages(prev => {
@@ -324,6 +356,7 @@ export function useRealtimeChat({ inquiryId, userId }: UseRealtimeChatProps) {
 
   // Initialize
   useEffect(() => {
+    initializeSoundNotifications();
     loadMessages();
     setupRealtimeConnection();
 
