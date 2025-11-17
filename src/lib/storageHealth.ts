@@ -83,26 +83,57 @@ export const repairStorage = async (): Promise<boolean> => {
   const platform = Capacitor.getPlatform();
   
   try {
-    // Step 1: Clear localStorage
+    // Step 1: Backup critical flags before clearing
+    const criticalFlags = {
+      locationPermissionGranted: localStorage.getItem('location_permission_granted'),
+      skipLocationPermission: localStorage.getItem('skip_location_permission'),
+      userLocation: localStorage.getItem('userLocation'),
+    };
+    
+    // Step 2: Clear localStorage
     localStorage.clear();
     sessionStorage.clear();
     console.log('[StorageHealth] Cleared storage');
     
-    // Step 2: Clear all caches
+    // Step 3: Restore critical flags if they were valid
+    if (criticalFlags.locationPermissionGranted === 'true') {
+      localStorage.setItem('location_permission_granted', 'true');
+      console.log('[StorageHealth] Restored location permission flag');
+    }
+    
+    if (criticalFlags.skipLocationPermission === 'true') {
+      localStorage.setItem('skip_location_permission', 'true');
+      console.log('[StorageHealth] Restored skip location flag');
+    }
+    
+    // Try to restore location if it's valid JSON
+    if (criticalFlags.userLocation) {
+      try {
+        const parsed = JSON.parse(criticalFlags.userLocation);
+        if (parsed.lat && parsed.lng) {
+          localStorage.setItem('userLocation', criticalFlags.userLocation);
+          console.log('[StorageHealth] Restored user location');
+        }
+      } catch (e) {
+        console.log('[StorageHealth] Could not restore location (corrupted)');
+      }
+    }
+    
+    // Step 4: Clear all caches
     if ('caches' in window) {
       const cacheNames = await caches.keys();
       await Promise.all(cacheNames.map(name => caches.delete(name)));
       console.log(`[StorageHealth] Deleted ${cacheNames.length} caches`);
     }
     
-    // Step 3: Unregister service workers
+    // Step 5: Unregister service workers
     if ('serviceWorker' in navigator) {
       const registrations = await navigator.serviceWorker.getRegistrations();
       await Promise.all(registrations.map(r => r.unregister()));
       console.log(`[StorageHealth] Unregistered ${registrations.length} service workers`);
     }
     
-    // Step 4: Verify repair worked
+    // Step 6: Verify repair worked
     const testKey = '_repair_test_';
     localStorage.setItem(testKey, 'success');
     const testValue = localStorage.getItem(testKey);

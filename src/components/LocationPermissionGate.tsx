@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import React, { ReactNode } from 'react';
 import { MapPin, Navigation, Store, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useUserLocation } from '@/contexts/LocationContext';
@@ -9,15 +9,45 @@ interface LocationPermissionGateProps {
 
 export function LocationPermissionGate({ children }: LocationPermissionGateProps) {
   const { location, loading, error, requestLocation, openSettings, isNative } = useUserLocation();
+  const [skipLocation, setSkipLocation] = React.useState(false);
+  const [failedAttempts, setFailedAttempts] = React.useState(0);
 
-  // If we have a location, render the app
-  if (location) {
-    return <>{children}</>;
-  }
+  // Check if user previously chose to skip
+  React.useEffect(() => {
+    const skipFlag = localStorage.getItem('skip_location_permission');
+    if (skipFlag === 'true') {
+      setSkipLocation(true);
+    }
+  }, []);
 
-  // If permission was previously granted, don't block the UI - let the app load with cached/loading location
+  // Track failed attempts
+  React.useEffect(() => {
+    if (error) {
+      setFailedAttempts(prev => prev + 1);
+    }
+  }, [error]);
+
+  // Auto-bypass gate if loading too long
+  React.useEffect(() => {
+    if (!loading) return;
+    
+    const timer = setTimeout(() => {
+      console.warn('[LocationGate] Loading timeout, bypassing gate');
+      setSkipLocation(true);
+    }, 20000);
+    
+    return () => clearTimeout(timer);
+  }, [loading]);
+
+  // Allow bypass if:
+  // 1. User explicitly skipped
+  // 2. Too many failed attempts
+  // 3. Error message indicates user can continue
+  // 4. Permission was previously granted (cached location)
   const permissionGranted = localStorage.getItem('location_permission_granted') === 'true';
-  if (permissionGranted && !error) {
+  const canContinue = error?.includes('continue without location');
+  
+  if (location || skipLocation || failedAttempts >= 3 || canContinue || (permissionGranted && !error)) {
     return <>{children}</>;
   }
 
@@ -94,9 +124,10 @@ export function LocationPermissionGate({ children }: LocationPermissionGateProps
             onClick={requestLocation}
             size="lg"
             className="w-full text-base font-semibold h-12 shadow-lg hover:shadow-xl transition-shadow"
+            disabled={loading}
           >
             <MapPin className="w-5 h-5 mr-2" />
-            Enable Location Access
+            {loading ? 'Getting Location...' : 'Enable Location Access'}
           </Button>
 
           {error && isNative && (
@@ -110,6 +141,18 @@ export function LocationPermissionGate({ children }: LocationPermissionGateProps
               Open Settings
             </Button>
           )}
+
+          <Button 
+            onClick={() => {
+              localStorage.setItem('skip_location_permission', 'true');
+              setSkipLocation(true);
+            }}
+            variant="ghost"
+            size="lg"
+            className="w-full text-base font-semibold h-12"
+          >
+            Continue without location
+          </Button>
         </div>
 
         {/* Help text */}
