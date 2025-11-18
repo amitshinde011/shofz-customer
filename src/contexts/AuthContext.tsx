@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { checkSessionHealth, attemptTokenRefresh, SessionHealth } from '@/lib/sessionValidator';
 
 export interface AuthUser {
   id: string;
@@ -71,6 +72,38 @@ const clearUserProfileFromStorage = () => {
   }
 };
 
+// Utility: Check if device is online
+const isOnline = () => navigator.onLine;
+
+// Utility: Retry with exponential backoff
+const retryWithBackoff = async <T,>(
+  fn: () => Promise<T>,
+  maxRetries = 3,
+  operation = 'operation'
+): Promise<T | null> => {
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      if (!isOnline() && attempt > 1) {
+        console.log(`[AuthContext] Offline - skipping retry ${attempt}/${maxRetries}`);
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        continue;
+      }
+      
+      const result = await fn();
+      return result;
+    } catch (error) {
+      console.error(`[AuthContext] ${operation} attempt ${attempt}/${maxRetries} failed:`, error);
+      
+      if (attempt < maxRetries) {
+        const delay = Math.pow(2, attempt - 1) * 1000; // 1s, 2s, 4s
+        console.log(`[AuthContext] Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  }
+  return null;
+};
+
 interface AuthContextType {
   user: AuthUser | null;
   session: Session | null;
@@ -96,10 +129,66 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const { toast } = useToast();
   const toastRef = useRef(toast);
+  const healthCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     toastRef.current = toast;
   }, [toast]);
+
+  // Monitor session health every 30 minutes (reduced from 2 minutes for efficiency)
+  useEffect(() => {
+    if (!authState.session) {
+      if (healthCheckIntervalRef.current) {
+        clearInterval(healthCheckIntervalRef.current);
+        healthCheckIntervalRef.current = null;
+      }
+      return;
+    }
+
+    const monitorSessionHealth = async () => {
+      if (!isOnline()) {
+        console.log('[AuthContext] Device offline - skipping health check');
+        return;
+      }
+      
+      const health = await checkSessionHealth();
+
+      if (!health.isValid) {
+        console.warn('[AuthContext] Session is invalid:', health.reason);
+        
+        // Try to refresh if token is expired
+        if (health.shouldRefresh) {
+          const refreshed = await attemptTokenRefresh();
+          
+          if (!refreshed) {
+            console.error('[AuthContext] Token refresh failed - Supabase will handle sign-out if needed');
+            toastRef.current({
+              title: "Connection issue",
+              description: "Your session may need to be refreshed. Please try again if you experience issues.",
+              variant: "default",
+            });
+            // Don't force sign-out - let Supabase's autoRefreshToken handle it
+          }
+        }
+      } else if (health.shouldRefresh) {
+        // Proactively refresh before expiration
+        console.log('[AuthContext] Proactively refreshing token');
+        await attemptTokenRefresh();
+      }
+    };
+
+    // Initial check
+    monitorSessionHealth();
+
+    // Check every 30 minutes (reduced from 2 minutes for efficiency)
+    healthCheckIntervalRef.current = setInterval(monitorSessionHealth, 30 * 60 * 1000);
+
+    return () => {
+      if (healthCheckIntervalRef.current) {
+        clearInterval(healthCheckIntervalRef.current);
+      }
+    };
+  }, [authState.session]);
 
   const fetchUserProfile = async (userId: string, session?: Session | null): Promise<AuthUser | null> => {
     try {
@@ -167,6 +256,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Fetch user profile with retry logic
+  const fetchUserProfileWithRetry = async (
+    userId: string, 
+    session: Session | null
+  ): Promise<AuthUser | null> => {
+    return await retryWithBackoff(
+      () => fetchUserProfile(userId, session),
+      3,
+      'fetchUserProfile'
+    );
+  };
+
   // Set up auth listener ONCE (empty dependency array)
   useEffect(() => {
     if (import.meta.env.DEV) {
@@ -181,6 +282,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('[AuthContext] Auth event:', event, 'Session:', !!session);
       }
 
+      // Detect Supabase's automatic token refresh failures
+      if (event === 'TOKEN_REFRESHED' && !session) {
+        console.error('[AuthContext] Supabase autoRefreshToken failed - likely network issue');
+        toastRef.current({
+          title: "Connection issue",
+          description: "Having trouble staying connected. Your session is safe.",
+          variant: "default"
+        });
+        // Don't sign out - Supabase will retry automatically
+        return;
+      }
+
       // Handle explicit sign out
       if (event === 'SIGNED_OUT') {
         clearUserProfileFromStorage();
@@ -190,20 +303,56 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
+      // Explicitly handle token refresh
+      if (event === 'TOKEN_REFRESHED') {
+        if (!session) {
+          console.warn('[AuthContext] Token refresh returned no session - likely transient issue');
+          // Don't sign out - this could be temporary. Let Supabase handle it.
+          return;
+        }
+        console.log('[AuthContext] Token refreshed successfully');
+      }
+
       // Handle session updates (SIGNED_IN, TOKEN_REFRESHED, INITIAL_SESSION)
       try {
         if (session?.user) {
-          const profile = await fetchUserProfile(session.user.id, session);
+          const profile = await fetchUserProfileWithRetry(session.user.id, session);
 
           if (!profile) {
-            console.warn('[AuthContext] No profile found for user');
-            // Don't sign out - just clear local state
-            // Profile might be temporarily unavailable due to token refresh
-            clearUserProfileFromStorage();
-            if (mounted) {
-              setAuthState({ user: null, session: null, loading: false });
+            console.warn('[AuthContext] Cannot load profile after retries');
+            
+            // For SIGNED_IN, keep the session even if profile fails
+            if (event === 'SIGNED_IN') {
+              console.warn('[AuthContext] SIGNED_IN profile fetch failed - keeping session active');
+              toastRef.current({
+                title: "Profile data unavailable",
+                description: "You're signed in but profile couldn't load. Try refreshing.",
+                variant: "default"
+              });
+              
+              if (mounted) {
+                setAuthState({ 
+                  user: null, // No profile data
+                  session: session, // But keep the session
+                  loading: false 
+                });
+              }
+              return;
             }
-            return;
+            
+            // For token refresh or initial load, keep existing state
+            if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+              console.warn('[AuthContext] Cannot load profile - may be network issue. Keeping existing state.');
+              // Keep the existing user state if we have it
+              if (!authState.user && mounted) {
+                setAuthState({ 
+                  user: null, 
+                  session: session, // Keep session
+                  loading: false 
+                });
+              }
+              return;
+            }
           }
 
           if (mounted) {
@@ -214,23 +363,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
           }
         } else {
-          // No session - clear state but don't force sign out
-          clearUserProfileFromStorage();
-          if (mounted) {
-            setAuthState({
-              user: null,
-              session: null,
-              loading: false,
-            });
+          // Only clear on explicit sign out, not on transient states
+          if (event === 'SIGNED_OUT') {
+            clearUserProfileFromStorage();
+            if (mounted) {
+              setAuthState({ user: null, session: null, loading: false });
+            }
+          } else {
+            console.warn('[AuthContext] No session.user in event:', event, '- keeping existing state');
           }
         }
       } catch (error) {
         console.error('[AuthContext] Error in handleAuthChange:', error);
-        // Don't sign out - let Supabase handle token refresh automatically
-        clearUserProfileFromStorage();
-        if (mounted) {
-          setAuthState({ user: null, session: null, loading: false });
+        
+        // Don't sign out on errors - could be temporary network/DB issues
+        if (event === 'TOKEN_REFRESHED') {
+          console.error('[AuthContext] Error during token refresh - keeping existing state');
+          // Keep existing state, don't clear user
+          return;
         }
+        
+        // Don't clear state on errors - could be temporary network/DB issues
+        console.error('[AuthContext] Error in non-refresh event - keeping existing state');
+        // Keep user logged in, they can retry operations
       }
     };
 
@@ -239,41 +394,81 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Get initial session with timeout and error handling
     const sessionTimeout = setTimeout(() => {
       if (mounted && authState.loading) {
-        console.warn('[AuthContext] Session load timeout - clearing loading state');
-        clearUserProfileFromStorage();
-        setAuthState({
-          user: null,
-          session: null,
-          loading: false,
-        });
+        console.warn('[AuthContext] Session load timeout - checking offline status');
+        
+        // Don't clear storage or session on timeout - could be slow network
+        // Only clear loading state so app becomes usable
+        if (isOnline()) {
+          console.warn('[AuthContext] Online but slow - keeping any cached session');
+        } else {
+          console.warn('[AuthContext] Device is offline - will retry when online');
+        }
+        
+        setAuthState(prev => ({
+          ...prev, // Keep existing user/session if any
+          loading: false
+        }));
       }
-    }, 5000); // 5 second timeout
+    }, 30000); // 30 second timeout (increased from 5s)
 
     supabase.auth.getSession()
-      .then(({ data: { session }, error }) => {
+      .then(async ({ data: { session }, error }) => {
         clearTimeout(sessionTimeout);
 
         if (error) {
           console.error('[AuthContext] Session fetch error:', error);
-          // Don't sign out - Supabase will auto-refresh the token
-          clearUserProfileFromStorage();
+          // Don't clear storage on error - keep any cached data
           if (mounted) {
-            setAuthState({ user: null, session: null, loading: false });
+            setAuthState(prev => ({
+              ...prev,
+              loading: false
+            }));
           }
           return;
+        }
+
+        // Check if session is expired
+        if (session) {
+          const health = await checkSessionHealth();
+          
+          if (health.isExpired) {
+            console.warn('[AuthContext] Loaded expired session, attempting refresh...');
+            const refreshed = await attemptTokenRefresh();
+            
+            if (!refreshed) {
+              console.warn('[AuthContext] Cannot refresh expired session - letting Supabase handle it');
+              // Don't force sign-out - let Supabase's autoRefreshToken mechanism handle this
+              // If the token is truly invalid, Supabase will send SIGNED_OUT event
+              if (mounted) {
+                setAuthState({ user: null, session: null, loading: false });
+              }
+              return;
+            }
+            
+            // Get refreshed session
+            const { data: { session: newSession } } = await supabase.auth.getSession();
+            if (mounted && newSession) {
+              handleAuthChange('INITIAL_SESSION', newSession);
+            }
+            return;
+          }
         }
 
         if (mounted) {
           handleAuthChange('INITIAL_SESSION', session);
         }
       })
-      .catch((error) => {
+      .catch(async (error) => {
         clearTimeout(sessionTimeout);
         console.error('[AuthContext] Session fetch exception:', error);
-        // Don't sign out - keep session in localStorage for auto-refresh
-        clearUserProfileFromStorage();
+        
+        // Don't clear storage on fetch errors - could be network issues
+        // Keep existing session if available
         if (mounted) {
-          setAuthState({ user: null, session: null, loading: false });
+          setAuthState(prev => ({
+            ...prev,
+            loading: false // Just stop loading, keep user/session if cached
+          }));
         }
       });
 
@@ -370,8 +565,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (roleInsertError) {
           console.error('[AuthContext] Failed to add customer role:', roleInsertError);
-          await supabase.auth.signOut();
-          return { success: false, error: 'Failed to set up account. Please try again.' };
+          // Don't sign out - let user retry registration
+          return { 
+            success: false, 
+            error: 'Failed to set up account. Please try again.',
+          };
         }
 
         // Create customer profile
@@ -393,11 +591,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .eq('is_active', true)
           .single();
 
-        if (!verifyRole) {
-          console.error('[AuthContext] Role verification failed');
-          await supabase.auth.signOut();
-          return { success: false, error: 'Failed to verify account setup. Please try again.' };
-        }
+      if (!verifyRole) {
+        console.error('[AuthContext] Role verification failed');
+        // Don't sign out - let user retry
+        return { 
+          success: false, 
+          error: 'Failed to verify account setup. Please try again.',
+        };
+      }
 
         return { success: true, isNewUser: true, user: signInData.user };
       }
@@ -414,8 +615,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signInWithEmail = async (email: string, password: string) => {
+  const signInWithEmail = async (email: string, password: string, rememberMe: boolean = false) => {
     try {
+      // Store remember me preference
+      if (rememberMe) {
+        localStorage.setItem('auth_remember_me', 'true');
+        localStorage.setItem('auth_remember_me_date', new Date().toISOString());
+      } else {
+        localStorage.removeItem('auth_remember_me');
+        localStorage.removeItem('auth_remember_me_date');
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -436,6 +646,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Check email verification
       if (!data.user.email_confirmed_at) {
+        // ✅ INTENTIONAL: Sign out unverified users for security
+        // This does NOT affect infinite sessions - user never had a valid session
         await supabase.auth.signOut();
         return { 
           success: false, 
@@ -509,8 +721,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const authenticateWithEmail = async (email: string, password: string, name?: string) => {
+  const authenticateWithEmail = async (email: string, password: string, name?: string, rememberMe: boolean = false) => {
     try {
+      // Store remember me preference
+      if (rememberMe) {
+        localStorage.setItem('auth_remember_me', 'true');
+        localStorage.setItem('auth_remember_me_date', new Date().toISOString());
+      } else {
+        localStorage.removeItem('auth_remember_me');
+        localStorage.removeItem('auth_remember_me_date');
+      }
+
       // Try to sign in first
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
@@ -528,6 +749,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .single();
 
         if (!roleData) {
+          // ✅ INTENTIONAL: Sign out users who don't belong in this app
+          // This is security enforcement, not a session bug
           await supabase.auth.signOut();
           return { success: false, error: 'This app is for customers only. Please use the Shop Owner app.' };
         }
@@ -582,6 +805,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
+      // Clear remember me preference on sign out
+      localStorage.removeItem('auth_remember_me');
+      localStorage.removeItem('auth_remember_me_date');
+      
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
 
