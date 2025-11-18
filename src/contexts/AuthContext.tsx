@@ -369,7 +369,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             if (mounted) {
               setAuthState({ user: null, session: null, loading: false });
             }
+          } else if (event === 'INITIAL_SESSION') {
+            // Initialization complete - user not logged in
+            console.log('[AuthContext] Initial session complete - no user logged in');
+            if (mounted) {
+              setAuthState({ user: null, session: null, loading: false });
+            }
           } else {
+            // For other events like TOKEN_REFRESHED, keep existing state to prevent sign-out on transient errors
             console.warn('[AuthContext] No session.user in event:', event, '- keeping existing state');
           }
         }
