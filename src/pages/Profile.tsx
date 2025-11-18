@@ -570,20 +570,58 @@ export default function Profile() {
                         </span>
                       </div>
                       
+                      {/* Show access token expiry, not session expiry */}
                       {sessionHealth.isValid && sessionHealth.expiresIn > 0 && (
                         <div className="flex items-center justify-between">
-                          <span>Expires in:</span>
+                          <span>Access token refreshes in:</span>
                           <span className="font-mono text-muted-foreground">
-                            {Math.floor(sessionHealth.expiresIn / 60)} minutes
+                            {Math.floor(sessionHealth.expiresIn / 60)} min
                           </span>
                         </div>
                       )}
                       
+                      {/* Clarification about infinite sessions */}
+                      <div className="text-xs text-muted-foreground pt-2 border-t">
+                        ℹ️ Your session never expires - you'll stay logged in automatically
+                      </div>
+                      
                       {sessionHealth.reason && (
-                        <div className="text-xs text-muted-foreground pt-2 border-t">
+                        <div className="text-xs text-yellow-600 pt-1">
                           {sessionHealth.reason}
                         </div>
                       )}
+                    </div>
+                  )}
+                  
+                  {/* Session recovery UI */}
+                  {sessionHealth && !sessionHealth.isValid && (
+                    <div className="p-3 rounded-lg bg-orange-50 border border-orange-200">
+                      <div className="flex items-start gap-2">
+                        <span className="text-orange-600 text-sm">
+                          Your login is safe. Having trouble connecting to the server.
+                        </span>
+                      </div>
+                      <Button 
+                        size="sm" 
+                        variant="outline"
+                        className="mt-2 w-full"
+                        onClick={async () => {
+                          const refreshed = await attemptTokenRefresh();
+                          if (refreshed) {
+                            toast({ title: "✅ Connection restored" });
+                            const health = await checkSessionHealth();
+                            setSessionHealth(health);
+                          } else {
+                            toast({ 
+                              title: "Still having issues", 
+                              description: "Please check your internet connection",
+                              variant: "destructive" 
+                            });
+                          }
+                        }}
+                      >
+                        Retry Connection
+                      </Button>
                     </div>
                   )}
                   
@@ -713,6 +751,55 @@ export default function Profile() {
                     >
                       Refresh
                     </Button>
+                  </div>
+
+                  <Separator />
+
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Location Services</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Enable location to find nearby shops
+                      </p>
+                    </div>
+                    <Button 
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        if (Capacitor.isNativePlatform()) {
+                          window.open('app-settings:', '_system');
+                        } else {
+                          toast({
+                            title: "Location Settings",
+                            description: "Please enable location in your browser settings"
+                          });
+                        }
+                      }}
+                    >
+                      Open Settings
+                    </Button>
+                  </div>
+
+                  <Separator />
+
+                  {/* Debug Mode Toggle */}
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <Label>Debug Mode</Label>
+                      <p className="text-xs text-muted-foreground">
+                        Enable detailed authentication logs (reload required)
+                      </p>
+                    </div>
+                    <Switch 
+                      checked={localStorage.getItem('auth_debug') === 'true'}
+                      onCheckedChange={(checked) => {
+                        localStorage.setItem('auth_debug', String(checked));
+                        toast({ 
+                          title: checked ? '🐛 Debug enabled' : 'Debug disabled',
+                          description: 'Reload the app to apply changes'
+                        });
+                      }}
+                    />
                   </div>
 
                   <Separator />

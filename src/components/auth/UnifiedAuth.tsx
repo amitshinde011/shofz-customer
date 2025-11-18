@@ -4,7 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Mail, Lock, Loader2, User, MapPin, Search, Store } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { ArrowLeft, Mail, Lock, Loader2, User, MapPin, Search, Store, HelpCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface UnifiedAuthProps {
@@ -291,9 +292,22 @@ export function UnifiedAuth({ onBack, onAuthSuccess, onAuthenticate, referralBan
               />
               <Label
                 htmlFor="rememberMe"
-                className="text-sm font-medium text-foreground cursor-pointer select-none"
+                className="text-sm font-medium text-foreground cursor-pointer select-none flex items-center gap-2"
               >
                 Keep session active
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <HelpCircle className="h-3 w-3 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="max-w-xs text-xs">
+                        Periodically refreshes your session in the background.
+                        All sessions are permanent - you only need to sign in once.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
               </Label>
             </div>
 
