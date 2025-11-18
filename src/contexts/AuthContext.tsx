@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useRef } from 'r
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { checkSessionHealth, attemptTokenRefresh, SessionHealth } from '@/lib/sessionValidator';
 
 export interface AuthUser {
   id: string;
@@ -96,10 +97,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   });
   const { toast } = useToast();
   const toastRef = useRef(toast);
+  const healthCheckIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     toastRef.current = toast;
   }, [toast]);
+
+  // Monitor session health every 2 minutes
+  useEffect(() => {
+    if (!authState.session) {
+      if (healthCheckIntervalRef.current) {
+        clearInterval(healthCheckIntervalRef.current);
+        healthCheckIntervalRef.current = null;
+      }
+      return;
+    }
+
+    const monitorSessionHealth = async () => {
+      const health = await checkSessionHealth();
+
+      if (!health.isValid) {
+        console.warn('[AuthContext] Session is invalid:', health.reason);
+        
+        // Try to refresh if token is expired
+        if (health.shouldRefresh) {
+          const refreshed = await attemptTokenRefresh();
+          
+          if (!refreshed) {
+            console.error('[AuthContext] Token refresh failed - signing out user');
+            toastRef.current({
+              title: "Session expired",
+              description: "Please sign in again",
+              variant: "destructive",
+            });
+            
+            // Force sign out after failed refresh
+            await supabase.auth.signOut();
+            clearUserProfileFromStorage();
+            setAuthState({ user: null, session: null, loading: false });
+          }
+        }
+      } else if (health.shouldRefresh) {
+        // Proactively refresh before expiration
+        console.log('[AuthContext] Proactively refreshing token');
+        await attemptTokenRefresh();
+      }
+    };
+
+    // Initial check
+    monitorSessionHealth();
+
+    // Check every 2 minutes
+    healthCheckIntervalRef.current = setInterval(monitorSessionHealth, 2 * 60 * 1000);
+
+    return () => {
+      if (healthCheckIntervalRef.current) {
+        clearInterval(healthCheckIntervalRef.current);
+      }
+    };
+  }, [authState.session]);
 
   const fetchUserProfile = async (userId: string, session?: Session | null): Promise<AuthUser | null> => {
     try {
@@ -190,6 +246,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return;
       }
 
+      // Explicitly handle token refresh
+      if (event === 'TOKEN_REFRESHED') {
+        if (!session) {
+          console.error('[AuthContext] Token refresh returned no session - signing out');
+          await supabase.auth.signOut();
+          clearUserProfileFromStorage();
+          if (mounted) {
+            setAuthState({ user: null, session: null, loading: false });
+          }
+          return;
+        }
+        console.log('[AuthContext] Token refreshed successfully');
+      }
+
       // Handle session updates (SIGNED_IN, TOKEN_REFRESHED, INITIAL_SESSION)
       try {
         if (session?.user) {
@@ -197,8 +267,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           if (!profile) {
             console.warn('[AuthContext] No profile found for user');
-            // Don't sign out - just clear local state
-            // Profile might be temporarily unavailable due to token refresh
+            
+            // If we can't fetch profile during token refresh or initial load, something is wrong
+            if (event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+              console.error('[AuthContext] Cannot load profile with valid session - signing out');
+              await supabase.auth.signOut();
+              clearUserProfileFromStorage();
+              if (mounted) {
+                setAuthState({ user: null, session: null, loading: false });
+              }
+              return;
+            }
+            
+            // For SIGNED_IN, profile might still be creating
             clearUserProfileFromStorage();
             if (mounted) {
               setAuthState({ user: null, session: null, loading: false });
@@ -214,7 +295,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
           }
         } else {
-          // No session - clear state but don't force sign out
           clearUserProfileFromStorage();
           if (mounted) {
             setAuthState({
@@ -226,7 +306,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       } catch (error) {
         console.error('[AuthContext] Error in handleAuthChange:', error);
-        // Don't sign out - let Supabase handle token refresh automatically
+        
+        // Sign out on errors during token refresh
+        if (event === 'TOKEN_REFRESHED') {
+          console.error('[AuthContext] Error during token refresh - signing out');
+          await supabase.auth.signOut();
+        }
+        
         clearUserProfileFromStorage();
         if (mounted) {
           setAuthState({ user: null, session: null, loading: false });
@@ -250,12 +336,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }, 5000); // 5 second timeout
 
     supabase.auth.getSession()
-      .then(({ data: { session }, error }) => {
+      .then(async ({ data: { session }, error }) => {
         clearTimeout(sessionTimeout);
 
         if (error) {
           console.error('[AuthContext] Session fetch error:', error);
-          // Don't sign out - Supabase will auto-refresh the token
           clearUserProfileFromStorage();
           if (mounted) {
             setAuthState({ user: null, session: null, loading: false });
@@ -263,14 +348,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
 
+        // Check if session is expired
+        if (session) {
+          const health = await checkSessionHealth();
+          
+          if (health.isExpired) {
+            console.warn('[AuthContext] Loaded expired session, attempting refresh...');
+            const refreshed = await attemptTokenRefresh();
+            
+            if (!refreshed) {
+              console.error('[AuthContext] Cannot refresh expired session - clearing');
+              await supabase.auth.signOut();
+              clearUserProfileFromStorage();
+              if (mounted) {
+                setAuthState({ user: null, session: null, loading: false });
+              }
+              return;
+            }
+            
+            // Get refreshed session
+            const { data: { session: newSession } } = await supabase.auth.getSession();
+            if (mounted && newSession) {
+              handleAuthChange('INITIAL_SESSION', newSession);
+            }
+            return;
+          }
+        }
+
         if (mounted) {
           handleAuthChange('INITIAL_SESSION', session);
         }
       })
-      .catch((error) => {
+      .catch(async (error) => {
         clearTimeout(sessionTimeout);
         console.error('[AuthContext] Session fetch exception:', error);
-        // Don't sign out - keep session in localStorage for auto-refresh
+        await supabase.auth.signOut();
         clearUserProfileFromStorage();
         if (mounted) {
           setAuthState({ user: null, session: null, loading: false });

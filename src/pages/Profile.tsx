@@ -31,9 +31,12 @@ import {
   X,
   ArrowLeft,
   Volume2,
-  Database
+  Database,
+  Lock
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { checkSessionHealth, attemptTokenRefresh, SessionHealth } from "@/lib/sessionValidator";
+import { formatDistance } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
@@ -78,6 +81,9 @@ export default function Profile() {
   const platform = Capacitor.getPlatform();
   const isNative = Capacitor.isNativePlatform();
 
+  // Session health state
+  const [sessionHealth, setSessionHealth] = useState<SessionHealth | null>(null);
+
   // Sync form data when user data loads
   useEffect(() => {
     if (user) {
@@ -91,6 +97,20 @@ export default function Profile() {
   // Load storage info
   useEffect(() => {
     loadStorageInfo();
+  }, []);
+
+  // Load and monitor session health
+  useEffect(() => {
+    const loadSessionHealth = async () => {
+      const health = await checkSessionHealth();
+      setSessionHealth(health);
+    };
+    
+    loadSessionHealth();
+    
+    // Refresh every minute
+    const interval = setInterval(loadSessionHealth, 60 * 1000);
+    return () => clearInterval(interval);
   }, []);
 
   const loadStorageInfo = async () => {
@@ -529,6 +549,67 @@ export default function Profile() {
 
             {/* Shop Referral Code Section */}
             {!isEditing && <ReferralCodeSettings />}
+            
+            {/* Session Status */}
+            {!isEditing && (
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Lock className="w-5 h-5 text-primary" />
+                    <CardTitle>🔐 Session Status</CardTitle>
+                  </div>
+                  <CardDescription>Your authentication session health</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {sessionHealth && (
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span>Status:</span>
+                        <span className={sessionHealth.isValid ? 'text-green-600 font-medium' : 'text-red-600 font-medium'}>
+                          {sessionHealth.isValid ? '✅ Active' : '❌ Invalid'}
+                        </span>
+                      </div>
+                      
+                      {sessionHealth.isValid && sessionHealth.expiresIn > 0 && (
+                        <div className="flex items-center justify-between">
+                          <span>Expires in:</span>
+                          <span className="font-mono text-muted-foreground">
+                            {Math.floor(sessionHealth.expiresIn / 60)} minutes
+                          </span>
+                        </div>
+                      )}
+                      
+                      {sessionHealth.reason && (
+                        <div className="text-xs text-muted-foreground pt-2 border-t">
+                          {sessionHealth.reason}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={async () => {
+                      const success = await attemptTokenRefresh();
+                      toast({
+                        title: success ? '✅ Session refreshed' : '❌ Refresh failed',
+                        description: success ? 'Your session has been extended' : 'Please sign in again',
+                        variant: success ? 'default' : 'destructive'
+                      });
+                      
+                      if (success) {
+                        const health = await checkSessionHealth();
+                        setSessionHealth(health);
+                      }
+                    }}
+                    className="w-full"
+                  >
+                    Refresh Session
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
             
             {/* Sound Notification Settings */}
             {!isEditing && (
