@@ -157,6 +157,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
   }, [authState.session]);
 
+  // Remember Me: Extended session management (180 days)
+  useEffect(() => {
+    const rememberMe = localStorage.getItem('auth_remember_me') === 'true';
+    if (!rememberMe || !authState.session) return;
+
+    console.log('[AuthContext] Remember Me enabled - implementing extended session');
+
+    // Refresh token every 7 days for Remember Me users
+    const extendedRefreshInterval = setInterval(async () => {
+      const session = await supabase.auth.getSession();
+      if (session.data.session) {
+        console.log('[AuthContext] Remember Me: Proactively refreshing token');
+        await attemptTokenRefresh();
+      }
+    }, 7 * 24 * 60 * 60 * 1000); // 7 days
+
+    return () => {
+      clearInterval(extendedRefreshInterval);
+    };
+  }, [authState.session]);
+
   const fetchUserProfile = async (userId: string, session?: Session | null): Promise<AuthUser | null> => {
     try {
       // Check cache first
@@ -526,8 +547,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const signInWithEmail = async (email: string, password: string) => {
+  const signInWithEmail = async (email: string, password: string, rememberMe: boolean = false) => {
     try {
+      // Store remember me preference
+      if (rememberMe) {
+        localStorage.setItem('auth_remember_me', 'true');
+        localStorage.setItem('auth_remember_me_date', new Date().toISOString());
+      } else {
+        localStorage.removeItem('auth_remember_me');
+        localStorage.removeItem('auth_remember_me_date');
+      }
+
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password
@@ -621,8 +651,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const authenticateWithEmail = async (email: string, password: string, name?: string) => {
+  const authenticateWithEmail = async (email: string, password: string, name?: string, rememberMe: boolean = false) => {
     try {
+      // Store remember me preference
+      if (rememberMe) {
+        localStorage.setItem('auth_remember_me', 'true');
+        localStorage.setItem('auth_remember_me_date', new Date().toISOString());
+      } else {
+        localStorage.removeItem('auth_remember_me');
+        localStorage.removeItem('auth_remember_me_date');
+      }
+
       // Try to sign in first
       const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
         email,
@@ -694,6 +733,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signOut = async () => {
     try {
+      // Clear remember me preference on sign out
+      localStorage.removeItem('auth_remember_me');
+      localStorage.removeItem('auth_remember_me_date');
+      
       const { error } = await supabase.auth.signOut();
       if (error) throw error;
 

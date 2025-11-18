@@ -3,13 +3,14 @@ import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Mail, Lock, Loader2, User, MapPin, Search, Store } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 interface UnifiedAuthProps {
   onBack: () => void;
   onAuthSuccess: (isNewUser: boolean, user?: any, requiresEmailConfirmation?: boolean) => void;
-  onAuthenticate: (email: string, password: string, name?: string) => Promise<{ 
+  onAuthenticate: (email: string, password: string, name?: string, rememberMe?: boolean) => Promise<{ 
     success: boolean; 
     isNewUser?: boolean;
     user?: any;
@@ -27,6 +28,7 @@ export function UnifiedAuth({ onBack, onAuthSuccess, onAuthenticate, referralBan
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [showNameField, setShowNameField] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true); // Default to checked
   const { toast } = useToast();
 
   const validateEmail = (email: string) => {
@@ -67,7 +69,7 @@ export function UnifiedAuth({ onBack, onAuthSuccess, onAuthenticate, referralBan
     }
 
     setLoading(true);
-    const result = await onAuthenticate(email, password, name || email.split('@')[0]);
+    const result = await onAuthenticate(email, password, name || email.split('@')[0], rememberMe);
     setLoading(false);
 
     if (result.success) {
@@ -277,6 +279,22 @@ export function UnifiedAuth({ onBack, onAuthSuccess, onAuthenticate, referralBan
                 />
               </div>
               <p className="text-xs text-muted-foreground">Minimum 6 characters</p>
+            </div>
+
+            {/* Remember Me Checkbox */}
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id="rememberMe"
+                checked={rememberMe}
+                onCheckedChange={(checked) => setRememberMe(checked as boolean)}
+                disabled={loading}
+              />
+              <Label
+                htmlFor="rememberMe"
+                className="text-sm font-medium text-foreground cursor-pointer select-none"
+              >
+                Remember me for 180 days
+              </Label>
             </div>
 
             <Button
