@@ -293,7 +293,7 @@ export function UnifiedAuth({ onBack, onAuthSuccess, onAuthenticate, referralBan
                 htmlFor="rememberMe"
                 className="text-sm font-medium text-foreground cursor-pointer select-none"
               >
-                Remember me for 180 days
+                Keep session active
               </Label>
             </div>
 
