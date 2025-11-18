@@ -80,6 +80,26 @@ The "Keep session active" checkbox (formerly "Remember me") serves as a **sessio
 - Suspicious activity detection
 - Geographic/IP-based session validation
 
+## Recent Production Fixes (2024)
+
+### What We Fixed
+- Removed aggressive sign-out logic that cleared sessions on temporary errors
+- Increased session load timeout from 5s to 30s for slow networks
+- Implemented retry logic with exponential backoff (3 attempts: 1s, 2s, 4s)
+- Added offline detection to skip health checks when disconnected
+- Reduced health monitoring from 2 minutes to 30 minutes
+- Removed redundant "Remember Me" 7-day refresh (all sessions are now infinite by default)
+- Fixed session clearing on profile fetch failures, role creation errors, and transient states
+- Added autoRefreshToken failure handling
+
+### Production-Ready Principles
+1. **Trust Supabase's autoRefreshToken** - Let Supabase handle token refresh automatically
+2. **Only sign out on explicit events** - SIGNED_OUT events or manual user action
+3. **Keep sessions active during errors** - Temporary network/DB errors don't force sign-out
+4. **User recovery first** - Let users recover from errors without re-authentication
+5. **Battery efficient** - 30-minute health check intervals instead of aggressive polling
+6. **Prioritize UX** - User experience over aggressive error handling
+
 ## User Experience
 
 ### Profile Page Features
