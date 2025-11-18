@@ -353,18 +353,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
               return;
             }
-            
-            // For SIGNED_IN, profile might still be creating - keep session active
-            console.warn('[AuthContext] Cannot load profile after retries - keeping session active');
-            if (mounted) {
-              setAuthState({ 
-                user: null,      // No profile data yet
-                session: session, // Keep the session
-                loading: false 
-              });
-            }
-            // Don't clear storage - profile may load later
-            return;
           }
 
           if (mounted) {
@@ -658,6 +646,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       // Check email verification
       if (!data.user.email_confirmed_at) {
+        // ✅ INTENTIONAL: Sign out unverified users for security
+        // This does NOT affect infinite sessions - user never had a valid session
         await supabase.auth.signOut();
         return { 
           success: false, 
@@ -759,6 +749,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .single();
 
         if (!roleData) {
+          // ✅ INTENTIONAL: Sign out users who don't belong in this app
+          // This is security enforcement, not a session bug
           await supabase.auth.signOut();
           return { success: false, error: 'This app is for customers only. Please use the Shop Owner app.' };
         }
