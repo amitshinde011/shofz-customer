@@ -91,12 +91,23 @@ function AppContent() {
 
     const handleFocus = async () => {
       console.log('[App] Window focused - checking session health');
-      const { checkSessionHealth } = await import('@/lib/sessionValidator');
+      const { checkSessionHealth, attemptTokenRefresh } = await import('@/lib/sessionValidator');
+      const { supabase } = await import('@/integrations/supabase/client');
+      
       const health = await checkSessionHealth();
       
       if (health.isExpired) {
-        console.warn('[App] Session expired while away - reloading');
-        window.location.reload();
+        console.warn('[App] Session may be expired - attempting refresh');
+        const refreshed = await attemptTokenRefresh();
+        
+        if (!refreshed) {
+          // Only reload if refresh fails AND session is truly gone
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) {
+            console.error('[App] No valid session - reloading');
+            window.location.reload();
+          }
+        }
       }
     };
 

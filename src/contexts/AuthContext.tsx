@@ -282,6 +282,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         console.log('[AuthContext] Auth event:', event, 'Session:', !!session);
       }
 
+      // Detect Supabase's automatic token refresh failures
+      if (event === 'TOKEN_REFRESHED' && !session) {
+        console.error('[AuthContext] Supabase autoRefreshToken failed - likely network issue');
+        toastRef.current({
+          title: "Connection issue",
+          description: "Having trouble staying connected. Your session is safe.",
+          variant: "default"
+        });
+        // Don't sign out - Supabase will retry automatically
+        return;
+      }
+
       // Handle explicit sign out
       if (event === 'SIGNED_OUT') {
         clearUserProfileFromStorage();
@@ -342,11 +354,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               return;
             }
             
-            // For SIGNED_IN, profile might still be creating
-            clearUserProfileFromStorage();
+            // For SIGNED_IN, profile might still be creating - keep session active
+            console.warn('[AuthContext] Cannot load profile after retries - keeping session active');
             if (mounted) {
-              setAuthState({ user: null, session: null, loading: false });
+              setAuthState({ 
+                user: null,      // No profile data yet
+                session: session, // Keep the session
+                loading: false 
+              });
             }
+            // Don't clear storage - profile may load later
             return;
           }
 
@@ -358,13 +375,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
           }
         } else {
-          clearUserProfileFromStorage();
-          if (mounted) {
-            setAuthState({
-              user: null,
-              session: null,
-              loading: false,
-            });
+          // Only clear on explicit sign out, not on transient states
+          if (event === 'SIGNED_OUT') {
+            clearUserProfileFromStorage();
+            if (mounted) {
+              setAuthState({ user: null, session: null, loading: false });
+            }
+          } else {
+            console.warn('[AuthContext] No session.user in event:', event, '- keeping existing state');
           }
         }
       } catch (error) {
@@ -377,11 +395,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
         
-        // Only clear state for non-refresh events
-        clearUserProfileFromStorage();
-        if (mounted) {
-          setAuthState({ user: null, session: null, loading: false });
-        }
+        // Don't clear state on errors - could be temporary network/DB issues
+        console.error('[AuthContext] Error in non-refresh event - keeping existing state');
+        // Keep user logged in, they can retry operations
       }
     };
 
@@ -561,8 +577,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         if (roleInsertError) {
           console.error('[AuthContext] Failed to add customer role:', roleInsertError);
-          await supabase.auth.signOut();
-          return { success: false, error: 'Failed to set up account. Please try again.' };
+          // Don't sign out - let user retry registration
+          return { 
+            success: false, 
+            error: 'Failed to set up account. Please try again.',
+          };
         }
 
         // Create customer profile
@@ -584,11 +603,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .eq('is_active', true)
           .single();
 
-        if (!verifyRole) {
-          console.error('[AuthContext] Role verification failed');
-          await supabase.auth.signOut();
-          return { success: false, error: 'Failed to verify account setup. Please try again.' };
-        }
+      if (!verifyRole) {
+        console.error('[AuthContext] Role verification failed');
+        // Don't sign out - let user retry
+        return { 
+          success: false, 
+          error: 'Failed to verify account setup. Please try again.',
+        };
+      }
 
         return { success: true, isNewUser: true, user: signInData.user };
       }
