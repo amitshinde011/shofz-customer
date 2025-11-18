@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { checkSessionHealth } from '@/lib/sessionValidator';
 
 // Generic hook for Supabase queries with React Query integration
 export function useSupabaseQuery<T = any>(
@@ -15,10 +16,28 @@ export function useSupabaseQuery<T = any>(
   return useQuery({
     queryKey: key,
     queryFn: async () => {
+      // Check session health before query
+      const health = await checkSessionHealth();
+      
+      if (!health.isValid) {
+        console.error('[useSupabaseQuery] Cannot query with invalid session');
+        throw new Error('Session expired. Please sign in again.');
+      }
+      
       const result = await queryFn();
+      
+      // Detect 401 errors (expired token)
+      if (result.error?.message?.includes('JWT') || 
+          result.error?.message?.includes('expired') ||
+          result.error?.code === 'PGRST301') {
+        console.error('[useSupabaseQuery] Token expired during query');
+        throw new Error('Your session has expired. Please sign in again.');
+      }
+      
       if (result.error) {
         throw new Error(result.error.message || 'Database query failed');
       }
+      
       return result.data;
     },
     enabled: options?.enabled,

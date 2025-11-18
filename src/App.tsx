@@ -13,6 +13,7 @@ import { initializeAnalytics } from "@/lib/analytics";
 import { LocationProvider } from "@/contexts/LocationContext";
 import { LocationPermissionGate } from "@/components/LocationPermissionGate";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
+import { useEffect } from "react";
 import Auth from "./pages/Auth";
 import ForgotPassword from "./pages/ForgotPassword";
 import ResetPassword from "./pages/ResetPassword";
@@ -81,8 +82,27 @@ const App = () => {
 function AppContent() {
   // Track page views automatically
   usePageTracking();
-  const { loading } = useAuth();
+  const { loading, isAuthenticated } = useAuth();
   const isMobile = useIsMobile();
+
+  // Check session on window focus (user returns to tab)
+  useEffect(() => {
+    if (!isAuthenticated) return;
+
+    const handleFocus = async () => {
+      console.log('[App] Window focused - checking session health');
+      const { checkSessionHealth } = await import('@/lib/sessionValidator');
+      const health = await checkSessionHealth();
+      
+      if (health.isExpired) {
+        console.warn('[App] Session expired while away - reloading');
+        window.location.reload();
+      }
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [isAuthenticated]);
 
   if (loading) {
     return (
