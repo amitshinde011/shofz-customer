@@ -417,13 +417,17 @@ export default function ShopMap({ shops, userLocation }: ShopMapProps) {
                         <span className="text-green-600 text-sm">✓</span>
                       )}
                     </div>
-                    <div className="flex items-center gap-1 mt-1">
-                      <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                      <span className="text-sm">{selectedShop.rating}</span>
-                      <span className="text-xs text-muted-foreground">
-                        ({selectedShop.total_reviews})
-                      </span>
-                    </div>
+                    {(selectedShop.rating && selectedShop.rating > 0) && (
+                      <div className="flex items-center gap-1 mt-1">
+                        <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                        <span className="text-sm">{selectedShop.rating.toFixed(1)}</span>
+                        {(selectedShop.total_reviews && selectedShop.total_reviews > 0) && (
+                          <span className="text-xs text-muted-foreground">
+                            ({selectedShop.total_reviews} {selectedShop.total_reviews === 1 ? 'review' : 'reviews'})
+                          </span>
+                        )}
+                      </div>
+                    )}
                     {selectedShop.categories && (
                       <div className="mt-1">
                         <span className="text-xs px-2 py-1 rounded-full bg-primary/10 text-primary">

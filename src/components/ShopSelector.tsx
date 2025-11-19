@@ -289,11 +289,15 @@ export default function ShopSelector({ selectedShops, onShopsChange, userLocatio
                             
                             <div className="space-y-1">
                               <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                                <div className="flex items-center gap-1">
-                                  <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
-                                  <span>{shop.rating.toFixed(1)}</span>
-                                  <span>({shop.total_reviews})</span>
-                                </div>
+                                {(shop.rating && shop.rating > 0) && (
+                                  <div className="flex items-center gap-1">
+                                    <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                                    <span>{shop.rating.toFixed(1)}</span>
+                                    {(shop.total_reviews && shop.total_reviews > 0) && (
+                                      <span>({shop.total_reviews} {shop.total_reviews === 1 ? 'review' : 'reviews'})</span>
+                                    )}
+                                  </div>
+                                )}
                                 {shop.distance_km < 999 && (
                                   <div className="flex items-center gap-1">
                                     <MapPin className="w-3 h-3" />
