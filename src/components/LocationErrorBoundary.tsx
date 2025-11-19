@@ -1,6 +1,8 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { safeLocalStorage } from '@/hooks/useLocation';
+import { LOCATION_CONFIG } from '@/config/locationConfig';
 
 interface Props {
   children: ReactNode;
@@ -31,6 +33,9 @@ export class LocationErrorBoundary extends Component<Props, State> {
   };
 
   private handleContinue = () => {
+    // Clear location storage and set skip flag
+    safeLocalStorage.removeItem(LOCATION_CONFIG.STORAGE_KEYS.LOCATION);
+    safeLocalStorage.setItem('shofz_skip_location_permission', 'true');
     this.setState({ hasError: false, error: null });
   };
 

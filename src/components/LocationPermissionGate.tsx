@@ -20,6 +20,7 @@ export function LocationPermissionGate({ children }: LocationPermissionGateProps
   const [skipLocation, setSkipLocation] = React.useState(false);
   const [gateTimeout, setGateTimeout] = React.useState(false);
   const [settingsError, setSettingsError] = React.useState<string | null>(null);
+  const [loadingStartTime] = React.useState(Date.now());
 
   // Check if user previously skipped location permission
   React.useEffect(() => {
@@ -60,6 +61,8 @@ export function LocationPermissionGate({ children }: LocationPermissionGateProps
   }
 
   // Show loading state while checking location
+  const showTimeoutButton = gateTimeout || (loading && (Date.now() - loadingStartTime > 15000));
+  
   if (loading && !gateTimeout) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
@@ -72,7 +75,9 @@ export function LocationPermissionGate({ children }: LocationPermissionGateProps
           <p className="text-sm text-muted-foreground max-w-xs text-center">
             This helps us show you nearby shops and deals
           </p>
-          {gateTimeout && (
+        </div>
+        {showTimeoutButton && (
+          <div className="absolute bottom-8">
             <Button
               variant="outline"
               size="sm"
@@ -80,12 +85,11 @@ export function LocationPermissionGate({ children }: LocationPermissionGateProps
                 safeLocalStorage.setItem(STORAGE_KEYS.SKIP, 'true');
                 setSkipLocation(true);
               }}
-              className="mt-4"
             >
               Continue without location
             </Button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
     );
   }
