@@ -171,6 +171,8 @@ export function useLocation() {
   const lastUpdateToastRef = useRef<number>(0);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const watchIdRef = useRef<string | null>(null);
+  const watchDurationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isWatchActiveRef = useRef(false);
 
   // Helper to show location update toast (throttled to once per minute)
   const showLocationUpdateToast = useCallback(() => {
