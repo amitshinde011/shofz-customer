@@ -1,5 +1,6 @@
 import React, { ReactNode } from 'react';
 import { useUserLocation } from '@/contexts/LocationContext';
+import { safeLocalStorage } from '@/hooks/useLocation';
 import { MapPin, Navigation } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -21,7 +22,7 @@ export function LocationPermissionGate({ children }: LocationPermissionGateProps
 
   // Check if user previously skipped location permission
   React.useEffect(() => {
-    const skipFlag = localStorage.getItem(STORAGE_KEYS.SKIP);
+    const skipFlag = safeLocalStorage.getItem(STORAGE_KEYS.SKIP);
     if (skipFlag === 'true') {
       setSkipLocation(true);
     }
@@ -40,7 +41,7 @@ export function LocationPermissionGate({ children }: LocationPermissionGateProps
   }, [loading]);
 
   // Check if we have permission cached
-  const permissionGranted = localStorage.getItem(STORAGE_KEYS.PERMISSION_GRANTED) === 'true';
+  const permissionGranted = safeLocalStorage.getItem(STORAGE_KEYS.PERMISSION_GRANTED) === 'true';
 
   // Determine if user can continue without location
   const canContinue = error?.toLowerCase().includes('continue without location');
@@ -75,7 +76,7 @@ export function LocationPermissionGate({ children }: LocationPermissionGateProps
               variant="outline"
               size="sm"
               onClick={() => {
-                localStorage.setItem(STORAGE_KEYS.SKIP, 'true');
+                safeLocalStorage.setItem(STORAGE_KEYS.SKIP, 'true');
                 setSkipLocation(true);
               }}
               className="mt-4"

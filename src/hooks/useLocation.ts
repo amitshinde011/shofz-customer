@@ -1,12 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
 import { toast } from 'sonner';
 
 const DEBUG_LOCATION = import.meta.env.DEV;
 
-// Helper to safely use localStorage
-const safeLocalStorage = {
+// Helper to safely use localStorage (exported for use in other components)
+export const safeLocalStorage = {
   getItem: (key: string): string | null => {
     try {
       if (typeof localStorage === 'undefined' || !localStorage) return null;
@@ -42,6 +42,26 @@ export interface UserLocation {
   timestamp: number;
 }
 
+// Configuration constants
+const SIGNIFICANT_MOVE_THRESHOLD_KM = 0.05; // 50 meters - update threshold for location changes
+const PERMISSION_QUERY_TIMEOUT = 5000; // 5 seconds - timeout for permission check
+const LOCATION_CACHE_VALIDITY_MS = 5 * 60 * 1000; // 5 minutes - cached location validity
+
+// Helper to get human-readable location age
+export function getLocationAge(location: UserLocation | null): string {
+  if (!location) return 'Unknown';
+  const ageMs = Date.now() - location.timestamp;
+  const ageMinutes = Math.floor(ageMs / 60000);
+  
+  if (ageMinutes < 1) return 'Just now';
+  if (ageMinutes === 1) return '1 minute ago';
+  if (ageMinutes < 60) return `${ageMinutes} minutes ago`;
+  
+  const ageHours = Math.floor(ageMinutes / 60);
+  if (ageHours === 1) return '1 hour ago';
+  return `${ageHours} hours ago`;
+}
+
 // Helper function to open device location settings
 const openDeviceSettings = async (): Promise<boolean> => {
   const platform = Capacitor.getPlatform();
@@ -65,6 +85,7 @@ export function useLocation() {
   const STORAGE_KEYS = {
     LOCATION: 'shofz_user_location',
     PERMISSION_GRANTED: 'shofz_location_permission_granted',
+    TOAST_ENABLED: 'shofz_location_toast_enabled', // User preference for location update toasts
   };
 
   const [location, setLocation] = useState<UserLocation | null>(null);
@@ -72,19 +93,27 @@ export function useLocation() {
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [isRequesting, setIsRequesting] = useState(false);
-  const [lastUpdateToast, setLastUpdateToast] = useState<number>(0);
+  
+  // Use ref instead of state to avoid dependency issues in watchPosition
+  const lastUpdateToastRef = useRef<number>(0);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const watchIdRef = useRef<string | null>(null);
 
   // Helper to show location update toast (throttled to once per minute)
   const showLocationUpdateToast = useCallback(() => {
+    // Check if user has disabled location update toasts
+    const toastEnabled = safeLocalStorage.getItem(STORAGE_KEYS.TOAST_ENABLED);
+    if (toastEnabled === 'false') return;
+    
     const now = Date.now();
-    if (now - lastUpdateToast > 60000) { // Only show once per minute
+    if (now - lastUpdateToastRef.current > 60000) { // Only show once per minute
       toast.success('Location updated', {
         description: 'Your location has been refreshed',
         duration: 2000,
       });
-      setLastUpdateToast(now);
+      lastUpdateToastRef.current = now;
     }
-  }, [lastUpdateToast]);
+  }, [STORAGE_KEYS.TOAST_ENABLED]);
 
   const getLocationInternal = async (isManualTrigger: boolean = false): Promise<void> => {
     // Prevent simultaneous requests
@@ -295,6 +324,32 @@ export function useLocation() {
       // Error already set by getLocationInternal
     }
   };
+
+  // Function to clear location and allow re-requesting
+  const clearLocation = useCallback(() => {
+    if (DEBUG_LOCATION) console.log('[useLocation] Clearing location data');
+    setLocation(null);
+    setError(null);
+    setRetryCount(0);
+    safeLocalStorage.removeItem(STORAGE_KEYS.LOCATION);
+    safeLocalStorage.removeItem(STORAGE_KEYS.PERMISSION_GRANTED);
+    
+    // Clear any scheduled retries
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+    
+    // Stop watching position
+    if (watchIdRef.current) {
+      if (Capacitor.isNativePlatform()) {
+        Geolocation.clearWatch({ id: watchIdRef.current });
+      } else {
+        navigator.geolocation.clearWatch(parseInt(watchIdRef.current));
+      }
+      watchIdRef.current = null;
+    }
+  }, [STORAGE_KEYS.LOCATION, STORAGE_KEYS.PERMISSION_GRANTED]);
 
   // Load cached location on mount (no auto-request)
   useEffect(() => {
@@ -509,11 +564,21 @@ export function useLocation() {
     };
   }, [showLocationUpdateToast]); // Add showLocationUpdateToast dependency
 
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return {
     location,
     loading,
     error,
     requestLocation,
+    clearLocation,
     openSettings: openDeviceSettings,
     isNative: Capacitor.isNativePlatform(),
   };
