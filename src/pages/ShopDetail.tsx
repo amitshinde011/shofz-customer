@@ -281,7 +281,7 @@ export default function ShopDetail() {
       {/* Mobile Back Button - Floating */}
       <div className="lg:hidden fixed top-4 left-4 z-10">
         <Button
-          variant="secondary"
+          variant="ghost"
           size="icon"
           onClick={() => navigate(-1)}
           className="h-9 w-9 shadow-lg bg-background/80 backdrop-blur-sm"
@@ -372,11 +372,17 @@ export default function ShopDetail() {
 
                   {/* Rating & Stats */}
                   <div className="flex flex-wrap items-center gap-4 mb-3">
-                    <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 fill-warning text-warning" />
-                      <span className="font-bold text-foreground">{shop.rating || 0}</span>
-                      <span className="text-sm text-muted-foreground">({shop.total_reviews || 0})</span>
-                    </div>
+                    {(shop.rating && shop.rating > 0) && (
+                      <div className="flex items-center gap-1">
+                        <Star className="w-4 h-4 fill-warning text-warning" />
+                        <span className="font-bold text-foreground">{shop.rating.toFixed(1)}</span>
+                        {(shop.total_reviews && shop.total_reviews > 0) && (
+                          <span className="text-sm text-muted-foreground">
+                            ({shop.total_reviews} {shop.total_reviews === 1 ? 'review' : 'reviews'})
+                          </span>
+                        )}
+                      </div>
+                    )}
                     {viewCounts && viewCounts.view_count > 0 && (
                       <div className="flex items-center gap-1">
                         <Eye className="w-4 h-4 text-muted-foreground" />
@@ -562,8 +568,8 @@ export default function ShopDetail() {
 
             {/* Shop Reviews */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold">Customer Reviews</h2>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
+                <h2 className="text-xl sm:text-2xl font-bold">Customer Reviews</h2>
                 <ShopReviewButton shop={shop} />
               </div>
               <ShopReviewsList shopId={shop.id} />
