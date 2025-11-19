@@ -14,7 +14,7 @@ import { DescriptionSection } from '@/components/product-detail/DescriptionSecti
 import { SpecificationsTable } from '@/components/product-detail/SpecificationsTable';
 import { ReviewsPreview } from '@/components/product-detail/ReviewsPreview';
 import { RelatedProductsRail } from '@/components/product-detail/RelatedProductsRail';
-import { InlineActionButtons } from '@/components/product-detail/InlineActionButtons';
+import { StickyActionBar } from '@/components/product-detail/StickyActionBar';
 import { ProductDetailSkeleton } from '@/components/product-detail/ProductDetailSkeleton';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -102,7 +102,7 @@ const ProductDetail = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background pb-20 overflow-x-hidden w-full max-w-full">
+    <div className="min-h-screen bg-background pb-24 overflow-x-hidden w-full max-w-full">
       {/* Breadcrumbs - Amazon Style */}
       <div className="bg-background border-b border-border px-4 sm:px-6 py-2">
         <div className="max-w-screen-xl mx-auto">
@@ -185,9 +185,6 @@ const ProductDetail = () => {
                 quantity={product.stock_quantity}
               />
             </div>
-
-            {/* Action Buttons */}
-            <InlineActionButtons product={product} />
 
             <Separator />
 
@@ -306,6 +303,8 @@ const ProductDetail = () => {
         </div>
       </div>
 
+      {/* Sticky Action Bar */}
+      <StickyActionBar product={product} />
     </div>
   );
 };

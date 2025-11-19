@@ -50,11 +50,10 @@ const getCategoryIcon = (categoryName: string): keyof typeof Icons => {
 
 export default function Home() {
   const { user } = useAuth();
-  const { location, requestLocation } = useUserLocation();
+  const { location } = useUserLocation();
   const queryClient = useQueryClient();
   
-  // ✅ FIX: Pass null instead of undefined to allow fallback data
-  const locationParams = location ? { lat: location.lat, lng: location.lng, radius: 50 } : null;
+  const locationParams = location ? { lat: location.lat, lng: location.lng, radius: 50 } : undefined;
   
   // Fetch enough items for 3 rows × 5 columns (max large desktop view)
   const { data: featuredShopsData } = useFeaturedShops(15, locationParams);
@@ -67,12 +66,8 @@ export default function Home() {
     limit: 10 
   });
 
-  // ✅ FIX MEDIUM #25: Pull-to-refresh handler with location update
+  // Pull-to-refresh handler
   const handleRefresh = async () => {
-    // Request fresh location first
-    await requestLocation();
-
-    // Then invalidate all queries to refetch with new location
     await queryClient.invalidateQueries({ queryKey: ['featured-shops'] });
     await queryClient.invalidateQueries({ queryKey: ['featured-products'] });
     await queryClient.invalidateQueries({ queryKey: ['featured-offers'] });
@@ -209,7 +204,7 @@ export default function Home() {
         {/* Ad Banner after Featured Offers */}
         <AdBanner placement="after-featured-offers" className="my-6" />
 
-        {/* Categories 
+        {/* Categories */}
         <section>
           <Card>
             <CardContent className="card-padding">
@@ -247,7 +242,6 @@ export default function Home() {
             </CardContent>
           </Card>
         </section>
-        */}
 
         {/* Featured Products */}
         {featuredProducts.length > 0 && (

@@ -268,7 +268,7 @@ export const shopService = {
     return { isFavorited: !!data, error };
   },
 
-  // Get featured shops
+  // Get featured shops  
   async getFeaturedShops(limit: number = 10, location?: { lat: number; lng: number; radius?: number }) {
     try {
       if (location) {
@@ -291,23 +291,9 @@ export const shopService = {
         return { data: featuredNearby, error: null };
       }
 
-      // ✅ FIX: No location provided - show popular featured shops without distance filter
-      console.log('getFeaturedShops called without location - showing popular featured shops');
-      const { data, error } = await (supabase as any)
-        .from('shops')
-        .select('*')
-        .eq('is_active', true)
-        .eq('is_verified', true)
-        .eq('is_featured', true)
-        .order('rating', { ascending: false })
-        .limit(limit);
-
-      if (error) {
-        console.error('Error fetching featured shops:', error);
-        return { data: [], error };
-      }
-
-      return { data: data || [], error: null };
+      // Location is required - this shouldn't happen with LocationPermissionGate
+      console.warn('getFeaturedShops called without location');
+      return { data: [], error: new Error('Location is required') };
     } catch (error) {
       console.error('Error calling get_featured_shops:', error);
       return { data: [], error };

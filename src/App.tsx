@@ -11,7 +11,7 @@ import { PWAInstallBanner } from "@/components/PWAInstallBanner";
 import { usePageTracking } from "@/hooks/useAnalytics";
 import { initializeAnalytics } from "@/lib/analytics";
 import { LocationProvider } from "@/contexts/LocationContext";
-import { LocationErrorBoundary } from "@/components/LocationErrorBoundary";
+import { LocationPermissionGate } from "@/components/LocationPermissionGate";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useEffect } from "react";
 import Auth from "./pages/Auth";
@@ -62,13 +62,17 @@ const App = () => {
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <OfflineIndicator />
-          <ConnectionStatus />
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <AppContent />
-          </BrowserRouter>
+          <LocationProvider>
+            <LocationPermissionGate>
+              <OfflineIndicator />
+              <ConnectionStatus />
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <AppContent />
+              </BrowserRouter>
+            </LocationPermissionGate>
+          </LocationProvider>
         </TooltipProvider>
       </QueryClientProvider>
     </AuthProvider>
@@ -89,13 +93,13 @@ function AppContent() {
       console.log('[App] Window focused - checking session health');
       const { checkSessionHealth, attemptTokenRefresh } = await import('@/lib/sessionValidator');
       const { supabase } = await import('@/integrations/supabase/client');
-
+      
       const health = await checkSessionHealth();
-
+      
       if (health.isExpired) {
         console.warn('[App] Session may be expired - attempting refresh');
         const refreshed = await attemptTokenRefresh();
-
+        
         if (!refreshed) {
           // Only reload if refresh fails AND session is truly gone
           const { data: { session } } = await supabase.auth.getSession();
@@ -130,46 +134,35 @@ function AppContent() {
     >
       <PWAInstallBanner />
       <Routes>
-        {/* Auth Routes - NO LOCATION REQUIRED */}
+        {/* Public Routes */}
+        <Route path="/" element={<Home />} />
+        <Route path="/products" element={<Products />} />
+        <Route path="/products/:id" element={<ProductDetail />} />
+        <Route path="/shops" element={<Shops />} />
+        <Route path="/shops/:id" element={<ShopDetail />} />
+        <Route path="/offers" element={<Offers />} />
+        <Route path="/offers/:id" element={<OfferDetail />} />
+        {/* Auth Routes */}
         <Route path="/auth" element={<Auth />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
+        {/* Protected Routes */}
+        <Route path="/inquiry/new" element={<ProtectedRoute><InquiryForm /></ProtectedRoute>} />
+        <Route path="/inquiry/create" element={<ProtectedRoute><InquiryForm /></ProtectedRoute>} />
+        <Route path="/inquiry/success" element={<ProtectedRoute><InquirySuccess /></ProtectedRoute>} />
+        <Route path="/inquiries" element={<ProtectedRoute><MyInquiries /></ProtectedRoute>} />
+        <Route path="/inquiries/:id" element={<ProtectedRoute><InquiryDetail /></ProtectedRoute>} />
+        <Route path="/favorites" element={<ProtectedRoute><Favorites /></ProtectedRoute>} />
+        <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+        <Route path="/referral-history" element={<ProtectedRoute><ReferralHistory /></ProtectedRoute>} />
+        <Route path="/shop/dashboard" element={<ProtectedRoute><ShopDashboard /></ProtectedRoute>} />
+        <Route path="/support" element={<ProtectedRoute><CustomerSupport /></ProtectedRoute>} />
+        <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
-        {/* All other routes wrapped with LocationProvider and Error Boundary */}
-        <Route path="/*" element={
-          <LocationErrorBoundary>
-            <LocationProvider>
-              <Routes>
-                {/* Public Routes with Location */}
-                <Route path="/" element={<Home />} />
-                <Route path="/products" element={<Products />} />
-                <Route path="/products/:id" element={<ProductDetail />} />
-                <Route path="/shops" element={<Shops />} />
-                <Route path="/shops/:id" element={<ShopDetail />} />
-                <Route path="/offers" element={<Offers />} />
-                <Route path="/offers/:id" element={<OfferDetail />} />
-
-                {/* Protected Routes */}
-                <Route path="/inquiry/new" element={<ProtectedRoute><InquiryForm /></ProtectedRoute>} />
-                <Route path="/inquiry/create" element={<ProtectedRoute><InquiryForm /></ProtectedRoute>} />
-                <Route path="/inquiry/success" element={<ProtectedRoute><InquirySuccess /></ProtectedRoute>} />
-                <Route path="/inquiries" element={<ProtectedRoute><MyInquiries /></ProtectedRoute>} />
-                <Route path="/inquiries/:id" element={<ProtectedRoute><InquiryDetail /></ProtectedRoute>} />
-                <Route path="/favorites" element={<ProtectedRoute><Favorites /></ProtectedRoute>} />
-                <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-                <Route path="/referral-history" element={<ProtectedRoute><ReferralHistory /></ProtectedRoute>} />
-                <Route path="/shop/dashboard" element={<ProtectedRoute><ShopDashboard /></ProtectedRoute>} />
-                <Route path="/support" element={<ProtectedRoute><CustomerSupport /></ProtectedRoute>} />
-                <Route path="/privacy-policy" element={<PrivacyPolicy />} />
-
-                {/* Catch-all */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </LocationProvider>
-          </LocationErrorBoundary>
-        } />
+        {/* Catch-all */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
-      {isAuthenticated && <BottomNav />}
+      <BottomNav />
     </div>
   );
 }

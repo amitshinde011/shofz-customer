@@ -37,8 +37,8 @@ export function ShopReviewsList({ shopId }: ShopReviewsListProps) {
   };
 
   return (
-    <Card className="p-4 sm:p-6">
-      <div className="space-y-3 mb-4">
+    <Card className="p-6">
+      <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-semibold">Reviews</h3>
         <ReviewFilters filters={filters} onFilterChange={handleFilterChange} />
       </div>

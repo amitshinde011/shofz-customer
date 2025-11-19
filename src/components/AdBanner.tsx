@@ -58,7 +58,7 @@ export const AdBanner = ({ placement, className = "" }: AdBannerProps) => {
         />
         
         {ad.title && (
-          <div className="absolute bottom-0 left-0 right-0 p-3 z-20">
+          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3 z-20">
             <h3 className="text-white font-semibold">{ad.title}</h3>
             {ad.description && (
               <p className="text-white/90 text-sm">{ad.description}</p>

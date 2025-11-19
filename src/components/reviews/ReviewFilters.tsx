@@ -15,9 +15,9 @@ interface ReviewFiltersProps {
 
 export function ReviewFilters({ filters, onFilterChange }: ReviewFiltersProps) {
   return (
-    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+    <div className="flex items-center space-x-2 flex-wrap gap-2">
       <Select value={filters.rating} onValueChange={(value) => onFilterChange('rating', value)}>
-        <SelectTrigger className="w-full sm:w-32">
+        <SelectTrigger className="w-32">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -31,7 +31,7 @@ export function ReviewFilters({ filters, onFilterChange }: ReviewFiltersProps) {
       </Select>
 
       <Select value={filters.sort} onValueChange={(value) => onFilterChange('sort', value)}>
-        <SelectTrigger className="w-full sm:w-32">
+        <SelectTrigger className="w-32">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>

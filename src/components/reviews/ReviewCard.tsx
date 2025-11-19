@@ -159,7 +159,7 @@ export function ReviewCard({ review, shopData }: ReviewCardProps) {
 
         {/* Category Ratings */}
         {(review.product_quality_rating || review.service_rating || review.price_rating || review.delivery_rating) && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 p-2 sm:p-3 bg-muted/50 rounded-lg">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 p-3 bg-muted/50 rounded-lg">
             {review.product_quality_rating && (
               <CategoryRatingDisplay label="Quality" rating={review.product_quality_rating} />
             )}
@@ -222,27 +222,27 @@ export function ReviewCard({ review, shopData }: ReviewCardProps) {
         )}
 
         {/* Helpfulness Voting */}
-        <div className="pt-2 space-y-2">
-          <span className="text-sm text-muted-foreground block">Was this review helpful?</span>
-          <div className="flex items-center gap-2">
-            <Button
-              variant={userVote === true ? "default" : "outline"}
-              size="sm"
-              onClick={() => handleHelpfulVote(true)}
-              className="flex-1 sm:flex-initial"
-            >
-              <ThumbsUp className="w-3 h-3 mr-1" />
-              Yes ({helpfulVotes.helpful})
-            </Button>
-            <Button
-              variant={userVote === false ? "default" : "outline"}
-              size="sm"
-              onClick={() => handleHelpfulVote(false)}
-              className="flex-1 sm:flex-initial"
-            >
-              <ThumbsDown className="w-3 h-3 mr-1" />
-              No ({helpfulVotes.notHelpful})
-            </Button>
+        <div className="flex items-center justify-between pt-2">
+          <div className="flex items-center space-x-4">
+            <span className="text-sm text-muted-foreground">Was this review helpful?</span>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant={userVote === true ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleHelpfulVote(true)}
+              >
+                <ThumbsUp className="w-3 h-3 mr-1" />
+                Yes ({helpfulVotes.helpful})
+              </Button>
+              <Button
+                variant={userVote === false ? "default" : "outline"}
+                size="sm"
+                onClick={() => handleHelpfulVote(false)}
+              >
+                <ThumbsDown className="w-3 h-3 mr-1" />
+                No ({helpfulVotes.notHelpful})
+              </Button>
+            </div>
           </div>
         </div>
       </div>

@@ -26,30 +26,9 @@ export const featuredService = {
         };
       }
 
-      // ✅ FIX CRITICAL #2: No location provided - show popular featured shops
-      console.log('getFeaturedShops called without location - showing popular featured shops');
-      const { data, error } = await (supabase as any)
-        .from('shops')
-        .select('*')
-        .eq('is_active', true)
-        .eq('is_verified', true)
-        .eq('is_featured', true)
-        .order('rating', { ascending: false })
-        .limit(limit);
-
-      if (error) {
-        console.error('Error fetching featured shops:', error);
-        return { data: [], error };
-      }
-
-      return {
-        data: (data || []).map((shop: any, index: number) => ({
-          ...shop,
-          featured_priority: (limit - index) * 10,
-          featured_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        })),
-        error: null
-      };
+      // Location is required - this shouldn't happen with LocationPermissionGate
+      console.warn('getFeaturedShops called without location');
+      return { data: [], error: new Error('Location is required') };
     } catch (error) {
       return { data: [], error };
     }
@@ -67,7 +46,7 @@ export const featuredService = {
         if (shopsError) return { data: [], error: shopsError };
 
         const nearbyShopIds = nearbyShops?.map((s: any) => s.id) || [];
-
+        
         if (nearbyShopIds.length === 0) {
           return { data: [], error: null };
         }
@@ -83,40 +62,19 @@ export const featuredService = {
 
         if (error) return { data: [], error };
 
-        return {
+        return { 
           data: (data || []).map((product, index) => ({
             ...product,
             featured_priority: (limit - index) * 10,
             featured_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          })),
-          error: null
+          })), 
+          error: null 
         };
       }
 
-      // ✅ FIX: No location provided - show popular featured products
-      console.log('getFeaturedProducts called without location - showing popular featured products');
-      const { data, error } = await (supabase as any)
-        .from('products')
-        .select('*, shops!inner(id, name, address, logo_url, is_verified)')
-        .eq('is_featured', true)
-        .eq('is_active', true)
-        .eq('shops.is_verified', true)
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-      if (error) {
-        console.error('Error fetching featured products:', error);
-        return { data: [], error };
-      }
-
-      return {
-        data: (data || []).map((product, index) => ({
-          ...product,
-          featured_priority: (limit - index) * 10,
-          featured_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-        })),
-        error: null
-      };
+      // Location is required - this shouldn't happen with LocationPermissionGate
+      console.warn('getFeaturedProducts called without location');
+      return { data: [], error: new Error('Location is required') };
     } catch (error) {
       return { data: [], error };
     }
@@ -134,7 +92,7 @@ export const featuredService = {
         if (shopsError) return { data: [], error: shopsError };
 
         const nearbyShopIds = nearbyShops?.map((s: any) => s.id) || [];
-
+        
         if (nearbyShopIds.length === 0) {
           return { data: [], error: null };
         }
@@ -151,42 +109,20 @@ export const featuredService = {
 
         if (result.error) return { data: [], error: result.error };
 
-        return {
+        return { 
           data: (result.data || []).map((offer: any, index: number) => ({
             ...offer,
             featured_priority: (limit - index) * 10,
             featured_until: offer.valid_until || '',
             products: [],
-          })),
-          error: null
+          })), 
+          error: null 
         };
       }
 
-      // ✅ FIX: No location provided - show popular featured offers
-      console.log('getFeaturedOffers called without location - showing popular featured offers');
-      const result = await (supabase as any)
-        .from('offers')
-        .select('*')
-        .eq('is_featured', true)
-        .eq('is_active', true)
-        .gte('valid_until', new Date().toISOString())
-        .order('created_at', { ascending: false })
-        .limit(limit);
-
-      if (result.error) {
-        console.error('Error fetching featured offers:', result.error);
-        return { data: [], error: result.error };
-      }
-
-      return {
-        data: (result.data || []).map((offer: any, index: number) => ({
-          ...offer,
-          featured_priority: (limit - index) * 10,
-          featured_until: offer.valid_until || '',
-          products: [],
-        })),
-        error: null
-      };
+      // Location is required - this shouldn't happen with LocationPermissionGate
+      console.warn('getFeaturedOffers called without location');
+      return { data: [], error: new Error('Location is required') };
     } catch (error) {
       return { data: [], error };
     }

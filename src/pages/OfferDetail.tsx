@@ -30,8 +30,6 @@ import { useProducts } from "@/hooks/useProducts";
 import { useViewTracking } from "@/hooks/useViewTracking";
 import { useEntityViewCounts } from "@/hooks/useEntityViewCounts";
 import { ResponsiveImage } from "@/components/ResponsiveImage";
-import { trackEvent } from "@/lib/analytics";
-import { useEffect } from "react";
 
 export default function OfferDetail() {
   const { id } = useParams<{ id: string }>();
@@ -72,13 +70,6 @@ export default function OfferDetail() {
 
   const offer = offerResponse;
   const shop = offer?.shops;
-
-  // Track offer view in Google Analytics
-  useEffect(() => {
-    if (offer) {
-      trackEvent('Offer', 'View', offer.title);
-    }
-  }, [offer]);
 
   // Get products from offer or fetch from shop
   const offerProducts = (offer as any)?.products || [];
