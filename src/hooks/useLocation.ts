@@ -1,6 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { Geolocation } from '@capacitor/geolocation';
+import { toast } from 'sonner';
 
 const DEBUG_LOCATION = import.meta.env.DEV;
 
@@ -71,6 +72,19 @@ export function useLocation() {
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const [isRequesting, setIsRequesting] = useState(false);
+  const [lastUpdateToast, setLastUpdateToast] = useState<number>(0);
+
+  // Helper to show location update toast (throttled to once per minute)
+  const showLocationUpdateToast = useCallback(() => {
+    const now = Date.now();
+    if (now - lastUpdateToast > 60000) { // Only show once per minute
+      toast.success('Location updated', {
+        description: 'Your location has been refreshed',
+        duration: 2000,
+      });
+      setLastUpdateToast(now);
+    }
+  }, [lastUpdateToast]);
 
   const getLocationInternal = async (isManualTrigger: boolean = false): Promise<void> => {
     // Prevent simultaneous requests
@@ -92,9 +106,18 @@ export function useLocation() {
 
     // Check retry limit (unless manually triggered)
     if (!isManualTrigger && retryCount >= 3) {
-      const retryError = 'Location request failed multiple times. You can continue without location.';
+      const retryError = 'Location request failed multiple times. Retrying automatically in 2 minutes, or continue without location.';
       setError(retryError);
       setLoading(false);
+      setIsRequesting(false);
+      
+      // Schedule automatic retry after 2 minutes
+      setTimeout(() => {
+        if (DEBUG_LOCATION) console.log('[useLocation] Auto-retry after failure cooldown');
+        setRetryCount(0);
+        requestLocation(false);
+      }, 2 * 60 * 1000);
+      
       throw new Error(retryError);
     }
 
@@ -421,6 +444,7 @@ export function useLocation() {
                   setLocation(newLocation);
                   lastKnownLocation = newLocation; // Update captured variable
                   safeLocalStorage.setItem(STORAGE_KEYS.LOCATION, JSON.stringify(newLocation));
+                  showLocationUpdateToast();
                 }
               }
             }
@@ -450,6 +474,7 @@ export function useLocation() {
                 setLocation(newLocation);
                 lastKnownLocation = newLocation; // Update captured variable
                 safeLocalStorage.setItem(STORAGE_KEYS.LOCATION, JSON.stringify(newLocation));
+                showLocationUpdateToast();
               }
             },
             (error) => {
@@ -482,7 +507,7 @@ export function useLocation() {
         }
       }
     };
-  }, []); // Remove location dependency to prevent infinite loop
+  }, [showLocationUpdateToast]); // Add showLocationUpdateToast dependency
 
   return {
     location,
