@@ -3,7 +3,7 @@ import { MapPin, Phone, Star, Store, Navigation } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { useLocation } from '@/hooks/useLocation';
+import { useUserLocation } from '@/contexts/LocationContext';
 
 interface SellerCardProps {
   shop: {
@@ -19,7 +19,7 @@ interface SellerCardProps {
 
 export const SellerCard = ({ shop, productId }: SellerCardProps) => {
   const navigate = useNavigate();
-  const { location: userLocation } = useLocation();
+  const { location: userLocation } = useUserLocation();
 
   const handleViewShop = () => {
     navigate(`/shops/${shop.id}`, { state: { from: `/products/${productId}` } });

@@ -27,8 +27,10 @@ import { Geolocation } from '@capacitor/geolocation';
 import { toast } from 'sonner';
 import { calculateDistance } from '@/lib/distanceCalculation';
 import { trackEvent } from '@/lib/analytics';
+import { LOCATION_CONFIG } from '@/config/locationConfig';
 
-const DEBUG_LOCATION = import.meta.env.DEV;
+const DEBUG_LOCATION = LOCATION_CONFIG.DEBUG_LOGGING;
+const ANALYTICS_ENABLED = LOCATION_CONFIG.ANALYTICS_ENABLED;
 
 /**
  * Safe localStorage wrapper that handles unavailability (private browsing, etc.)
@@ -251,7 +253,12 @@ export function useLocation() {
           lat: position.coords.latitude,
           lng: position.coords.longitude,
           timestamp: Date.now(),
+          accuracy: position.coords.accuracy,
         };
+        
+        if (ANALYTICS_ENABLED) {
+          trackEvent('Location', 'Updated Successfully', 'native', Math.round(position.coords.accuracy));
+        }
 
         setLocation(newLocation);
         setError(null);
@@ -298,7 +305,12 @@ export function useLocation() {
                 lat: pos.coords.latitude,
                 lng: pos.coords.longitude,
                 timestamp: Date.now(),
+                accuracy: pos.coords.accuracy,
               };
+              
+              if (ANALYTICS_ENABLED) {
+                trackEvent('Location', 'Updated Successfully', 'web', Math.round(pos.coords.accuracy));
+              }
 
               setLocation(newLocation);
               setError(null);
@@ -544,11 +556,12 @@ export function useLocation() {
               }
 
               if (position) {
-                const newLocation: UserLocation = {
-                  lat: position.coords.latitude,
-                  lng: position.coords.longitude,
-                  timestamp: Date.now(),
-                };
+          const newLocation: UserLocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            timestamp: Date.now(),
+            accuracy: position.coords.accuracy,
+          };
 
                 // Only update if location changed significantly (>50 meters)
                 const distance = calculateDistance(
@@ -572,11 +585,12 @@ export function useLocation() {
           
           watchId = navigator.geolocation.watchPosition(
             (position) => {
-              const newLocation: UserLocation = {
-                lat: position.coords.latitude,
-                lng: position.coords.longitude,
-                timestamp: Date.now(),
-              };
+          const newLocation: UserLocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            timestamp: Date.now(),
+            accuracy: position.coords.accuracy,
+          };
 
               // Only update if location changed significantly (>50 meters)
               const distance = calculateDistance(
