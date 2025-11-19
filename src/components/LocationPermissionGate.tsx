@@ -120,15 +120,15 @@ export function LocationPermissionGate({ children }: LocationPermissionGateProps
 
         {/* Action buttons */}
         <div className="space-y-3">
-          <Button 
-            onClick={requestLocation}
-            size="lg"
-            className="w-full text-base font-semibold h-12 shadow-lg hover:shadow-xl transition-shadow"
-            disabled={loading}
-          >
-            <MapPin className="w-5 h-5 mr-2" />
-            {loading ? 'Getting Location...' : 'Enable Location Access'}
-          </Button>
+        <Button 
+          onClick={() => requestLocation(true)}
+          size="lg"
+          className="w-full text-base font-semibold h-12 shadow-lg hover:shadow-xl transition-shadow"
+          disabled={loading}
+        >
+          <MapPin className="w-5 h-5 mr-2" />
+          {loading ? 'Getting Location...' : 'Enable Location Access'}
+        </Button>
 
           {error && isNative && (
             <Button 
