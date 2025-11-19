@@ -33,7 +33,7 @@ export const AdBannerCarousel = ({ placement = 'home-top' }: AdBannerCarouselPro
   if (!ads || ads.length === 0) return null;
 
   return (
-    <div className="w-full max-w-screen-xl mx-auto px-4 py-4">
+    <div className="w-full max-w-screen-xl mx-auto px-1 py-1">
       <Carousel
         opts={{
           align: "start",

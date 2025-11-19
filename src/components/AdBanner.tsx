@@ -34,7 +34,7 @@ export const AdBanner = ({ placement, className = "" }: AdBannerProps) => {
   if (!ad) return null;
 
   return (
-    <div className={`w-full max-w-screen-xl mx-auto px-4 ${className}`}>
+    <div className={`w-full max-w-screen-xl mx-auto px-1 ${className}`}>
       <div
         className={`relative aspect-[16/4] sm:aspect-[21/4] rounded-lg overflow-hidden ${
           ad.link_url ? 'cursor-pointer hover:opacity-95 transition-opacity' : ''
