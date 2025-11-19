@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,13 +26,13 @@ import {
   Eye,
   Share2
 } from "lucide-react";
-import { useState, useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProductCard from "@/components/ProductCard";
 import { useToast } from "@/hooks/use-toast";
 import { useViewTracking } from "@/hooks/useViewTracking";
 import { useEntityViewCounts } from "@/hooks/useEntityViewCounts";
 import { useShop, useToggleShopFavorite, useUserFavoriteShops } from "@/hooks/useShops";
+import { useAnalytics } from "@/hooks/useAnalytics";
 import { ShopReviewsList } from "@/components/reviews/ShopReviewsList";
 import { ShopReviewButton } from "@/components/reviews/ShopReviewButton";
 import { DeliveryDetailsCard } from "@/components/shop/DeliveryDetailsCard";
@@ -62,6 +63,7 @@ export default function ShopDetail() {
   const [showAllCategories, setShowAllCategories] = useState(false);
   const { location } = useUserLocation();
   const { user } = useAuth();
+  const { trackShopView } = useAnalytics();
 
   // Track shop view (automatically updates shop_stats via database trigger)
   useViewTracking('shop', id);
@@ -72,6 +74,13 @@ export default function ShopDetail() {
   // Fetch shop data
   const { data: shopData, isLoading, error } = useShop(id!);
   const shop = shopData?.data;
+
+  // Track shop view in analytics (Google Analytics + Database)
+  useEffect(() => {
+    if (shop) {
+      trackShopView(shop.id, shop.name, 'shop_detail');
+    }
+  }, [shop]);
 
   // Fetch shop products
   const { data: productsData } = useProducts({
@@ -363,11 +372,17 @@ export default function ShopDetail() {
 
                   {/* Rating & Stats */}
                   <div className="flex flex-wrap items-center gap-4 mb-3">
-                    <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 fill-warning text-warning" />
-                      <span className="font-bold text-foreground">{shop.rating || 0}</span>
-                      <span className="text-sm text-muted-foreground">({shop.total_reviews || 0})</span>
-                    </div>
+                    {(shop.rating && shop.rating > 0) && (
+                      <div className="flex items-center gap-1">
+                        <Star className="w-4 h-4 fill-warning text-warning" />
+                        <span className="font-bold text-foreground">{shop.rating.toFixed(1)}</span>
+                        {(shop.total_reviews && shop.total_reviews > 0) && (
+                          <span className="text-sm text-muted-foreground">
+                            ({shop.total_reviews} {shop.total_reviews === 1 ? 'review' : 'reviews'})
+                          </span>
+                        )}
+                      </div>
+                    )}
                     {viewCounts && viewCounts.view_count > 0 && (
                       <div className="flex items-center gap-1">
                         <Eye className="w-4 h-4 text-muted-foreground" />
@@ -553,8 +568,8 @@ export default function ShopDetail() {
 
             {/* Shop Reviews */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold">Customer Reviews</h2>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
+                <h2 className="text-xl sm:text-2xl font-bold">Customer Reviews</h2>
                 <ShopReviewButton shop={shop} />
               </div>
               <ShopReviewsList shopId={shop.id} />

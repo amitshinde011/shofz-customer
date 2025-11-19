@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Heart, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,11 +8,11 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
-interface StickyActionBarProps {
+interface InlineActionButtonsProps {
   product: Product;
 }
 
-export const StickyActionBar = ({ product }: StickyActionBarProps) => {
+export const InlineActionButtons = ({ product }: InlineActionButtonsProps) => {
   const navigate = useNavigate();
   const { user, isAuthenticated } = useAuth();
   const toggleFavorite = useToggleProductFavorite();
@@ -78,29 +77,27 @@ export const StickyActionBar = ({ product }: StickyActionBarProps) => {
     : 'Inquire';
 
   return (
-    <div className="fixed bottom-16 left-0 right-0 bg-background/95 backdrop-blur-sm border-t border-border p-3 sm:p-4 z-20 shadow-lg">
-      <div className="flex gap-2 sm:gap-3 max-w-screen-lg mx-auto px-2 sm:px-0">
-        <Button
-          variant="outline"
-          size="lg"
-          onClick={handleFavorite}
-          className="shrink-0 h-11 w-11 sm:h-12 sm:w-12 p-0"
-          disabled={toggleFavorite.isPending}
-        >
-          <Heart
-            className={`h-4 w-4 sm:h-5 sm:w-5 ${isFavorited ? 'fill-red-500 text-red-500' : ''}`}
-          />
-        </Button>
-        <Button
-          size="lg"
-          onClick={handleInquire}
-          className="flex-1 h-11 sm:h-12 text-sm sm:text-base"
-          disabled={!product.is_active}
-        >
-          <MessageSquare className="mr-1.5 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />
-          {ctaText}
-        </Button>
-      </div>
+    <div className="flex gap-2 sm:gap-3">
+      <Button
+        variant="outline"
+        size="lg"
+        onClick={handleFavorite}
+        className="shrink-0 h-11 w-11 sm:h-12 sm:w-12 p-0"
+        disabled={toggleFavorite.isPending}
+      >
+        <Heart
+          className={`h-4 w-4 sm:h-5 sm:w-5 ${isFavorited ? 'fill-red-500 text-red-500' : ''}`}
+        />
+      </Button>
+      <Button
+        size="lg"
+        onClick={handleInquire}
+        className="flex-1 h-11 sm:h-12 text-sm sm:text-base"
+        disabled={!product.is_active}
+      >
+        <MessageSquare className="mr-1.5 sm:mr-2 h-4 w-4 sm:h-5 sm:w-5" />
+        {ctaText}
+      </Button>
     </div>
   );
 };
