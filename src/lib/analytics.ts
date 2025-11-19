@@ -17,7 +17,7 @@ const GA_MEASUREMENT_ID = 'G-NLEXH6PLL4'; // TODO: Replace with your GA4 ID
 let isInitialized = false;
 
 export function initializeAnalytics() {
-  if (!isInitialized && GA_MEASUREMENT_ID !== 'G-XXXXXXXXXX') {
+  if (!isInitialized && GA_MEASUREMENT_ID && GA_MEASUREMENT_ID.startsWith('G-')) {
     ReactGA.initialize(GA_MEASUREMENT_ID);
     isInitialized = true;
     console.log('✅ Google Analytics initialized successfully');
