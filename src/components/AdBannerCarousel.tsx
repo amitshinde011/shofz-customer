@@ -51,7 +51,7 @@ export const AdBannerCarousel = ({ placement = 'home-top' }: AdBannerCarouselPro
           {ads.map((ad) => (
             <CarouselItem key={ad.id}>
               <div
-                className={`relative aspect-[16/6] sm:aspect-[21/6] rounded-lg overflow-hidden ${
+                className={`relative aspect-[16/4] sm:aspect-[21/4] rounded-lg overflow-hidden ${
                   ad.link_url ? 'cursor-pointer hover:opacity-95 transition-opacity' : ''
                 }`}
                 onClick={() => handleAdClick(ad)}
@@ -86,8 +86,12 @@ export const AdBannerCarousel = ({ placement = 'home-top' }: AdBannerCarouselPro
         </CarouselContent>
         {ads.length > 1 && (
           <>
-            <CarouselPrevious className="left-2" />
-            <CarouselNext className="right-2" />
+            <CarouselPrevious 
+              className="left-2 bg-transparent border-none hover:bg-white/10 text-white shadow-lg" 
+            />
+            <CarouselNext 
+              className="right-2 bg-transparent border-none hover:bg-white/10 text-white shadow-lg"
+            />
           </>
         )}
       </Carousel>
