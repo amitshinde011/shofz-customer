@@ -304,11 +304,15 @@ export default function ShopMap({ shops, userLocation }: ShopMapProps) {
               ${shop.is_verified ? '<span style="color: #10b981; font-size: 14px;">✓ Verified</span>' : ''}
             </div>
             
-            <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 6px;">
-              <span style="color: #f59e0b; font-size: 14px;">★</span>
-              <span style="font-size: 14px; color: #374151;">${shop.rating || 0}</span>
-              <span style="font-size: 12px; color: #6b7280;">(${shop.total_reviews || 0} reviews)</span>
-            </div>
+            ${shop.rating && shop.rating > 0 ? `
+              <div style="display: flex; align-items: center; gap: 4px; margin-bottom: 6px;">
+                <span style="color: #f59e0b; font-size: 14px;">★</span>
+                <span style="font-size: 14px; color: #374151;">${shop.rating.toFixed(1)}</span>
+                ${shop.total_reviews && shop.total_reviews > 0 ? `
+                  <span style="font-size: 12px; color: #6b7280;">(${shop.total_reviews} ${shop.total_reviews === 1 ? 'review' : 'reviews'})</span>
+                ` : ''}
+              </div>
+            ` : ''}
             
             <div style="font-size: 12px; color: #6b7280; margin-bottom: 6px;">
               📍 ${categoryText}

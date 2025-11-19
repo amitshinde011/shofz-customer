@@ -372,11 +372,17 @@ export default function ShopDetail() {
 
                   {/* Rating & Stats */}
                   <div className="flex flex-wrap items-center gap-4 mb-3">
-                    <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 fill-warning text-warning" />
-                      <span className="font-bold text-foreground">{shop.rating || 0}</span>
-                      <span className="text-sm text-muted-foreground">({shop.total_reviews || 0})</span>
-                    </div>
+                    {(shop.rating && shop.rating > 0) && (
+                      <div className="flex items-center gap-1">
+                        <Star className="w-4 h-4 fill-warning text-warning" />
+                        <span className="font-bold text-foreground">{shop.rating.toFixed(1)}</span>
+                        {(shop.total_reviews && shop.total_reviews > 0) && (
+                          <span className="text-sm text-muted-foreground">
+                            ({shop.total_reviews} {shop.total_reviews === 1 ? 'review' : 'reviews'})
+                          </span>
+                        )}
+                      </div>
+                    )}
                     {viewCounts && viewCounts.view_count > 0 && (
                       <div className="flex items-center gap-1">
                         <Eye className="w-4 h-4 text-muted-foreground" />
