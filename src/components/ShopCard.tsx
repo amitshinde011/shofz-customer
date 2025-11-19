@@ -131,11 +131,15 @@ export default function ShopCard({ shop, variant = "grid", onToggleFavorite, isF
                       </div>
 
                       <div className="flex items-center gap-3 mb-1">
-                        <div className="flex items-center space-x-1">
-                          <Star className="w-3 h-3 fill-warning text-warning" />
-                          <span className="text-xs font-medium text-foreground">{shop.rating}</span>
-                          <span className="text-xs text-muted-foreground">({shop.reviewCount})</span>
-                        </div>
+                        {(shop.rating && shop.rating > 0) && (
+                          <div className="flex items-center space-x-1">
+                            <Star className="w-3 h-3 fill-warning text-warning" />
+                            <span className="text-xs font-medium text-foreground">{shop.rating.toFixed(1)}</span>
+                            {(shop.reviewCount && shop.reviewCount > 0) && (
+                              <span className="text-xs text-muted-foreground">({shop.reviewCount})</span>
+                            )}
+                          </div>
+                        )}
                         {viewCounts && viewCounts.view_count > 0 && (
                           <div className="flex items-center space-x-1">
                             <Eye className="w-3 h-3 text-muted-foreground" />
@@ -272,10 +276,12 @@ export default function ShopCard({ shop, variant = "grid", onToggleFavorite, isF
                 <h4 className={`line-clamp-1 leading-tight flex-1 text-foreground ${isCompact ? 'text-xs sm:text-sm font-semibold' : 'text-card-title'}`}>
                   {shop.name}
                 </h4>
-                <div className={`flex items-center gap-1 bg-warning/10 rounded-full flex-shrink-0 ${isCompact ? 'px-1.5 py-0.5' : 'px-2 py-1'}`}>
-                  <Star className={`fill-warning text-warning ${isCompact ? 'w-3 h-3' : 'w-3 h-3 sm:w-3.5 sm:h-3.5'}`} />
-                  <span className={`font-bold text-foreground ${isCompact ? 'text-[10px] sm:text-xs' : 'text-xs sm:text-sm'}`}>{shop.rating}</span>
-                </div>
+                {(shop.rating && shop.rating > 0) && (
+                  <div className={`flex items-center gap-1 bg-warning/10 rounded-full flex-shrink-0 ${isCompact ? 'px-1.5 py-0.5' : 'px-2 py-1'}`}>
+                    <Star className={`fill-warning text-warning ${isCompact ? 'w-3 h-3' : 'w-3 h-3 sm:w-3.5 sm:h-3.5'}`} />
+                    <span className={`font-bold text-foreground ${isCompact ? 'text-[10px] sm:text-xs' : 'text-xs sm:text-sm'}`}>{shop.rating.toFixed(1)}</span>
+                  </div>
+                )}
               </div>
 
               {/* Category Tags - Hide in compact mode */}
