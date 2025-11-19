@@ -73,7 +73,7 @@ export const AdBannerCarousel = ({ placement = 'home-top' }: AdBannerCarouselPro
                 />
                 
                 {ad.title && (
-                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 z-20">
+                  <div className="absolute bottom-0 left-0 right-0 p-4 z-20">
                     <h3 className="text-white font-semibold text-lg">{ad.title}</h3>
                     {ad.description && (
                       <p className="text-white/90 text-sm mt-1">{ad.description}</p>

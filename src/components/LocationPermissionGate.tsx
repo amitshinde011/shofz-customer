@@ -10,7 +10,6 @@ interface LocationPermissionGateProps {
 export function LocationPermissionGate({ children }: LocationPermissionGateProps) {
   const { location, loading, error, requestLocation, openSettings, isNative } = useUserLocation();
   const [skipLocation, setSkipLocation] = React.useState(false);
-  const [failedAttempts, setFailedAttempts] = React.useState(0);
 
   // Check if user previously chose to skip
   React.useEffect(() => {
@@ -20,34 +19,12 @@ export function LocationPermissionGate({ children }: LocationPermissionGateProps
     }
   }, []);
 
-  // Track failed attempts
-  React.useEffect(() => {
-    if (error) {
-      setFailedAttempts(prev => prev + 1);
-    }
-  }, [error]);
+  // ✅ FIX #5: Removed auto-bypass timeout - users should explicitly choose to skip
+  // ✅ FIX #7: Don't track failed attempts from passive errors (watch, background)
+  // Only count when user actively clicks "Enable Location Access" button
 
-  // Auto-bypass gate if loading too long
-  React.useEffect(() => {
-    if (!loading) return;
-    
-    const timer = setTimeout(() => {
-      console.warn('[LocationGate] Loading timeout, bypassing gate');
-      setSkipLocation(true);
-    }, 20000);
-    
-    return () => clearTimeout(timer);
-  }, [loading]);
-
-  // Allow bypass if:
-  // 1. User explicitly skipped
-  // 2. Too many failed attempts
-  // 3. Error message indicates user can continue
-  // 4. Permission was previously granted (cached location)
-  const permissionGranted = localStorage.getItem('location_permission_granted') === 'true';
-  const canContinue = error?.includes('continue without location');
-  
-  if (location || skipLocation || failedAttempts >= 3 || canContinue || (permissionGranted && !error)) {
+  // ✅ FIX: Simplified bypass logic - only location obtained or user explicitly skipped
+  if (location || skipLocation) {
     return <>{children}</>;
   }
 

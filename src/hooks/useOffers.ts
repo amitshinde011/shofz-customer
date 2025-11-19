@@ -174,7 +174,8 @@ export const useOffers = (options?: {
 
 export const useActiveOffers = (limit?: number, location?: { lat: number; lng: number; radius?: number }) => {
   return useQuery({
-    queryKey: ['offers', 'active', limit, location],
+    // ✅ FIX HIGH #8: Stable query key using lat/lng values instead of object reference
+    queryKey: ['offers', 'active', limit, location?.lat, location?.lng, location?.radius],
     queryFn: async () => {
       if (location) {
         const { data: nearbyShops, error: shopsError } = await (supabase as any).rpc('get_nearby_shops', {
@@ -186,7 +187,7 @@ export const useActiveOffers = (limit?: number, location?: { lat: number; lng: n
         if (shopsError) throw shopsError;
 
         const nearbyShopIds = nearbyShops?.map((s: any) => s.id) || [];
-        
+
         if (nearbyShopIds.length === 0) {
           return { data: [], error: null };
         }
@@ -230,10 +231,47 @@ export const useActiveOffers = (limit?: number, location?: { lat: number; lng: n
         return { data: offersWithProducts, error: null };
       }
 
-      return { data: [], error: null };
+      // ✅ FIX: No location provided - show popular offers
+      console.log('useActiveOffers called without location - showing popular offers');
+      const { data: offers, error } = await (supabase as any)
+        .from('offers')
+        .select(`
+          *,
+          shops (
+            id,
+            name,
+            address,
+            logo_url,
+            location
+          )
+        `)
+        .eq('is_active', true)
+        .gte('valid_until', new Date().toISOString())
+        .order('is_featured', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(limit || 10);
+
+      if (error) throw error;
+
+      // Fetch product details for offers with applicable_products
+      const offersWithProducts = await Promise.all(
+        (offers || []).map(async (offer: any) => {
+          if (offer.applicable_products && offer.applicable_products.length > 0) {
+            const { data: products } = await (supabase as any)
+              .from('products')
+              .select('id, name, price, images')
+              .in('id', offer.applicable_products);
+
+            return { ...offer, products: products || [] };
+          }
+          return { ...offer, products: [] };
+        })
+      );
+
+      return { data: offersWithProducts, error: null };
     },
     staleTime: 10 * 60 * 1000, // 10 minutes
-    enabled: !!location,
+    // ✅ FIX: Allow fetching without location
   });
 };
 

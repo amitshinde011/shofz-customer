@@ -1,6 +1,4 @@
-import { useState, useEffect } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from './use-toast';
+import { useState, useEffect, useRef } from 'react';
 import { Capacitor } from '@capacitor/core';
 import { App } from '@capacitor/app';
 import { Geolocation } from '@capacitor/geolocation';
@@ -11,27 +9,51 @@ export interface UserLocation {
   timestamp: number;
 }
 
+// Safe localStorage wrapper
+const safeLocalStorage = {
+  setItem: (key: string, value: string) => {
+    try {
+      localStorage.setItem(key, value);
+    } catch (e) {
+      console.warn('[useLocation] localStorage.setItem failed:', e);
+    }
+  },
+  getItem: (key: string): string | null => {
+    try {
+      return localStorage.getItem(key);
+    } catch (e) {
+      console.warn('[useLocation] localStorage.getItem failed:', e);
+      return null;
+    }
+  },
+  removeItem: (key: string) => {
+    try {
+      localStorage.removeItem(key);
+    } catch (e) {
+      console.warn('[useLocation] localStorage.removeItem failed:', e);
+    }
+  }
+};
+
 // Helper to open device settings
 const openDeviceSettings = async () => {
   const isNative = Capacitor.isNativePlatform();
 
   if (isNative) {
     try {
-      // Use the App plugin to open settings
-      await (App as any).openUrl({ url: 'app-settings:' });
+      const platform = Capacitor.getPlatform();
+
+      if (platform === 'ios') {
+        // iOS: Open Settings app to this app's page
+        await (App as any).openUrl({ url: 'app-settings:root=Privacy&path=LOCATION' });
+      } else if (platform === 'android') {
+        // Android: Open app settings
+        await (App as any).openUrl({ url: 'app-settings:' });
+      }
       return true;
     } catch (error) {
-      console.error('Failed to open device settings:', error);
-      // Fallback to legacy methods
-      try {
-        const platform = Capacitor.getPlatform();
-        if (platform === 'ios') {
-          window.location.href = 'app-settings:';
-        }
-        return true;
-      } catch (e) {
-        return false;
-      }
+      console.error('[useLocation] Failed to open device settings:', error);
+      return false;
     }
   } else {
     // On web, cannot open system settings
@@ -43,147 +65,185 @@ export function useLocation() {
   const [location, setLocation] = useState<UserLocation | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
-  const { user, updateProfile } = useAuth();
-  const { toast } = useToast();
+  const [attemptCount, setAttemptCount] = useState(0);
 
-  const MAX_RETRIES = 3;
+  const watchIdRef = useRef<string | number | undefined>();
+  const isMountedRef = useRef(true);
+  const isRequestingRef = useRef(false);
+  const lastRequestTimeRef = useRef(0); // ✅ FIX CRITICAL #4: Track last request time
+
+  const MAX_ATTEMPTS = 3;
   const LOCATION_TIMEOUT = 15000;
+  const CACHE_DURATION = 5 * 60 * 1000; // ✅ FIX #4: Reduced from 30 to 5 minutes to prevent stale location
 
-  console.log('[useLocation] Hook state - location:', !!location, 'loading:', loading, 'error:', error, 'retries:', retryCount);
+  // Browser geolocation wrapped in Promise (FIX #2)
+  const getBrowserLocation = (): Promise<UserLocation> => {
+    return new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(new Error('UNSUPPORTED'));
+        return;
+      }
 
-  const getLocationInternal = async () => {
-    const isNative = Capacitor.isNativePlatform();
-
-    try {
-      console.log('[useLocation] Requesting position...');
-      let position;
-
-      if (isNative) {
-        // Use Capacitor Geolocation on native platforms
-        console.log('[useLocation] Using Capacitor Geolocation');
-
-        // Check permissions first
-        const permissions = await Geolocation.checkPermissions();
-        console.log('[useLocation] Current permissions:', permissions.location);
-
-        if (permissions.location === 'denied') {
-          throw new Error('PERMISSION_DENIED');
-        }
-
-        if (permissions.location !== 'granted') {
-          const requestResult = await Geolocation.requestPermissions();
-          console.log('[useLocation] Permission request result:', requestResult.location);
-
-          if (requestResult.location === 'denied') {
-            throw new Error('PERMISSION_DENIED');
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const newLocation: UserLocation = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+            timestamp: Date.now(),
+          };
+          resolve(newLocation);
+        },
+        (error) => {
+          switch (error.code) {
+            case error.PERMISSION_DENIED:
+              reject(new Error('PERMISSION_DENIED'));
+              break;
+            case error.POSITION_UNAVAILABLE:
+              reject(new Error('POSITION_UNAVAILABLE'));
+              break;
+            case error.TIMEOUT:
+              reject(new Error('LOCATION_TIMEOUT'));
+              break;
+            default:
+              reject(new Error('UNKNOWN_ERROR'));
           }
-        }
-
-        position = await Geolocation.getCurrentPosition({
-          enableHighAccuracy: true,
+        },
+        {
+          enableHighAccuracy: false, // FIX #12: Reduce battery drain
           timeout: 10000,
           maximumAge: 300000,
-        });
-
-        const newLocation: UserLocation = {
-          lat: position.coords.latitude,
-          lng: position.coords.longitude,
-          timestamp: Date.now(),
-        };
-
-        console.log('[useLocation] Position received:', newLocation);
-        setLocation(newLocation);
-        setError(null);
-        setRetryCount(0);
-
-        localStorage.setItem('userLocation', JSON.stringify(newLocation));
-        localStorage.setItem('location_permission_granted', 'true');
-      } else {
-        // Use browser Geolocation API on web
-        console.log('[useLocation] Using browser Geolocation API');
-        if (!navigator.geolocation) {
-          throw new Error('UNSUPPORTED');
         }
+      );
+    });
+  };
 
-        navigator.geolocation.getCurrentPosition(
-          async (pos) => {
-            const newLocation: UserLocation = {
-              lat: pos.coords.latitude,
-              lng: pos.coords.longitude,
-              timestamp: Date.now(),
-            };
+  // Capacitor geolocation
+  const getCapacitorLocation = async (): Promise<UserLocation> => {
+    // Check permissions first
+    const permissions = await Geolocation.checkPermissions();
+    console.log('[useLocation] Current permissions:', permissions.location);
 
-            setLocation(newLocation);
-            setError(null);
-            setRetryCount(0);
+    // FIX #4: Handle all permission states properly
+    if (permissions.location === 'denied') {
+      throw new Error('PERMISSION_DENIED');
+    }
 
-            localStorage.setItem('userLocation', JSON.stringify(newLocation));
-            localStorage.setItem('location_permission_granted', 'true');
-          },
-          (error) => {
-            let errorMsg = 'Failed to get your location';
-            switch (error.code) {
-              case error.PERMISSION_DENIED:
-                errorMsg = 'Location permission denied. Please enable location access in your browser settings.';
-                break;
-              case error.POSITION_UNAVAILABLE:
-                errorMsg = 'Location information unavailable. Please check your device settings.';
-                break;
-              case error.TIMEOUT:
-                errorMsg = 'Location request timed out. Please try again.';
-                break;
-            }
-            setError(errorMsg);
-            setLoading(false);
-            // Toast removed - LocationPermissionGate will show the error
-          },
-          {
-            enableHighAccuracy: true,
-            timeout: 10000,
-            maximumAge: 300000,
-          }
-        );
+    // Request permission if not granted
+    if (permissions.location !== 'granted') {
+      const requestResult = await Geolocation.requestPermissions();
+      console.log('[useLocation] Permission request result:', requestResult.location);
+
+      // FIX #4: Check result of permission request
+      if (requestResult.location === 'denied') {
+        throw new Error('PERMISSION_DENIED');
       }
-    } catch (error: any) {
-      console.error('[useLocation] Error getting location:', error);
-      throw error;
+
+      if (requestResult.location !== 'granted') {
+        throw new Error('PERMISSION_NOT_GRANTED');
+      }
+    }
+
+    // Get position
+    const position = await Geolocation.getCurrentPosition({
+      enableHighAccuracy: false, // FIX #12: Reduce battery drain
+      timeout: 10000,
+      maximumAge: 300000,
+    });
+
+    return {
+      lat: position.coords.latitude,
+      lng: position.coords.longitude,
+      timestamp: Date.now(),
+    };
+  };
+
+  // Main location request function
+  const getLocationInternal = async (): Promise<UserLocation> => {
+    const isNative = Capacitor.isNativePlatform();
+
+    if (isNative) {
+      console.log('[useLocation] Using Capacitor Geolocation');
+      return await getCapacitorLocation();
+    } else {
+      console.log('[useLocation] Using browser Geolocation API');
+      return await getBrowserLocation();
     }
   };
 
+  // Public request location function
   const requestLocation = async () => {
-    console.log('[useLocation] requestLocation called, retry:', retryCount);
-    
-    // Check retry limit
-    if (retryCount >= MAX_RETRIES) {
+    console.log('[useLocation] requestLocation called, attempt:', attemptCount);
+
+    // ✅ FIX CRITICAL #4: Debounce - prevent requests within 2 seconds
+    const now = Date.now();
+    const timeSinceLastRequest = now - lastRequestTimeRef.current;
+    if (timeSinceLastRequest < 2000) {
+      console.log('[useLocation] Request debounced, too soon since last request (', timeSinceLastRequest, 'ms)');
+      return;
+    }
+
+    // Prevent concurrent requests
+    if (isRequestingRef.current) {
+      console.log('[useLocation] Request already in progress, skipping');
+      return;
+    }
+
+    lastRequestTimeRef.current = now;
+
+    // FIX #3: Don't count permission denials as attempts
+    // Only check attempt limit for non-permission errors
+    if (attemptCount >= MAX_ATTEMPTS && error && !error.includes('permission')) {
+      console.log('[useLocation] Max attempts reached for non-permission errors');
       setError('Unable to get location after multiple attempts. You can continue without location.');
       setLoading(false);
       return;
     }
 
+    isRequestingRef.current = true;
     setLoading(true);
     setError(null);
 
     // Add timeout wrapper
-    const timeoutPromise = new Promise((_, reject) => {
+    const timeoutPromise = new Promise<never>((_, reject) => {
       setTimeout(() => reject(new Error('LOCATION_TIMEOUT')), LOCATION_TIMEOUT);
     });
 
     try {
-      await Promise.race([
+      const newLocation = await Promise.race([
         getLocationInternal(),
         timeoutPromise
       ]);
-      setLoading(false);
+
+      if (isMountedRef.current) {
+        setLocation(newLocation);
+        setError(null);
+        setAttemptCount(0); // Reset on success
+
+        // FIX #7: Safe localStorage
+        safeLocalStorage.setItem('userLocation', JSON.stringify(newLocation));
+        safeLocalStorage.setItem('location_permission_granted', 'true');
+      }
     } catch (error: any) {
       console.error('[useLocation] Error getting location:', error);
-      setLoading(false);
-      setRetryCount(prev => prev + 1);
 
+      if (!isMountedRef.current) return;
+
+      const isNative = Capacitor.isNativePlatform();
+
+      // FIX #3: Only increment attempts for non-permission errors
+      const isPermissionError = error.message === 'PERMISSION_DENIED' || error.message === 'PERMISSION_NOT_GRANTED';
+
+      if (!isPermissionError) {
+        setAttemptCount(prev => prev + 1);
+      } else {
+        // FIX #10: Clear permission flag on denial
+        safeLocalStorage.removeItem('location_permission_granted');
+      }
+
+      // Set appropriate error messages
       if (error.message === 'LOCATION_TIMEOUT') {
         setError('Location request timed out. You can continue without location.');
-      } else if (error.message === 'PERMISSION_DENIED') {
-        const isNative = Capacitor.isNativePlatform();
+      } else if (error.message === 'PERMISSION_DENIED' || error.message === 'PERMISSION_NOT_GRANTED') {
         setError(
           isNative
             ? 'Location permission denied. Please enable location access in your device settings.'
@@ -196,50 +256,64 @@ export function useLocation() {
       } else {
         setError('Failed to get your location. You can continue without location.');
       }
+    } finally {
+      if (isMountedRef.current) {
+        setLoading(false);
+        isRequestingRef.current = false;
+      }
     }
   };
 
-  // Try to get location on mount
+  // Load cached location on mount
   useEffect(() => {
+    isMountedRef.current = true;
     console.log('[useLocation] Initial mount effect running');
-    // First check localStorage for cached location
-    const cachedLocation = localStorage.getItem('userLocation');
+
+    // Check localStorage for cached location
+    const cachedLocation = safeLocalStorage.getItem('userLocation');
     if (cachedLocation) {
       try {
         const parsed = JSON.parse(cachedLocation);
         const age = Date.now() - parsed.timestamp;
         console.log('[useLocation] Found cached location, age:', age, 'ms');
-        // Use cached location if less than 30 minutes old
-        if (age < 30 * 60 * 1000) {
-          console.log('[useLocation] Using cached location');
+
+        // ✅ FIX #4: Use cache if recent, but ALWAYS request fresh location
+        if (age < CACHE_DURATION) {
+          console.log('[useLocation] Using cached location (age:', Math.round(age / 1000), 'seconds)');
           setLocation(parsed);
-          setLoading(false);
-          return;
         } else {
-          console.log('[useLocation] Cached location too old, requesting fresh');
+          console.log('[useLocation] Cache expired (age:', Math.round(age / 1000), 'seconds), will request fresh');
         }
       } catch (e) {
         console.error('[useLocation] Error parsing cached location:', e);
+        safeLocalStorage.removeItem('userLocation');
       }
-    } else {
-      console.log('[useLocation] No cached location found');
     }
 
-    // Request fresh location in background (non-blocking)
+    // Always request fresh location in background (non-blocking)
     requestLocation();
+
+    return () => {
+      isMountedRef.current = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Watch for location changes - only update if significantly different
+  // Watch for location changes - FIX #1: Use refs to avoid stale closures
   useEffect(() => {
+    // FIX #8: Only start watching after we have initial location
+    if (!location) {
+      console.log('[useLocation] No initial location yet, skipping watch setup');
+      return;
+    }
+
     const isNative = Capacitor.isNativePlatform();
-    let watchId: string | number | undefined;
+    const locationRef = { current: location };
 
     const startWatching = async () => {
       if (isNative) {
-        // Use Capacitor Geolocation on native
         try {
-          watchId = await Geolocation.watchPosition(
+          watchIdRef.current = await Geolocation.watchPosition(
             {
               enableHighAccuracy: false,
               timeout: 10000,
@@ -247,65 +321,62 @@ export function useLocation() {
             },
             (position, err) => {
               if (err) {
-                console.error('Location watch error:', err);
+                console.error('[useLocation] Watch error:', err);
                 return;
               }
 
-              if (position) {
+              if (position && isMountedRef.current) {
                 const newLocation: UserLocation = {
                   lat: position.coords.latitude,
                   lng: position.coords.longitude,
                   timestamp: Date.now(),
                 };
 
-                // Only update if location changed significantly (>100m)
-                setLocation(prev => {
-                  if (!prev) return newLocation;
+                // FIX #19: Increase threshold to 500m to reduce updates
+                const latDiff = Math.abs(locationRef.current.lat - newLocation.lat);
+                const lngDiff = Math.abs(locationRef.current.lng - newLocation.lng);
+                const significantChange = latDiff > 0.005 || lngDiff > 0.005; // ~500m
 
-                  const latDiff = Math.abs(prev.lat - newLocation.lat);
-                  const lngDiff = Math.abs(prev.lng - newLocation.lng);
-                  const significantChange = latDiff > 0.001 || lngDiff > 0.001;
-
-                  if (significantChange) {
-                    localStorage.setItem('userLocation', JSON.stringify(newLocation));
-                    return newLocation;
-                  }
-                  return prev;
-                });
+                if (significantChange) {
+                  console.log('[useLocation] Significant location change detected');
+                  locationRef.current = newLocation;
+                  setLocation(newLocation);
+                  safeLocalStorage.setItem('userLocation', JSON.stringify(newLocation));
+                }
               }
             }
           );
+          console.log('[useLocation] Started Capacitor location watch');
         } catch (error) {
-          console.error('Failed to start location watch:', error);
+          console.error('[useLocation] Failed to start location watch:', error);
         }
       } else {
-        // Use browser Geolocation API
         if (!navigator.geolocation) return;
 
-        watchId = navigator.geolocation.watchPosition(
+        watchIdRef.current = navigator.geolocation.watchPosition(
           (position) => {
+            if (!isMountedRef.current) return;
+
             const newLocation: UserLocation = {
               lat: position.coords.latitude,
               lng: position.coords.longitude,
               timestamp: Date.now(),
             };
 
-            setLocation(prev => {
-              if (!prev) return newLocation;
+            // FIX #19: Increase threshold to 500m
+            const latDiff = Math.abs(locationRef.current.lat - newLocation.lat);
+            const lngDiff = Math.abs(locationRef.current.lng - newLocation.lng);
+            const significantChange = latDiff > 0.005 || lngDiff > 0.005;
 
-              const latDiff = Math.abs(prev.lat - newLocation.lat);
-              const lngDiff = Math.abs(prev.lng - newLocation.lng);
-              const significantChange = latDiff > 0.001 || lngDiff > 0.001;
-
-              if (significantChange) {
-                localStorage.setItem('userLocation', JSON.stringify(newLocation));
-                return newLocation;
-              }
-              return prev;
-            });
+            if (significantChange) {
+              console.log('[useLocation] Significant location change detected');
+              locationRef.current = newLocation;
+              setLocation(newLocation);
+              safeLocalStorage.setItem('userLocation', JSON.stringify(newLocation));
+            }
           },
           (error) => {
-            console.error('Location watch error:', error);
+            console.error('[useLocation] Watch error:', error);
           },
           {
             enableHighAccuracy: false,
@@ -313,21 +384,31 @@ export function useLocation() {
             maximumAge: 300000,
           }
         );
+        console.log('[useLocation] Started browser location watch');
       }
     };
 
     startWatching();
 
     return () => {
-      if (watchId !== undefined) {
-        if (isNative) {
-          Geolocation.clearWatch({ id: watchId as string });
-        } else {
-          navigator.geolocation.clearWatch(watchId as number);
+      // ✅ FIX HIGH #6: Ensure watch is always cleaned up, even if not fully initialized
+      if (watchIdRef.current !== undefined) {
+        console.log('[useLocation] Cleaning up location watch, id:', watchIdRef.current);
+        try {
+          if (isNative) {
+            Geolocation.clearWatch({ id: watchIdRef.current as string });
+          } else {
+            navigator.geolocation.clearWatch(watchIdRef.current as number);
+          }
+        } catch (error) {
+          console.error('[useLocation] Error clearing watch:', error);
         }
+        watchIdRef.current = undefined;
+      } else {
+        console.log('[useLocation] No watch to clean up');
       }
     };
-  }, []);
+  }, [location]); // Depend on location so we can update watch
 
   return {
     location,
