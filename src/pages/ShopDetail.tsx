@@ -568,8 +568,8 @@ export default function ShopDetail() {
 
             {/* Shop Reviews */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-bold">Customer Reviews</h2>
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-0">
+                <h2 className="text-xl sm:text-2xl font-bold">Customer Reviews</h2>
                 <ShopReviewButton shop={shop} />
               </div>
               <ShopReviewsList shopId={shop.id} />
