@@ -738,7 +738,7 @@ export default function Products() {
             <p className="text-muted-foreground mb-6 max-w-md mx-auto">
               Enable location to discover products from nearby shops in your area
             </p>
-            <Button onClick={() => requestLocation(true)} size="lg">
+            <Button onClick={requestLocation} size="lg">
               <MapPin className="w-4 h-4 mr-2" />
               Enable Location
             </Button>

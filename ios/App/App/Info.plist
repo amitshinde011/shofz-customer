@@ -45,9 +45,5 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
-	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Shofz needs your location to show you nearby shops, products, and exclusive local deals.</string>
-	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
-	<string>Shofz needs your location to show you nearby shops, products, and exclusive local deals.</string>
 </dict>
 </plist>

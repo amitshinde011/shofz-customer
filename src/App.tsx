@@ -12,7 +12,6 @@ import { usePageTracking } from "@/hooks/useAnalytics";
 import { initializeAnalytics } from "@/lib/analytics";
 import { LocationProvider } from "@/contexts/LocationContext";
 import { LocationPermissionGate } from "@/components/LocationPermissionGate";
-import { LocationErrorBoundary } from "@/components/LocationErrorBoundary";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useEffect } from "react";
 import Auth from "./pages/Auth";
@@ -63,19 +62,17 @@ const App = () => {
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <LocationErrorBoundary>
-            <LocationProvider>
-              <LocationPermissionGate>
-                <OfflineIndicator />
-                <ConnectionStatus />
-                <Toaster />
-                <Sonner />
-                <BrowserRouter>
-                  <AppContent />
-                </BrowserRouter>
-              </LocationPermissionGate>
-            </LocationProvider>
-          </LocationErrorBoundary>
+          <LocationProvider>
+            <LocationPermissionGate>
+              <OfflineIndicator />
+              <ConnectionStatus />
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <AppContent />
+              </BrowserRouter>
+            </LocationPermissionGate>
+          </LocationProvider>
         </TooltipProvider>
       </QueryClientProvider>
     </AuthProvider>

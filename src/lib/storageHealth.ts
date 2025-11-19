@@ -85,9 +85,9 @@ export const repairStorage = async (): Promise<boolean> => {
   try {
     // Step 1: Backup critical flags before clearing
     const criticalFlags = {
-      locationPermissionGranted: localStorage.getItem('shofz_location_permission_granted'),
-      skipLocationPermission: localStorage.getItem('shofz_skip_location_permission'),
-      userLocation: localStorage.getItem('shofz_user_location'),
+      locationPermissionGranted: localStorage.getItem('location_permission_granted'),
+      skipLocationPermission: localStorage.getItem('skip_location_permission'),
+      userLocation: localStorage.getItem('userLocation'),
     };
     
     // Step 2: Clear localStorage
@@ -97,12 +97,12 @@ export const repairStorage = async (): Promise<boolean> => {
     
     // Step 3: Restore critical flags if they were valid
     if (criticalFlags.locationPermissionGranted === 'true') {
-      localStorage.setItem('shofz_location_permission_granted', 'true');
+      localStorage.setItem('location_permission_granted', 'true');
       console.log('[StorageHealth] Restored location permission flag');
     }
     
     if (criticalFlags.skipLocationPermission === 'true') {
-      localStorage.setItem('shofz_skip_location_permission', 'true');
+      localStorage.setItem('skip_location_permission', 'true');
       console.log('[StorageHealth] Restored skip location flag');
     }
     
@@ -111,7 +111,7 @@ export const repairStorage = async (): Promise<boolean> => {
       try {
         const parsed = JSON.parse(criticalFlags.userLocation);
         if (parsed.lat && parsed.lng) {
-          localStorage.setItem('shofz_user_location', criticalFlags.userLocation);
+          localStorage.setItem('userLocation', criticalFlags.userLocation);
           console.log('[StorageHealth] Restored user location');
         }
       } catch (e) {
