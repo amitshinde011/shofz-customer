@@ -7,7 +7,10 @@ const config: CapacitorConfig = {
   server: {
     androidScheme: 'https'
   },
-  plugins: {    
+  plugins: {
+    Geolocation: {
+      // Ensure consistent behavior across platforms
+    },
     StatusBar: {
       overlaysWebView: false, // Changed from 'overlay' to 'overlaysWebView'
       style: 'Dark',          // Changed from 'LIGHT' to 'Dark' for consistency
