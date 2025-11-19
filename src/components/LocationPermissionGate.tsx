@@ -17,6 +17,7 @@ interface LocationPermissionGateProps {
 export function LocationPermissionGate({ children }: LocationPermissionGateProps) {
   const { location, loading, error, requestLocation, openSettings, isNative } = useUserLocation();
   const [skipLocation, setSkipLocation] = React.useState(false);
+  const [gateTimeout, setGateTimeout] = React.useState(false);
 
   // Check if user previously skipped location permission
   React.useEffect(() => {
@@ -26,25 +27,38 @@ export function LocationPermissionGate({ children }: LocationPermissionGateProps
     }
   }, []);
 
+  // Auto-bypass after 15 seconds if still loading (network issue, slow GPS, etc.)
+  React.useEffect(() => {
+    if (!loading) return;
+    
+    const timer = setTimeout(() => {
+      if (DEBUG_LOCATION) console.warn('[LocationGate] Loading timeout reached, allowing bypass');
+      setGateTimeout(true);
+    }, 15000);
+    
+    return () => clearTimeout(timer);
+  }, [loading]);
+
   // Check if we have permission cached
   const permissionGranted = localStorage.getItem(STORAGE_KEYS.PERMISSION_GRANTED) === 'true';
 
   // Determine if user can continue without location
   const canContinue = error?.toLowerCase().includes('continue without location');
 
-  if (DEBUG_LOCATION) console.log('[LocationGate] State - location:', !!location, 'loading:', loading, 'skipLocation:', skipLocation, 'canContinue:', canContinue);
+  if (DEBUG_LOCATION) console.log('[LocationGate] State - location:', !!location, 'loading:', loading, 'skipLocation:', skipLocation, 'canContinue:', canContinue, 'gateTimeout:', gateTimeout);
 
   // Allow bypass if:
   // 1. Location is already retrieved
   // 2. User previously skipped
   // 3. Error message allows bypass
   // 4. Permission was previously granted (even if current request failed)
-  if (location || skipLocation || canContinue || (permissionGranted && !error)) {
+  // 5. Gate timeout reached (15s)
+  if (location || skipLocation || canContinue || (permissionGranted && !error) || gateTimeout) {
     return <>{children}</>;
   }
 
   // Show loading state while checking location
-  if (loading) {
+  if (loading && !gateTimeout) {
     return (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
         <div className="flex flex-col items-center gap-4">
@@ -56,6 +70,19 @@ export function LocationPermissionGate({ children }: LocationPermissionGateProps
           <p className="text-sm text-muted-foreground max-w-xs text-center">
             This helps us show you nearby shops and deals
           </p>
+          {gateTimeout && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                localStorage.setItem(STORAGE_KEYS.SKIP, 'true');
+                setSkipLocation(true);
+              }}
+              className="mt-4"
+            >
+              Continue without location
+            </Button>
+          )}
         </div>
       </div>
     );
