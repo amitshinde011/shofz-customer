@@ -17,7 +17,7 @@ import {
   MessageCircle,
   Navigation,
   Heart,
-  
+
   ChevronDown,
   ChevronRight,
   Package,
@@ -236,13 +236,13 @@ export default function ShopDetail() {
   const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
   const dayDisplayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
   const businessHours = shop.business_hours as any;
-  
+
   // Get unique categories to avoid duplicates
   const uniqueCategories = shop.categories ? [...new Set(shop.categories)] as string[] : [];
-  
+
   // Categories display logic
-  const visibleCategories = showAllCategories 
-    ? uniqueCategories 
+  const visibleCategories = showAllCategories
+    ? uniqueCategories
     : uniqueCategories.slice(0, 3);
   const hasMoreCategories = uniqueCategories.length > 3;
   const hiddenCategoriesCount = uniqueCategories.length - 3;
@@ -325,9 +325,8 @@ export default function ShopDetail() {
                       <Button
                         variant="ghost"
                         size="icon"
-                        className={`h-9 w-9 ${
-                          isFavorite ? 'text-destructive' : ''
-                        }`}
+                        className={`h-9 w-9 ${isFavorite ? 'text-destructive' : ''
+                          }`}
                         onClick={toggleFavorite}
                       >
                         <Heart className={`w-4 h-4 ${isFavorite ? 'fill-current' : ''}`} />
@@ -342,29 +341,28 @@ export default function ShopDetail() {
                         {category}
                       </Badge>
                     ))}
-                    
+
                     {/* Show More/Less Button */}
                     {hasMoreCategories && (
-                      <Badge 
-                        variant="outline" 
+                      <Badge
+                        variant="outline"
                         className="text-xs cursor-pointer hover:bg-accent transition-colors"
                         onClick={() => setShowAllCategories(!showAllCategories)}
                       >
-                        {showAllCategories 
-                          ? 'Show less' 
+                        {showAllCategories
+                          ? 'Show less'
                           : `+${hiddenCategoriesCount} more`
                         }
                       </Badge>
                     )}
-                    
+
                     {/* Status Badge */}
                     <Badge
                       variant={shopStatus?.isOpen ? "default" : "secondary"}
-                      className={`text-xs ${
-                        shopStatus?.isOpen
+                      className={`text-xs ${shopStatus?.isOpen
                           ? "bg-success/10 text-success hover:bg-success/20"
                           : "bg-muted text-muted-foreground"
-                      }`}
+                        }`}
                     >
                       {shopStatus?.isOpen ? "Open Now" : "Closed"}
                     </Badge>
@@ -372,17 +370,11 @@ export default function ShopDetail() {
 
                   {/* Rating & Stats */}
                   <div className="flex flex-wrap items-center gap-4 mb-3">
-                    {(shop.rating && shop.rating > 0) && (
-                      <div className="flex items-center gap-1">
-                        <Star className="w-4 h-4 fill-warning text-warning" />
-                        <span className="font-bold text-foreground">{shop.rating.toFixed(1)}</span>
-                        {(shop.total_reviews && shop.total_reviews > 0) && (
-                          <span className="text-sm text-muted-foreground">
-                            ({shop.total_reviews} {shop.total_reviews === 1 ? 'review' : 'reviews'})
-                          </span>
-                        )}
-                      </div>
-                    )}
+                    <div className="flex items-center gap-1">
+                      <Star className="w-4 h-4 fill-warning text-warning" />
+                      <span className="font-bold text-foreground">{shop.rating || 0}</span>
+                      <span className="text-sm text-muted-foreground">({shop.total_reviews || 0})</span>
+                    </div>
                     {viewCounts && viewCounts.view_count > 0 && (
                       <div className="flex items-center gap-1">
                         <Eye className="w-4 h-4 text-muted-foreground" />
@@ -492,13 +484,13 @@ export default function ShopDetail() {
                     <Truck className="w-5 h-5 text-primary" />
                     <h2 className="text-lg font-bold text-foreground">Delivery Information</h2>
                   </div>
-                  
+
                   {/* Delivery Details Card */}
-                  <DeliveryDetailsCard 
-                    shop={shop} 
-                    customerLocation={location} 
+                  <DeliveryDetailsCard
+                    shop={shop}
+                    customerLocation={location}
                   />
-                  
+
                   {/* Interactive Coverage Checker */}
                   <DeliveryCoverageChecker
                     shop={shop}
