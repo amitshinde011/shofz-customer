@@ -86,8 +86,12 @@ export const AdBannerCarousel = ({ placement = 'home-top' }: AdBannerCarouselPro
         </CarouselContent>
         {ads.length > 1 && (
           <>
-            <CarouselPrevious className="left-2" />
-            <CarouselNext className="right-2" />
+            <CarouselPrevious 
+              className="left-2 bg-transparent border-none hover:bg-white/10 text-white shadow-lg" 
+            />
+            <CarouselNext 
+              className="right-2 bg-transparent border-none hover:bg-white/10 text-white shadow-lg"
+            />
           </>
         )}
       </Carousel>
