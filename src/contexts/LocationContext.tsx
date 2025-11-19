@@ -8,6 +8,7 @@ interface LocationContextType {
   loading: boolean;
   error: string | null;
   requestLocation: (isManualTrigger?: boolean) => Promise<void>;
+  clearLocation: () => void;
   openSettings: () => Promise<boolean>;
   isNative: boolean;
 }
