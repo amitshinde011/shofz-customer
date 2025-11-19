@@ -429,11 +429,11 @@ export default function Profile() {
                           </div>
                           <Button
                             variant="outline"
-                            size="sm"
+                            size="icon"
                             onClick={() => setIsEditing(true)}
-                            className="h-9 sm:h-10 shrink-0"
+                            className="h-10 w-10 sm:h-10 sm:w-auto sm:px-4 shrink-0"
                           >
-                            <Edit className="w-4 h-4 sm:w-3.5 sm:h-3.5 sm:mr-1.5" />
+                            <Edit className="w-4 h-4 sm:mr-2" />
                             <span className="hidden sm:inline">Edit</span>
                           </Button>
                         </div>
