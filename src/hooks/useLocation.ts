@@ -106,6 +106,21 @@ export function useLocation() {
           throw new Error('UNSUPPORTED');
         }
 
+        // Check permission state on web (if supported)
+        if ('permissions' in navigator) {
+          try {
+            const permissionStatus = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+            console.log('[useLocation] Web permission state:', permissionStatus.state);
+            
+            if (permissionStatus.state === 'denied') {
+              throw new Error('PERMISSION_DENIED');
+            }
+          } catch (e) {
+            // Permissions API might not be supported, continue anyway
+            console.log('[useLocation] Permissions API not supported or failed:', e);
+          }
+        }
+
         navigator.geolocation.getCurrentPosition(
           async (pos) => {
             const newLocation: UserLocation = {
@@ -122,16 +137,16 @@ export function useLocation() {
             localStorage.setItem('location_permission_granted', 'true');
           },
           (error) => {
-            let errorMsg = 'Failed to get your location';
+            let errorMsg = 'Failed to get your location. You can continue without location.';
             switch (error.code) {
               case error.PERMISSION_DENIED:
-                errorMsg = 'Location permission denied. Please enable location access in your browser settings.';
+                errorMsg = 'Location permission denied. Please enable location access in your browser settings, or continue without location.';
                 break;
               case error.POSITION_UNAVAILABLE:
-                errorMsg = 'Location information unavailable. Please check your device settings.';
+                errorMsg = 'Location information unavailable. Please check your device settings, or continue without location.';
                 break;
               case error.TIMEOUT:
-                errorMsg = 'Location request timed out. Please try again.';
+                errorMsg = 'Location request timed out. You can continue without location.';
                 break;
             }
             setError(errorMsg);
@@ -151,12 +166,25 @@ export function useLocation() {
     }
   };
 
-  const requestLocation = async () => {
-    console.log('[useLocation] requestLocation called, retry:', retryCount);
+  const requestLocation = async (isManualTrigger = false) => {
+    console.log('[useLocation] requestLocation called, retry:', retryCount, 'manual:', isManualTrigger);
+    
+    // Reset retry counter if this is a manual user action
+    if (isManualTrigger) {
+      console.log('[useLocation] Manual trigger - resetting retry counter');
+      setRetryCount(0);
+    }
     
     // Check retry limit
     if (retryCount >= MAX_RETRIES) {
       setError('Unable to get location after multiple attempts. You can continue without location.');
+      setLoading(false);
+      return;
+    }
+
+    // Check if user is offline
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setError('No internet connection. You can continue without location.');
       setLoading(false);
       return;
     }
@@ -186,13 +214,13 @@ export function useLocation() {
         const isNative = Capacitor.isNativePlatform();
         setError(
           isNative
-            ? 'Location permission denied. Please enable location access in your device settings.'
-            : 'Location permission denied. Please enable location access in your browser settings.'
+            ? 'Location permission denied. Please enable location access in your device settings, or continue without location.'
+            : 'Location permission denied. Please enable location access in your browser settings, or continue without location.'
         );
       } else if (error.message === 'POSITION_UNAVAILABLE') {
-        setError('Unable to determine your location. Please check your device settings.');
+        setError('Unable to determine your location. Please check your device settings, or continue without location.');
       } else if (error.message === 'UNSUPPORTED') {
-        setError('Your browser does not support geolocation.');
+        setError('Your browser does not support geolocation. You can continue without location.');
       } else {
         setError('Failed to get your location. You can continue without location.');
       }
@@ -209,24 +237,24 @@ export function useLocation() {
         const parsed = JSON.parse(cachedLocation);
         const age = Date.now() - parsed.timestamp;
         console.log('[useLocation] Found cached location, age:', age, 'ms');
-        // Use cached location if less than 30 minutes old
-        if (age < 30 * 60 * 1000) {
+        // Use cached location if less than 10 minutes old
+        if (age < 10 * 60 * 1000) {
           console.log('[useLocation] Using cached location');
           setLocation(parsed);
           setLoading(false);
           return;
         } else {
-          console.log('[useLocation] Cached location too old, requesting fresh');
+          console.log('[useLocation] Cached location too old, waiting for user interaction');
         }
       } catch (e) {
         console.error('[useLocation] Error parsing cached location:', e);
       }
     } else {
-      console.log('[useLocation] No cached location found');
+      console.log('[useLocation] No cached location found, waiting for user interaction');
     }
 
-    // Request fresh location in background (non-blocking)
-    requestLocation();
+    // Don't auto-request - let LocationPermissionGate button handle it
+    setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -241,7 +269,7 @@ export function useLocation() {
         try {
           watchId = await Geolocation.watchPosition(
             {
-              enableHighAccuracy: false,
+              enableHighAccuracy: true,
               timeout: 10000,
               maximumAge: 300000,
             },
@@ -308,7 +336,7 @@ export function useLocation() {
             console.error('Location watch error:', error);
           },
           {
-            enableHighAccuracy: false,
+            enableHighAccuracy: true,
             timeout: 10000,
             maximumAge: 300000,
           }

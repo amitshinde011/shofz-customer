@@ -342,7 +342,7 @@ export default function Shops() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={requestLocation}
+                    onClick={() => requestLocation(true)}
                     className="text-xs"
                   >
                     <MapPin className="w-3 h-3 mr-1" />
@@ -657,7 +657,7 @@ export default function Shops() {
               {locationError || 'Please enable location access to discover nearby shops and services.'}
             </p>
             <div className="flex flex-col gap-2 items-center">
-              <Button onClick={requestLocation}>
+              <Button onClick={() => requestLocation(true)}>
                 <MapPin className="w-4 h-4 mr-2" />
                 Enable Location
               </Button>

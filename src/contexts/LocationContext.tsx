@@ -5,7 +5,7 @@ interface LocationContextType {
   location: UserLocation | null;
   loading: boolean;
   error: string | null;
-  requestLocation: () => Promise<void>;
+  requestLocation: (isManualTrigger?: boolean) => Promise<void>;
   openSettings: () => Promise<boolean>;
   isNative: boolean;
 }
