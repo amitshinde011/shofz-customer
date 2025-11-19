@@ -10,6 +10,7 @@ import { calculateDistance, formatDistance } from "@/lib/distanceCalculation";
 import { useUserLocation } from "@/contexts/LocationContext";
 import DirectionsButton from "./DirectionsButton";
 import { ShopDeliveryBadge } from "./shop/ShopDeliveryBadge";
+import { getLocationAge, getLocationFreshness } from "@/hooks/useLocation";
 
 interface FeaturedShopCardProps {
   shop: any;

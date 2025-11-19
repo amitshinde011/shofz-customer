@@ -26,11 +26,13 @@ export const LOCATION_CONFIG = {
   MAX_RETRY_ATTEMPTS: 3,
   RETRY_DELAYS: [1000, 2000, 4000], // Exponential backoff
   
-  // Storage keys
+  // Storage keys (centralized)
   STORAGE_KEYS: {
     LOCATION: 'user_location_v2',
     TOAST_ENABLED: 'location_toast_enabled',
     BATTERY_WARNING_SHOWN: 'location_battery_warning_shown',
+    SKIP_PERMISSION: 'shofz_skip_location_permission',
+    PERMISSION_GRANTED: 'shofz_location_permission_granted',
   },
   
   // Feature flags

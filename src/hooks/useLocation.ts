@@ -76,14 +76,21 @@ export interface UserLocation {
   accuracy?: number; // Accuracy in meters (if available)
 }
 
-// ============= Configuration Constants =============
-const SIGNIFICANT_MOVE_THRESHOLD_KM = 0.05; // 50 meters - update threshold
-const PERMISSION_QUERY_TIMEOUT = 5000; // 5 seconds - permission check timeout
+// ============= Configuration Constants (from centralized config) =============
+const { 
+  TIMEOUT_MS,
+  PERMISSION_QUERY_TIMEOUT,
+  SIGNIFICANT_MOVE_THRESHOLD_KM,
+  HIGH_ACCURACY_THRESHOLD_M,
+  MAX_WATCH_DURATION_MS,
+  WATCH_OPTIONS,
+  MAX_RETRY_ATTEMPTS,
+  RETRY_DELAYS,
+  STORAGE_KEYS,
+} = LOCATION_CONFIG;
+
 const LOCATION_CACHE_VALIDITY_MS = 5 * 60 * 1000; // 5 minutes - cache validity
-const MAX_WATCH_DURATION_MS = 4 * 60 * 60 * 1000; // 4 hours - auto-stop watch
-const MAX_RETRY_COUNT = 3; // Maximum automatic retry attempts
-const RETRY_COOLDOWN_MS = 2 * 60 * 1000; // 2 minutes cooldown after max retries
-const BATTERY_WARNING_SHOWN_KEY = 'shofz_battery_warning_shown'; // One-time battery warning
+const MAX_RETRY_COUNT = MAX_RETRY_ATTEMPTS;
 
 /**
  * Get human-readable location age string
@@ -638,11 +645,14 @@ export function useLocation() {
     };
   }, [showLocationUpdateToast]); // Add showLocationUpdateToast dependency
 
-  // Cleanup on unmount
+  // Cleanup all timeouts on unmount
   useEffect(() => {
     return () => {
       if (retryTimeoutRef.current) {
         clearTimeout(retryTimeoutRef.current);
+      }
+      if (watchDurationTimeoutRef.current) {
+        clearTimeout(watchDurationTimeoutRef.current);
       }
     };
   }, []);
