@@ -302,7 +302,9 @@ export default function ShopCard({ shop, variant = "grid", onToggleFavorite, isF
               {/* Reviews Count & Views - Simplified in compact mode */}
 
               <div className="flex items-center gap-3 text-meta text-muted-foreground font-medium">
-                <span>{shop.reviewCount} reviews</span>
+                {(shop.reviewCount && shop.reviewCount > 0) && (
+                  <span>{shop.reviewCount} {shop.reviewCount === 1 ? 'review' : 'reviews'}</span>
+                )}
                 {viewCounts && viewCounts.view_count > 0 && (
                   <div className="flex items-center gap-1">
                     <Eye className="w-3 h-3" />
