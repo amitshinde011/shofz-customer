@@ -30,6 +30,10 @@ export class LocationErrorBoundary extends Component<Props, State> {
     window.location.reload();
   };
 
+  private handleContinue = () => {
+    this.setState({ hasError: false, error: null });
+  };
+
   public render() {
     if (this.state.hasError) {
       return (
@@ -56,9 +60,14 @@ export class LocationErrorBoundary extends Component<Props, State> {
                 </details>
               )}
             </div>
-            <Button onClick={this.handleReset} className="w-full">
-              Reload Application
-            </Button>
+            <div className="flex gap-2">
+              <Button onClick={this.handleContinue} variant="outline" className="flex-1">
+                Continue without location
+              </Button>
+              <Button onClick={this.handleReset} className="flex-1">
+                Reload
+              </Button>
+            </div>
           </div>
         </div>
       );

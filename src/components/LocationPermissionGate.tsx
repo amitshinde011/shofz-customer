@@ -19,6 +19,7 @@ export function LocationPermissionGate({ children }: LocationPermissionGateProps
   const { location, loading, error, requestLocation, openSettings, isNative } = useUserLocation();
   const [skipLocation, setSkipLocation] = React.useState(false);
   const [gateTimeout, setGateTimeout] = React.useState(false);
+  const [settingsError, setSettingsError] = React.useState<string | null>(null);
 
   // Check if user previously skipped location permission
   React.useEffect(() => {
@@ -111,9 +112,9 @@ export function LocationPermissionGate({ children }: LocationPermissionGateProps
           </p>
         </div>
 
-        {error && (
+        {(error || settingsError) && (
           <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4 text-sm text-destructive">
-            {error}
+            {settingsError || error}
           </div>
         )}
 
@@ -151,7 +152,12 @@ export function LocationPermissionGate({ children }: LocationPermissionGateProps
 
           {isNative && error && (
             <Button
-              onClick={openSettings}
+              onClick={async () => {
+                const success = await openSettings();
+                if (!success) {
+                  setSettingsError('Could not open Settings automatically. Please open Settings manually and enable Location for this app, or continue without location.');
+                }
+              }}
               variant="outline"
               className="w-full h-12 text-base"
               size="lg"
