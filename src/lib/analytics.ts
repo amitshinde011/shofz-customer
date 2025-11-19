@@ -5,8 +5,14 @@
 
 import ReactGA from 'react-ga4';
 
-// Initialize GA4 with your measurement ID
-const GA_MEASUREMENT_ID = 'G-XXXXXXXXXX'; // Replace with your actual GA4 measurement ID
+/**
+ * To activate Google Analytics:
+ * 1. Get your GA4 Measurement ID from https://analytics.google.com/
+ *    (Format: G-XXXXXXXXXX)
+ * 2. Replace 'G-XXXXXXXXXX' below with your actual ID
+ * 3. That's it! GA4 will start tracking automatically
+ */
+const GA_MEASUREMENT_ID = 'G-XXXXXXXXXX'; // TODO: Replace with your GA4 ID
 
 let isInitialized = false;
 
@@ -14,7 +20,7 @@ export function initializeAnalytics() {
   if (!isInitialized && GA_MEASUREMENT_ID !== 'G-XXXXXXXXXX') {
     ReactGA.initialize(GA_MEASUREMENT_ID);
     isInitialized = true;
-    console.log('Google Analytics initialized');
+    console.log('✅ Google Analytics initialized successfully');
   }
 }
 
