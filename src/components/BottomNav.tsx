@@ -9,7 +9,6 @@ const publicNavItems = [
   { path: "/products", icon: Search, label: "Products" },
   { path: "/shops", icon: Store, label: "Shops" },
   { path: "/offers", icon: Tag, label: "Offers" },
-  { path: "/favorites", icon: Heart, label: "Favorites" },
 ];
 
 export function BottomNav() {
