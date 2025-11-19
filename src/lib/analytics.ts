@@ -12,7 +12,7 @@ import ReactGA from 'react-ga4';
  * 2. Replace 'G-XXXXXXXXXX' below with your actual ID
  * 3. That's it! GA4 will start tracking automatically
  */
-const GA_MEASUREMENT_ID = 'G-XXXXXXXXXX'; // TODO: Replace with your GA4 ID
+const GA_MEASUREMENT_ID = 'G-NLEXH6PLL4'; // TODO: Replace with your GA4 ID
 
 let isInitialized = false;
 
