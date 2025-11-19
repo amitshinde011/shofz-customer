@@ -36,7 +36,7 @@ export const AdBanner = ({ placement, className = "" }: AdBannerProps) => {
   return (
     <div className={`w-full max-w-screen-xl mx-auto px-1 ${className}`}>
       <div
-        className={`relative aspect-[16/4] sm:aspect-[21/4] rounded-lg overflow-hidden ${
+        className={`relative aspect-[16/6] sm:aspect-[21/6] rounded-lg overflow-hidden ${
           ad.link_url ? 'cursor-pointer hover:opacity-95 transition-opacity' : ''
         }`}
         onClick={handleAdClick}
