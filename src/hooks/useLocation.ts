@@ -4,6 +4,37 @@ import { Geolocation } from '@capacitor/geolocation';
 
 const DEBUG_LOCATION = import.meta.env.DEV;
 
+// Helper to safely use localStorage
+const safeLocalStorage = {
+  getItem: (key: string): string | null => {
+    try {
+      if (typeof localStorage === 'undefined' || !localStorage) return null;
+      return localStorage.getItem(key);
+    } catch (e) {
+      if (DEBUG_LOCATION) console.warn('[useLocation] localStorage unavailable:', e);
+      return null;
+    }
+  },
+  setItem: (key: string, value: string): boolean => {
+    try {
+      if (typeof localStorage === 'undefined' || !localStorage) return false;
+      localStorage.setItem(key, value);
+      return true;
+    } catch (e) {
+      if (DEBUG_LOCATION) console.warn('[useLocation] localStorage set failed:', e);
+      return false;
+    }
+  },
+  removeItem: (key: string): void => {
+    try {
+      if (typeof localStorage === 'undefined' || !localStorage) return;
+      localStorage.removeItem(key);
+    } catch (e) {
+      if (DEBUG_LOCATION) console.warn('[useLocation] localStorage remove failed:', e);
+    }
+  },
+};
+
 export interface UserLocation {
   lat: number;
   lng: number;
@@ -14,27 +45,18 @@ export interface UserLocation {
 const openDeviceSettings = async (): Promise<boolean> => {
   const platform = Capacitor.getPlatform();
   
-  if (platform === 'ios') {
+  if (platform === 'ios' || platform === 'android') {
     try {
-      // On iOS, we can try to open app settings
-      window.location.href = 'app-settings:';
-      return true;
+      // Open settings without navigating the app away
+      const settingsOpened = window.open('app-settings:', '_system');
+      return settingsOpened !== null;
     } catch (error) {
-      if (DEBUG_LOCATION) console.error('[useLocation] Failed to open iOS settings:', error);
-      return false;
-    }
-  } else if (platform === 'android') {
-    try {
-      // On Android, try to open app settings
-      window.location.href = 'app-settings:';
-      return true;
-    } catch (error) {
-      if (DEBUG_LOCATION) console.error('[useLocation] Failed to open Android settings:', error);
+      if (DEBUG_LOCATION) console.error('[useLocation] Failed to open settings:', error);
       return false;
     }
   }
   
-  // On web, we can't open system settings
+  // On web, can't open system settings
   return false;
 };
 
@@ -48,8 +70,16 @@ export function useLocation() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [isRequesting, setIsRequesting] = useState(false);
 
   const getLocationInternal = async (isManualTrigger: boolean = false): Promise<void> => {
+    // Prevent simultaneous requests
+    if (isRequesting) {
+      if (DEBUG_LOCATION) console.log('[useLocation] Request already in progress, skipping');
+      return;
+    }
+    
+    setIsRequesting(true);
     if (DEBUG_LOCATION) console.log('[useLocation] Starting location request, manual:', isManualTrigger);
 
     // Check if offline
@@ -111,15 +141,11 @@ export function useLocation() {
         setError(null);
         setRetryCount(0);
 
-        try {
-          localStorage.setItem(STORAGE_KEYS.LOCATION, JSON.stringify(newLocation));
-          localStorage.setItem(STORAGE_KEYS.PERMISSION_GRANTED, 'true');
-        } catch (storageError) {
-          if (DEBUG_LOCATION) console.error('[useLocation] Failed to save location to localStorage:', storageError);
-          // Location still works, just won't persist
-        }
+        safeLocalStorage.setItem(STORAGE_KEYS.LOCATION, JSON.stringify(newLocation));
+        safeLocalStorage.setItem(STORAGE_KEYS.PERMISSION_GRANTED, 'true');
 
         setLoading(false);
+        setIsRequesting(false);
       } else {
         // Use browser Geolocation API on web
         if (DEBUG_LOCATION) console.log('[useLocation] Using browser Geolocation API');
@@ -130,7 +156,14 @@ export function useLocation() {
         // Check permission state on web (if supported)
         if ('permissions' in navigator) {
           try {
-            const permissionStatus = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+            const timeoutPromise = new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Permission query timeout')), 3000)
+            );
+            
+            const permissionPromise = navigator.permissions.query({ name: 'geolocation' as PermissionName });
+            
+            const permissionStatus = await Promise.race([permissionPromise, timeoutPromise]) as PermissionStatus;
+            
             if (DEBUG_LOCATION) console.log('[useLocation] Web permission state:', permissionStatus.state);
             
             if (permissionStatus.state === 'denied') {
@@ -155,13 +188,8 @@ export function useLocation() {
               setError(null);
               setRetryCount(0);
 
-              try {
-                localStorage.setItem(STORAGE_KEYS.LOCATION, JSON.stringify(newLocation));
-                localStorage.setItem(STORAGE_KEYS.PERMISSION_GRANTED, 'true');
-              } catch (storageError) {
-                if (DEBUG_LOCATION) console.error('[useLocation] Failed to save location to localStorage:', storageError);
-                // Location still works, just won't persist
-              }
+              safeLocalStorage.setItem(STORAGE_KEYS.LOCATION, JSON.stringify(newLocation));
+              safeLocalStorage.setItem(STORAGE_KEYS.PERMISSION_GRANTED, 'true');
               
               resolve();
             },
@@ -192,10 +220,12 @@ export function useLocation() {
         });
 
         setLoading(false);
+        setIsRequesting(false);
       }
 
       if (DEBUG_LOCATION) console.log('[useLocation] Location retrieved successfully');
     } catch (error: any) {
+      setIsRequesting(false);
       if (DEBUG_LOCATION) console.error('[useLocation] Error getting location:', error);
 
       let errorMessage = 'Failed to get your location. You can continue without location.';
@@ -249,23 +279,32 @@ export function useLocation() {
       if (DEBUG_LOCATION) console.log('[useLocation] Checking for cached location...');
 
       try {
-        const cachedLocation = localStorage.getItem(STORAGE_KEYS.LOCATION);
+        const cachedLocation = safeLocalStorage.getItem(STORAGE_KEYS.LOCATION);
         if (cachedLocation) {
           const parsed = JSON.parse(cachedLocation);
-          const age = Date.now() - parsed.timestamp;
+          
+          // Validate structure
+          if (parsed && typeof parsed.lat === 'number' && typeof parsed.lng === 'number' && typeof parsed.timestamp === 'number') {
+            const age = Date.now() - parsed.timestamp;
 
-          // Use cached location if less than 5 minutes old
-          if (age < 5 * 60 * 1000) { // 5 minutes for hyperlocal accuracy
-            if (DEBUG_LOCATION) console.log('[useLocation] Using cached location (age:', age, 'ms)');
-            setLocation(parsed);
-            setLoading(false);
-            return;
+            // Use cached location if less than 5 minutes old
+            if (age < 5 * 60 * 1000) { // 5 minutes for hyperlocal accuracy
+              if (DEBUG_LOCATION) console.log('[useLocation] Using cached location (age:', age, 'ms)');
+              setLocation(parsed);
+              setLoading(false);
+              return;
+            } else {
+              if (DEBUG_LOCATION) console.log('[useLocation] Cached location too old (age:', age, 'ms)');
+            }
           } else {
-            if (DEBUG_LOCATION) console.log('[useLocation] Cached location too old (age:', age, 'ms)');
+            if (DEBUG_LOCATION) console.warn('[useLocation] Cached location has invalid structure');
+            safeLocalStorage.removeItem(STORAGE_KEYS.LOCATION);
           }
         }
       } catch (error) {
         if (DEBUG_LOCATION) console.error('[useLocation] Failed to load cached location:', error);
+        // Clear corrupted cache
+        safeLocalStorage.removeItem(STORAGE_KEYS.LOCATION);
       }
 
       // No valid cache, just set loading to false
@@ -281,11 +320,11 @@ export function useLocation() {
     if (Capacitor.isNativePlatform()) return;
     if (!('permissions' in navigator)) return;
 
-    let permissionStatus: PermissionStatus;
+    let cleanup: (() => void) | undefined;
 
     const setupListener = async () => {
       try {
-        permissionStatus = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+        const permissionStatus = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
         
         const handlePermissionChange = () => {
           if (DEBUG_LOCATION) console.log('[useLocation] Permission state changed:', permissionStatus.state);
@@ -293,14 +332,14 @@ export function useLocation() {
           if (permissionStatus.state === 'denied') {
             setLocation(null);
             setError('Location permission was revoked. Please enable location access in your browser settings, or continue without location.');
-            localStorage.removeItem(STORAGE_KEYS.LOCATION);
-            localStorage.removeItem(STORAGE_KEYS.PERMISSION_GRANTED);
+            safeLocalStorage.removeItem(STORAGE_KEYS.LOCATION);
+            safeLocalStorage.removeItem(STORAGE_KEYS.PERMISSION_GRANTED);
           }
         };
 
         permissionStatus.addEventListener('change', handlePermissionChange);
         
-        return () => {
+        cleanup = () => {
           permissionStatus.removeEventListener('change', handlePermissionChange);
         };
       } catch (error) {
@@ -309,6 +348,10 @@ export function useLocation() {
     };
 
     setupListener();
+
+    return () => {
+      if (cleanup) cleanup();
+    };
   }, []);
 
   // Refresh location when app returns to foreground
@@ -326,7 +369,7 @@ export function useLocation() {
 
     document.addEventListener('visibilitychange', handleVisibilityChange);
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
-  }, [location]);
+  }, [location, requestLocation]);
 
   // Set up continuous location watching
   useEffect(() => {
@@ -338,6 +381,7 @@ export function useLocation() {
 
     const isNative = Capacitor.isNativePlatform();
     let watchId: string | number | undefined;
+    let lastKnownLocation = location; // Capture initial location
 
     const startWatching = async () => {
       try {
@@ -365,23 +409,18 @@ export function useLocation() {
                 };
 
                 // Only update if location changed significantly (>50 meters)
-                if (location) {
-                  const distance = calculateDistance(
-                    location.lat,
-                    location.lng,
-                    newLocation.lat,
-                    newLocation.lng
-                  );
+                const distance = calculateDistance(
+                  lastKnownLocation.lat,
+                  lastKnownLocation.lng,
+                  newLocation.lat,
+                  newLocation.lng
+                );
 
-                  if (distance > 0.05) {
-                    if (DEBUG_LOCATION) console.log('[useLocation] Location changed significantly:', distance, 'km');
-                    setLocation(newLocation);
-                    try {
-                      localStorage.setItem(STORAGE_KEYS.LOCATION, JSON.stringify(newLocation));
-                    } catch (storageError) {
-                      if (DEBUG_LOCATION) console.error('[useLocation] Failed to save location update:', storageError);
-                    }
-                  }
+                if (distance > 0.05) {
+                  if (DEBUG_LOCATION) console.log('[useLocation] Location changed significantly:', distance, 'km');
+                  setLocation(newLocation);
+                  lastKnownLocation = newLocation; // Update captured variable
+                  safeLocalStorage.setItem(STORAGE_KEYS.LOCATION, JSON.stringify(newLocation));
                 }
               }
             }
@@ -399,23 +438,18 @@ export function useLocation() {
               };
 
               // Only update if location changed significantly (>50 meters)
-              if (location) {
-                const distance = calculateDistance(
-                  location.lat,
-                  location.lng,
-                  newLocation.lat,
-                  newLocation.lng
-                );
+              const distance = calculateDistance(
+                lastKnownLocation.lat,
+                lastKnownLocation.lng,
+                newLocation.lat,
+                newLocation.lng
+              );
 
-                if (distance > 0.05) {
-                  if (DEBUG_LOCATION) console.log('[useLocation] Location changed significantly:', distance, 'km');
-                  setLocation(newLocation);
-                  try {
-                    localStorage.setItem(STORAGE_KEYS.LOCATION, JSON.stringify(newLocation));
-                  } catch (storageError) {
-                    if (DEBUG_LOCATION) console.error('[useLocation] Failed to save location update:', storageError);
-                  }
-                }
+              if (distance > 0.05) {
+                if (DEBUG_LOCATION) console.log('[useLocation] Location changed significantly:', distance, 'km');
+                setLocation(newLocation);
+                lastKnownLocation = newLocation; // Update captured variable
+                safeLocalStorage.setItem(STORAGE_KEYS.LOCATION, JSON.stringify(newLocation));
               }
             },
             (error) => {
@@ -448,7 +482,7 @@ export function useLocation() {
         }
       }
     };
-  }, [location]); // Add location dependency
+  }, []); // Remove location dependency to prevent infinite loop
 
   return {
     location,
