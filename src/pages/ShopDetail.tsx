@@ -1,5 +1,6 @@
 import { motion } from "framer-motion";
 import { useParams, useNavigate, Link } from "react-router-dom";
+import { useState, useMemo, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,13 +26,13 @@ import {
   Eye,
   Share2
 } from "lucide-react";
-import { useState, useMemo } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import ProductCard from "@/components/ProductCard";
 import { useToast } from "@/hooks/use-toast";
 import { useViewTracking } from "@/hooks/useViewTracking";
 import { useEntityViewCounts } from "@/hooks/useEntityViewCounts";
 import { useShop, useToggleShopFavorite, useUserFavoriteShops } from "@/hooks/useShops";
+import { useAnalytics } from "@/hooks/useAnalytics";
 import { ShopReviewsList } from "@/components/reviews/ShopReviewsList";
 import { ShopReviewButton } from "@/components/reviews/ShopReviewButton";
 import { DeliveryDetailsCard } from "@/components/shop/DeliveryDetailsCard";
@@ -62,6 +63,7 @@ export default function ShopDetail() {
   const [showAllCategories, setShowAllCategories] = useState(false);
   const { location } = useUserLocation();
   const { user } = useAuth();
+  const { trackShopView } = useAnalytics();
 
   // Track shop view (automatically updates shop_stats via database trigger)
   useViewTracking('shop', id);
@@ -72,6 +74,13 @@ export default function ShopDetail() {
   // Fetch shop data
   const { data: shopData, isLoading, error } = useShop(id!);
   const shop = shopData?.data;
+
+  // Track shop view in analytics (Google Analytics + Database)
+  useEffect(() => {
+    if (shop) {
+      trackShopView(shop.id, shop.name, 'shop_detail');
+    }
+  }, [shop]);
 
   // Fetch shop products
   const { data: productsData } = useProducts({
