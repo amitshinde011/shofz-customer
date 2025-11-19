@@ -1,4 +1,4 @@
-import { Home, Search, Store, User, Tag } from "lucide-react";
+import { Home, Search, Store, User, Tag, Heart } from "lucide-react";
 import { NavLink, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useScrollDirection } from "@/hooks/useScrollDirection";
@@ -9,6 +9,7 @@ const publicNavItems = [
   { path: "/products", icon: Search, label: "Products" },
   { path: "/shops", icon: Store, label: "Shops" },
   { path: "/offers", icon: Tag, label: "Offers" },
+  { path: "/favorites", icon: Heart, label: "Favorites" },
 ];
 
 export function BottomNav() {

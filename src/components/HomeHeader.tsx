@@ -90,7 +90,7 @@ export function HomeHeader() {
             {/* Favorites (Desktop) */}
             <Link
               to="/favorites"
-              className="hidden lg:flex items-center gap-2 hover:border border-white/20 px-2 py-2 rounded transition-all"
+              className="hidden md:flex items-center gap-2 hover:border border-white/20 px-2 py-2 rounded transition-all"
             >
               <Heart className="w-5 h-5" />
             </Link>
@@ -113,7 +113,7 @@ export function HomeHeader() {
             {/* Account (Desktop) */}
             <Link
               to="/profile"
-              className="hidden lg:flex flex-col hover:border border-white/20 px-2 rounded transition-all"
+              className="hidden md:flex flex-col hover:border border-white/20 px-2 rounded transition-all"
             >
               <div className="text-xs text-gray-300">Hello, {user?.name || 'Sign in'}</div>
               <div className="text-sm font-semibold">Account</div>
