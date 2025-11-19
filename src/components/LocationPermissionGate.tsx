@@ -1,7 +1,14 @@
 import React, { ReactNode } from 'react';
-import { MapPin, Navigation, Store, Settings } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { useUserLocation } from '@/contexts/LocationContext';
+import { MapPin, Navigation } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+
+const DEBUG_LOCATION = import.meta.env.DEV;
+
+const STORAGE_KEYS = {
+  SKIP: 'shofz_skip_location_permission',
+  PERMISSION_GRANTED: 'shofz_location_permission_granted',
+};
 
 interface LocationPermissionGateProps {
   children: ReactNode;
@@ -10,57 +17,45 @@ interface LocationPermissionGateProps {
 export function LocationPermissionGate({ children }: LocationPermissionGateProps) {
   const { location, loading, error, requestLocation, openSettings, isNative } = useUserLocation();
   const [skipLocation, setSkipLocation] = React.useState(false);
-  const [failedAttempts, setFailedAttempts] = React.useState(0);
 
-  // Check if user previously chose to skip
+  // Check if user previously skipped location permission
   React.useEffect(() => {
-    const skipFlag = localStorage.getItem('skip_location_permission');
+    const skipFlag = localStorage.getItem(STORAGE_KEYS.SKIP);
     if (skipFlag === 'true') {
       setSkipLocation(true);
     }
   }, []);
 
-  // Track failed attempts
-  React.useEffect(() => {
-    if (error) {
-      setFailedAttempts(prev => prev + 1);
-    }
-  }, [error]);
+  // Check if we have permission cached
+  const permissionGranted = localStorage.getItem(STORAGE_KEYS.PERMISSION_GRANTED) === 'true';
 
-  // Auto-bypass gate if loading too long
-  React.useEffect(() => {
-    if (!loading) return;
-    
-    const timer = setTimeout(() => {
-      console.warn('[LocationGate] Loading timeout, bypassing gate');
-      setSkipLocation(true);
-    }, 20000);
-    
-    return () => clearTimeout(timer);
-  }, [loading]);
+  // Determine if user can continue without location
+  const canContinue = error?.toLowerCase().includes('continue without location');
+
+  if (DEBUG_LOCATION) console.log('[LocationGate] State - location:', !!location, 'loading:', loading, 'skipLocation:', skipLocation, 'canContinue:', canContinue);
 
   // Allow bypass if:
-  // 1. User explicitly skipped
-  // 2. Too many failed attempts
-  // 3. Error message indicates user can continue
-  // 4. Permission was previously granted (cached location)
-  const permissionGranted = localStorage.getItem('location_permission_granted') === 'true';
-  const canContinue = error?.includes('continue without location');
-  
-  if (location || skipLocation || failedAttempts >= 3 || canContinue || (permissionGranted && !error)) {
+  // 1. Location is already retrieved
+  // 2. User previously skipped
+  // 3. Error message allows bypass
+  // 4. Permission was previously granted (even if current request failed)
+  if (location || skipLocation || canContinue || (permissionGranted && !error)) {
     return <>{children}</>;
   }
 
-  // Show loading state while requesting location
+  // Show loading state while checking location
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-6">
-        <div className="text-center space-y-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
           <div className="relative">
-            <MapPin className="w-16 h-16 mx-auto text-primary animate-pulse" />
-            <div className="absolute inset-0 bg-primary/20 blur-xl animate-pulse rounded-full" />
+            <MapPin className="h-16 w-16 text-primary animate-pulse" />
+            <div className="absolute inset-0 rounded-full border-4 border-primary/20 animate-ping" />
           </div>
-          <p className="text-lg text-foreground font-medium">Getting your location...</p>
+          <p className="text-lg font-medium text-foreground">Getting your location...</p>
+          <p className="text-sm text-muted-foreground max-w-xs text-center">
+            This helps us show you nearby shops and deals
+          </p>
         </div>
       </div>
     );
@@ -68,99 +63,90 @@ export function LocationPermissionGate({ children }: LocationPermissionGateProps
 
   // Show permission request UI
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-6">
-      <div className="max-w-md w-full space-y-8 text-center">
-        {/* Icon with animation */}
-        <div className="relative">
-          <MapPin className="w-20 h-20 mx-auto text-primary animate-bounce" />
-          <div className="absolute inset-0 bg-primary/20 blur-2xl rounded-full" />
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4 overflow-y-auto">
+      <div className="w-full max-w-md space-y-6 py-8">
+        <div className="flex justify-center">
+          <div className="relative">
+            <div className="absolute inset-0 rounded-full bg-primary/20 blur-2xl animate-pulse" />
+            <div className="relative rounded-full bg-primary/10 p-8 backdrop-blur-sm">
+              <Navigation className="h-16 w-16 text-primary animate-bounce" />
+            </div>
+          </div>
         </div>
 
-        {/* Heading */}
-        <div className="space-y-3">
-          <h1 className="text-3xl font-bold text-foreground">
-            Discover Local Treasures
-          </h1>
+        <div className="space-y-3 text-center">
+          <h2 className="text-3xl font-bold text-foreground">
+            Enable Location Access
+          </h2>
           <p className="text-muted-foreground text-lg">
-            We need your location to show you amazing shops, products, and offers nearby
+            Discover local shops and exclusive deals near you
           </p>
         </div>
 
-        {/* Benefits */}
-        <div className="space-y-4 text-left bg-card/50 backdrop-blur-sm rounded-2xl p-6 border border-border/50">
-          <div className="flex items-start gap-3">
-            <Store className="w-6 h-6 text-primary flex-shrink-0 mt-0.5" />
-            <div>
-              <h3 className="font-semibold text-foreground">Find Local Shops</h3>
-              <p className="text-sm text-muted-foreground">Browse stores right around you</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <Navigation className="w-6 h-6 text-primary flex-shrink-0 mt-0.5" />
-            <div>
-              <h3 className="font-semibold text-foreground">Discover Nearby Products</h3>
-              <p className="text-sm text-muted-foreground">See what's available close to you</p>
-            </div>
-          </div>
-          <div className="flex items-start gap-3">
-            <MapPin className="w-6 h-6 text-primary flex-shrink-0 mt-0.5" />
-            <div>
-              <h3 className="font-semibold text-foreground">Get Exclusive Offers</h3>
-              <p className="text-sm text-muted-foreground">Find deals from shops near you</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Error message if permission was denied */}
         {error && (
-          <div className="bg-destructive/10 border border-destructive/20 rounded-xl p-4">
-            <p className="text-sm text-destructive font-medium">{error}</p>
+          <div className="rounded-lg bg-destructive/10 border border-destructive/20 p-4 text-sm text-destructive">
+            {error}
           </div>
         )}
 
-        {/* Action buttons */}
-        <div className="space-y-3">
-        <Button 
-          onClick={() => requestLocation(true)}
-          size="lg"
-          className="w-full text-base font-semibold h-12 shadow-lg hover:shadow-xl transition-shadow"
-          disabled={loading}
-        >
-          <MapPin className="w-5 h-5 mr-2" />
-          {loading ? 'Getting Location...' : 'Enable Location Access'}
-        </Button>
+        <div className="space-y-3 rounded-lg bg-card/50 backdrop-blur-sm border border-border/50 p-6">
+          <h3 className="font-semibold text-foreground">With location, you get:</h3>
+          <ul className="space-y-2 text-sm text-muted-foreground">
+            <li className="flex items-start gap-2">
+              <span className="text-primary mt-0.5">✓</span>
+              <span>Shops sorted by distance from you</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-primary mt-0.5">✓</span>
+              <span>Exclusive offers in your neighborhood</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-primary mt-0.5">✓</span>
+              <span>Filter shops by delivery availability</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-primary mt-0.5">✓</span>
+              <span>Accurate delivery charge calculations</span>
+            </li>
+          </ul>
+        </div>
 
-          {error && isNative && (
-            <Button 
+        <div className="space-y-3">
+          <Button
+            onClick={() => requestLocation(true)}
+            className="w-full h-12 text-base font-semibold"
+            size="lg"
+          >
+            <MapPin className="mr-2 h-5 w-5" />
+            Enable Location Access
+          </Button>
+
+          {isNative && error && (
+            <Button
               onClick={openSettings}
               variant="outline"
+              className="w-full h-12 text-base"
               size="lg"
-              className="w-full text-base font-semibold h-12"
             >
-              <Settings className="w-5 h-5 mr-2" />
               Open Settings
             </Button>
           )}
 
-          <Button 
+          <Button
             onClick={() => {
-              localStorage.setItem('skip_location_permission', 'true');
               setSkipLocation(true);
+              localStorage.setItem(STORAGE_KEYS.SKIP, 'true');
             }}
             variant="ghost"
+            className="w-full h-12 text-base"
             size="lg"
-            className="w-full text-base font-semibold h-12"
           >
             Continue without location
           </Button>
         </div>
 
-        {/* Help text */}
-        <p className="text-xs text-muted-foreground">
-          {isNative 
-            ? "Your location is only used to show nearby content and is never shared with anyone."
-            : "Enable location in your browser settings to continue. Your location is only used to show nearby content."
-          }
+        <p className="text-xs text-center text-muted-foreground">
+          We only use your location to show you nearby shops. Your location is never stored on our servers or shared with third parties.
         </p>
       </div>
     </div>
