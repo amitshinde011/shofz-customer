@@ -281,7 +281,7 @@ export default function ShopDetail() {
       {/* Mobile Back Button - Floating */}
       <div className="lg:hidden fixed top-4 left-4 z-10">
         <Button
-          variant="ghost"
+          variant="secondary"
           size="icon"
           onClick={() => navigate(-1)}
           className="h-9 w-9 shadow-lg bg-background/80 backdrop-blur-sm"

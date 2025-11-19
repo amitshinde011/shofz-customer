@@ -48,7 +48,7 @@ export function HomeHeader() {
           </Link>
 
           {/* Location (Desktop) */}
-          <button className="hidden md:flex items-center gap-1 hover:border border-white/20 p-2 rounded transition-all flex-shrink-0">
+          <button className="hidden lg:flex items-center gap-1 hover:border border-white/20 p-2 rounded transition-all flex-shrink-0">
             <div className="text-left max-w-[220px]">
               <div className="text-xs text-gray-300">Find Offers, Products,</div>
               <div className="text-xs text-gray-300">Shops, and More Around You</div>
@@ -90,7 +90,7 @@ export function HomeHeader() {
             {/* Favorites (Desktop) */}
             <Link
               to="/favorites"
-              className="hidden md:flex items-center gap-2 hover:border border-white/20 px-2 py-2 rounded transition-all"
+              className="hidden lg:flex items-center gap-2 hover:border border-white/20 px-2 py-2 rounded transition-all"
             >
               <Heart className="w-5 h-5" />
             </Link>
@@ -104,7 +104,7 @@ export function HomeHeader() {
               className="flex items-center gap-2 hover:border border-white/20 px-2 py-2 rounded transition-all relative"
             >
               <MessageCircleHeart className="w-6 h-6" />
-              <span className="hidden md:block text-sm font-semibold">Inquiries</span>
+              <span className="hidden lg:block text-sm font-semibold">Inquiries</span>
             </Link>
             {/* Badge 
               <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs bg-primary">
@@ -113,7 +113,7 @@ export function HomeHeader() {
             {/* Account (Desktop) */}
             <Link
               to="/profile"
-              className="hidden md:flex flex-col hover:border border-white/20 px-2 rounded transition-all"
+              className="hidden lg:flex flex-col hover:border border-white/20 px-2 rounded transition-all"
             >
               <div className="text-xs text-gray-300">Hello, {user?.name || 'Sign in'}</div>
               <div className="text-sm font-semibold">Account</div>
