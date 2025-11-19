@@ -64,7 +64,7 @@ export default function OfferDetail() {
         `)
         .eq('id', id)
         .single();
-      
+
       if (error) throw error;
       return data;
     },
@@ -82,9 +82,9 @@ export default function OfferDetail() {
 
   // Get products from offer or fetch from shop
   const offerProducts = (offer as any)?.products || [];
-  
+
   // Fetch additional products from shop for display
-  const { data: productsData } = useProducts({ 
+  const { data: productsData } = useProducts({
     shopId: offer?.shop_id,
     limit: 6,
   });
@@ -110,34 +110,34 @@ export default function OfferDetail() {
     const now = new Date();
     const diffTime = date.getTime() - now.getTime();
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    
+
     // Correct type assignment for toLocaleDateString options
     const options: Intl.DateTimeFormatOptions = {
-        day: '2-digit', // This is a valid literal string
-        month: 'short'  // This is a valid literal string
+      day: '2-digit', // This is a valid literal string
+      month: 'short'  // This is a valid literal string
     };
-    
+
     if (diffDays < 1) return "Expires today";
     if (diffDays === 1) return "Expires tomorrow";
     if (diffDays <= 7) return `${diffDays} days left`;
-    
+
     return `Valid ${new Date(offer.valid_from).toLocaleDateString('en-GB', options)} - ${date.toLocaleDateString('en-GB', options)}`;
   };
 
   const handleInquire = () => {
     let inquiryDescription = `I'm interested in the offer: ${offer?.title}. ${offer?.description || ''}`;
-    
+
     // If offer has specific products, include them in the inquiry
     if (offerProducts.length > 0) {
       const productNames = offerProducts.map((p: any) => p.name).join(', ');
       inquiryDescription += `\n\nApplicable products: ${productNames}`;
     }
-    
+
     // Use first applicable product name if available, otherwise use offer title
     const productName = offerProducts.length > 0
       ? offerProducts[0].name
       : offer?.title;
-    
+
     navigate(`/inquiry/new?offer_id=${offer?.id}&shop_id=${offer?.shop_id}&product_name=${encodeURIComponent(productName || '')}&description=${encodeURIComponent(inquiryDescription)}`);
   };
 
@@ -296,19 +296,16 @@ export default function OfferDetail() {
                           <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-primary shrink-0" />
                         )}
                       </div>
-                      {(shop.rating && shop.rating > 0) && (
-                        <div className="flex items-center gap-1.5 text-xs sm:text-sm">
-                          <div className="flex items-center gap-0.5">
-                            <Star className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-warning text-warning" />
-                            <span className="font-medium text-foreground">{shop.rating.toFixed(1)}</span>
-                          </div>
-                          {(shop.total_reviews && shop.total_reviews > 0) && (
-                            <span className="text-muted-foreground">
-                              ({shop.total_reviews} {shop.total_reviews === 1 ? 'review' : 'reviews'})
-                            </span>
-                          )}
+                      <div className="flex items-center gap-2 mb-2">
+                        <div className="flex items-center gap-1">
+                          <Star className="w-3 h-3 sm:w-4 sm:h-4 fill-amber-400 text-amber-400" />
+                          <span className="font-semibold text-xs sm:text-sm">{shop.rating?.toFixed(1) || '0.0'}</span>
                         </div>
-                      )}
+                        <span className="text-[10px] sm:text-xs text-muted-foreground">
+                          ({shop.total_reviews || 0} reviews)
+                        </span>
+                      </div>
+
                       {shop.address && (
                         <div className="flex items-start gap-1 text-xs sm:text-sm text-muted-foreground mt-1">
                           <MapPin className="w-3 h-3 sm:w-3.5 sm:h-3.5 shrink-0 mt-0.5" />

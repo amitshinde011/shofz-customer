@@ -81,20 +81,16 @@ export const FeaturedShopCard = ({ shop }: FeaturedShopCardProps) => {
             />
           </div>
 
-          {/* Rating & Reviews - Only show if shop has rating */}
-          {(shop.rating && shop.rating > 0) && (
-            <div className="flex items-center gap-2 mb-2">
-              <div className="flex items-center gap-1">
-                <Star className="w-3 h-3 sm:w-4 sm:h-4 fill-amber-400 text-amber-400" />
-                <span className="font-semibold text-xs sm:text-sm">{shop.rating.toFixed(1)}</span>
-              </div>
-              {(shop.total_reviews && shop.total_reviews > 0) && (
-                <span className="text-[10px] sm:text-xs text-muted-foreground">
-                  ({shop.total_reviews} {shop.total_reviews === 1 ? 'review' : 'reviews'})
-                </span>
-              )}
+          {/* Rating & Reviews */}
+          <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-1">
+              <Star className="w-3 h-3 sm:w-4 sm:h-4 fill-amber-400 text-amber-400" />
+              <span className="font-semibold text-xs sm:text-sm">{shop.rating?.toFixed(1) || '0.0'}</span>
             </div>
-          )}
+            <span className="text-[10px] sm:text-xs text-muted-foreground">
+              ({shop.total_reviews || 0} reviews)
+            </span>
+          </div>
 
           {/* Distance & Status */}
           <div className="space-y-1 text-[10px] sm:text-xs text-muted-foreground flex-grow">
