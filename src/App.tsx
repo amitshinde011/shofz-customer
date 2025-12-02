@@ -35,6 +35,7 @@ import OfferDetail from "./pages/OfferDetail";
 import ShopDashboard from "./pages/ShopDashboard";
 import CustomerSupport from "./pages/CustomerSupport";
 import ReferralHistory from "./pages/ReferralHistory";
+import SearchResults from "./pages/SearchResults";
 import { useIsMobile } from "@/hooks/use-mobile";
 
 // Initialize Google Analytics
@@ -136,6 +137,7 @@ function AppContent() {
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<Home />} />
+        <Route path="/search" element={<SearchResults />} />
         <Route path="/products" element={<Products />} />
         <Route path="/products/:id" element={<ProductDetail />} />
         <Route path="/shops" element={<Shops />} />

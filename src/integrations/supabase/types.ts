@@ -693,10 +693,13 @@ export type Database = {
           budget_min: number | null
           created_at: string | null
           customer_id: string
+          delivery_address: string | null
+          delivery_location: Json | null
           description: string | null
           expires_at: string | null
           id: string
           image_url: string | null
+          order_type: string | null
           preferred_contact: string | null
           product_details: string | null
           product_name: string
@@ -711,10 +714,13 @@ export type Database = {
           budget_min?: number | null
           created_at?: string | null
           customer_id: string
+          delivery_address?: string | null
+          delivery_location?: Json | null
           description?: string | null
           expires_at?: string | null
           id?: string
           image_url?: string | null
+          order_type?: string | null
           preferred_contact?: string | null
           product_details?: string | null
           product_name: string
@@ -729,10 +735,13 @@ export type Database = {
           budget_min?: number | null
           created_at?: string | null
           customer_id?: string
+          delivery_address?: string | null
+          delivery_location?: Json | null
           description?: string | null
           expires_at?: string | null
           id?: string
           image_url?: string | null
+          order_type?: string | null
           preferred_contact?: string | null
           product_details?: string | null
           product_name?: string
@@ -1501,6 +1510,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string | null
+          endpoint: string
+          id: string
+          p256dh: string
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string | null
+          endpoint: string
+          id?: string
+          p256dh: string
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string | null
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       referral_codes: {
         Row: {
