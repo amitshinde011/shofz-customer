@@ -55,9 +55,19 @@ class SearchService {
         .eq('is_active', true)
         .order('is_featured', { ascending: false });
 
-      // Full-text search on products
+      // Full-text search on products - search all important fields
       if (query) {
-        productsQuery = productsQuery.or(`name.ilike.%${query}%,description.ilike.%${query}%,brand.ilike.%${query}%,tags.cs.{${query}}`);
+        productsQuery = productsQuery.or(
+          `name.ilike.%${query}%,` +
+          `description.ilike.%${query}%,` +
+          `brand.ilike.%${query}%,` +
+          `category.ilike.%${query}%,` +
+          `subcategory.ilike.%${query}%,` +
+          `sku.ilike.%${query}%,` +
+          `meta_title.ilike.%${query}%,` +
+          `meta_description.ilike.%${query}%,` +
+          `tags.cs.{${query}}`
+        );
       }
 
       // Category filter
@@ -91,9 +101,16 @@ class SearchService {
         .eq('is_active', true)
         .order('is_featured', { ascending: false });
 
-      // Full-text search on shops
+      // Full-text search on shops - search all important fields
       if (query) {
-        shopsQuery = shopsQuery.or(`name.ilike.%${query}%,description.ilike.%${query}%,categories.cs.{${query}}`);
+        shopsQuery = shopsQuery.or(
+          `name.ilike.%${query}%,` +
+          `description.ilike.%${query}%,` +
+          `address.ilike.%${query}%,` +
+          `slug.ilike.%${query}%,` +
+          `delivery_notes.ilike.%${query}%,` +
+          `categories.cs.{${query}}`
+        );
       }
 
       // Rating filter
@@ -118,9 +135,16 @@ class SearchService {
         .eq('is_active', true)
         .order('is_featured', { ascending: false });
 
-      // Full-text search on offers
+      // Full-text search on offers - search all important fields
       if (query) {
-        offersQuery = offersQuery.or(`title.ilike.%${query}%,description.ilike.%${query}%`);
+        offersQuery = offersQuery.or(
+          `title.ilike.%${query}%,` +
+          `description.ilike.%${query}%,` +
+          `terms_conditions.ilike.%${query}%,` +
+          `offer_type.ilike.%${query}%,` +
+          `discount_type.ilike.%${query}%,` +
+          `applicable_categories.cs.{${query}}`
+        );
       }
 
       // Geospatial filtering using PostGIS
@@ -194,25 +218,37 @@ class SearchService {
         return { data: [], error: null };
       }
 
-      // Get product name suggestions
+      // Get product suggestions - search name, brand, category
       const { data: products, error: productsError } = await (supabase as any)
         .from('products')
-        .select('name')
-        .ilike('name', `${query}%`)
+        .select('name, brand, category')
+        .or(`name.ilike.%${query}%,brand.ilike.%${query}%,category.ilike.%${query}%`)
         .eq('is_active', true)
         .limit(limit);
 
-      // Get shop name suggestions
+      // Get shop suggestions - search name, address
       const { data: shops, error: shopsError } = await supabase
         .from('shops')
-        .select('name')
-        .ilike('name', `${query}%`)
+        .select('name, address')
+        .or(`name.ilike.%${query}%,address.ilike.%${query}%`)
         .eq('is_active', true)
         .limit(limit);
 
+      // Get offer suggestions - search title
+      const { data: offers, error: offersError } = await supabase
+        .from('offers')
+        .select('title')
+        .ilike('title', `%${query}%`)
+        .eq('is_active', true)
+        .limit(Math.floor(limit / 3));
+
+      // Combine suggestions from all sources
       const suggestions = [
         ...((products as any)?.map((p: any) => p.name) || []),
+        ...((products as any)?.map((p: any) => p.brand).filter(Boolean) || []),
+        ...((products as any)?.map((p: any) => p.category).filter(Boolean) || []),
         ...((shops as any)?.map((s: any) => s.name) || []),
+        ...((offers as any)?.map((o: any) => o.title) || []),
       ];
 
       // Remove duplicates and limit
