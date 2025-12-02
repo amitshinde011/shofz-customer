@@ -14,8 +14,10 @@ export interface SearchOptions {
 export interface SearchResult {
   products: any[];
   shops: any[];
+  offers: any[];
   totalProducts: number;
   totalShops: number;
+  totalOffers: number;
 }
 
 class SearchService {
@@ -99,6 +101,28 @@ class SearchService {
         shopsQuery = shopsQuery.gte('rating', rating);
       }
 
+      // Search offers
+      let offersQuery = (supabase as any)
+        .from('offers')
+        .select(`
+          *,
+          shops (
+            id,
+            name,
+            rating,
+            location,
+            address,
+            logo_url
+          )
+        `, { count: 'exact' })
+        .eq('is_active', true)
+        .order('is_featured', { ascending: false });
+
+      // Full-text search on offers
+      if (query) {
+        offersQuery = offersQuery.or(`title.ilike.%${query}%,description.ilike.%${query}%`);
+      }
+
       // Geospatial filtering using PostGIS
       if (location) {
         const { data: nearbyShops, error: shopsError } = await supabase
@@ -112,34 +136,48 @@ class SearchService {
           console.error('Error searching nearby shops:', shopsError);
         }
 
+        // Fetch offers without location filtering
+        offersQuery = offersQuery.range(offset, offset + limit - 1);
+        const { data: offersNearby, error: offersErrorNearby, count: offerCountNearby } = await offersQuery;
+
         return {
           data: {
             products: products || [],
             shops: nearbyShops || [],
+            offers: offersNearby || [],
             totalProducts: productCount || 0,
             totalShops: nearbyShops?.length || 0,
+            totalOffers: offerCountNearby || 0,
           },
-          error: productsError || shopsError,
+          error: productsError || shopsError || offersErrorNearby,
         };
       }
 
-      // Apply limit for shops
+      // Apply limit for shops and offers
       shopsQuery = shopsQuery.range(offset, offset + limit - 1);
+      offersQuery = offersQuery.range(offset, offset + limit - 1);
 
       const { data: shops, error: shopsError, count: shopCount } = await shopsQuery;
+      const { data: offers, error: offersError, count: offerCount } = await offersQuery;
 
       if (shopsError) {
         console.error('Error searching shops:', shopsError);
+      }
+
+      if (offersError) {
+        console.error('Error searching offers:', offersError);
       }
 
       return {
         data: {
           products: products || [],
           shops: shops || [],
+          offers: offers || [],
           totalProducts: productCount || 0,
           totalShops: shopCount || 0,
+          totalOffers: offerCount || 0,
         },
-        error: productsError || shopsError,
+        error: productsError || shopsError || offersError,
       };
     } catch (error) {
       console.error('Search error:', error);
