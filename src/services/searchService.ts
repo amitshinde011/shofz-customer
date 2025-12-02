@@ -23,7 +23,8 @@ export interface SearchResult {
 class SearchService {
   /**
    * Enhanced full-text search across products and shops
-   * Uses PostgreSQL tsvector for fast text search
+   * Uses PostgreSQL tsvector for fast text search via unified_search function
+   * Falls back to client-side filtering if function doesn't exist
    */
   async search(options: SearchOptions): Promise<{ data: SearchResult | null; error: any }> {
     try {
@@ -37,6 +38,43 @@ class SearchService {
         limit = 20,
         offset = 0,
       } = options;
+
+      // Try using the unified_search database function for better performance
+      if (query && query.trim()) {
+        try {
+          const { data: unifiedResult, error: unifiedError } = await (supabase as any).rpc('unified_search', {
+            search_query: query,
+            user_lat: location?.lat || null,
+            user_lng: location?.lng || null,
+            radius_km: radius,
+            category_filter: categories || null,
+            price_min: priceRange?.min || null,
+            price_max: priceRange?.max || null,
+            rating_min: rating || null,
+            result_limit: limit,
+            result_offset: offset,
+          });
+
+          // If unified search succeeds, parse and return results
+          if (!unifiedError && unifiedResult) {
+            const parsed = typeof unifiedResult === 'string' ? JSON.parse(unifiedResult) : unifiedResult;
+            return {
+              data: {
+                products: parsed.products || [],
+                shops: parsed.shops || [],
+                offers: parsed.offers || [],
+                totalProducts: parsed.products?.length || 0,
+                totalShops: parsed.shops?.length || 0,
+                totalOffers: parsed.offers?.length || 0,
+              },
+              error: null,
+            };
+          }
+        } catch (rpcError) {
+          // Function doesn't exist or failed, fall back to client-side filtering
+          console.log('Unified search not available, using fallback method');
+        }
+      }
 
       // Search products with full-text search
       let productsQuery = (supabase as any)
