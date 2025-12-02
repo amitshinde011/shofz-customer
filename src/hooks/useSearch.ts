@@ -52,17 +52,28 @@ export const useRecentSearches = () => {
 };
 
 /**
- * Get search suggestions (autocomplete)
+ * Get search suggestions (autocomplete) with debouncing
  */
 export const useSearchSuggestions = (query: string, enabled: boolean = true) => {
+  const [debouncedQuery, setDebouncedQuery] = useState(query);
+
+  // Debounce the query with 300ms delay
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(query);
+    }, 300);
+
+    return () => clearTimeout(timer);
+  }, [query]);
+
   return useQuery({
-    queryKey: ['search-suggestions', query],
+    queryKey: ['search-suggestions', debouncedQuery],
     queryFn: async () => {
-      const { data, error } = await searchService.getSuggestions(query, 5);
+      const { data, error } = await searchService.getSuggestions(debouncedQuery, 5);
       if (error) throw error;
       return data || [];
     },
-    enabled: enabled && query.length >= 2,
+    enabled: enabled && debouncedQuery.length >= 2,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };
