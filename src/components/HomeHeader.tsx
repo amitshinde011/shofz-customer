@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { Search, MessageCircleHeart, MapPin, Menu, User, Bell, Heart, ShoppingBag } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useScrollDirection } from '@/hooks/useScrollDirection';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { InstallPWAButton } from '@/components/InstallPWAButton';
+import SearchBar from '@/components/SearchBar';
 
 export function HomeHeader() {
   const [searchQuery, setSearchQuery] = useState('');
@@ -16,10 +16,9 @@ export function HomeHeader() {
   const scrollDirection = useScrollDirection();
   const isMobile = useIsMobile();
 
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (searchQuery.trim()) {
-      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+  const handleSearch = (query: string) => {
+    if (query.trim()) {
+      navigate(`/search?q=${encodeURIComponent(query.trim())}`);
     }
   };
 
@@ -56,33 +55,16 @@ export function HomeHeader() {
           </button>
 
           {/* Search Bar */}
-          <form onSubmit={handleSearch} className="flex-1 max-w-4xl">
-            <div className="flex items-center bg-white rounded-md overflow-hidden shadow-sm">
-              <Input
-                type="text"
-                placeholder="Search Shofz"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="text-sm flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-gray-900 placeholder:text-gray-500 h-8"
-              />
-              <Button
-                type="submit"
-                className="
-                relative
-                flex items-center
-                bg-[#ffe066] hover:bg-[#fad02e] text-[#640800] font-semibold uppercase
-                rounded-l-xl rounded-r-none
-                px-5 py-1.5 h-full
-                shadow-lg border-none
-                before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-3 before:h-3 before:bg-white before:rounded-full before:-ml-2 before:border-4 before:border-[#fad02e]
-                after:content-[''] after:absolute after:right-[-16px] after:top-1/2 after:-translate-y-1/2 after:border-t-[16px] after:border-b-[16px] after:border-l-[18px] after:border-t-transparent after:border-b-transparent after:border-l-[#ffe066]
-                "
-              >
-                <Search className="w-5 h-5 mr-2" />
-              </Button>
-
-            </div>
-          </form>
+          <div className="flex-1 max-w-4xl">
+            <SearchBar
+              value={searchQuery}
+              onChange={setSearchQuery}
+              onSearch={handleSearch}
+              placeholder="Search Shofz"
+              showDropdown={true}
+              className="w-full"
+            />
+          </div>
 
           {/* Right Side Actions */}
           <div className="flex items-center gap-2">

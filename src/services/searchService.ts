@@ -160,6 +160,27 @@ class SearchService {
           console.error('Error searching nearby shops:', shopsError);
         }
 
+        // Filter nearby shops by query text if query exists
+        let filteredShops = nearbyShops || [];
+        if (query && nearbyShops) {
+          const lowerQuery = query.toLowerCase();
+          filteredShops = nearbyShops.filter((shop: any) => {
+            return (
+              shop.name?.toLowerCase().includes(lowerQuery) ||
+              shop.description?.toLowerCase().includes(lowerQuery) ||
+              shop.address?.toLowerCase().includes(lowerQuery) ||
+              shop.slug?.toLowerCase().includes(lowerQuery) ||
+              shop.delivery_notes?.toLowerCase().includes(lowerQuery) ||
+              shop.categories?.some((cat: string) => cat.toLowerCase().includes(lowerQuery))
+            );
+          });
+        }
+
+        // Apply rating filter to nearby shops if specified
+        if (rating && rating > 0 && filteredShops) {
+          filteredShops = filteredShops.filter((shop: any) => shop.rating >= rating);
+        }
+
         // Fetch offers without location filtering
         offersQuery = offersQuery.range(offset, offset + limit - 1);
         const { data: offersNearby, error: offersErrorNearby, count: offerCountNearby } = await offersQuery;
@@ -167,10 +188,10 @@ class SearchService {
         return {
           data: {
             products: products || [],
-            shops: nearbyShops || [],
+            shops: filteredShops || [],
             offers: offersNearby || [],
             totalProducts: productCount || 0,
-            totalShops: nearbyShops?.length || 0,
+            totalShops: filteredShops?.length || 0,
             totalOffers: offerCountNearby || 0,
           },
           error: productsError || shopsError || offersErrorNearby,
