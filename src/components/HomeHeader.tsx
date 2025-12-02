@@ -1,25 +1,56 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Search, MessageCircleHeart, MapPin, Menu, User, Bell, Heart, ShoppingBag } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useScrollDirection } from '@/hooks/useScrollDirection';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { InstallPWAButton } from '@/components/InstallPWAButton';
-import SearchBar from '@/components/SearchBar';
+import { SearchDropdown } from '@/components/SearchDropdown';
+import { useSearchSuggestions, useRecentSearches, usePopularSearches } from '@/hooks/useSearch';
 
 export function HomeHeader() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
   const scrollDirection = useScrollDirection();
   const isMobile = useIsMobile();
 
-  const handleSearch = (query: string) => {
-    if (query.trim()) {
-      navigate(`/search?q=${encodeURIComponent(query.trim())}`);
+  // Autocomplete hooks
+  const { data: suggestions = [], isLoading: isLoadingSuggestions } = useSearchSuggestions(searchQuery, dropdownOpen);
+  const { searches: recentSearches, addSearch, clearSearches } = useRecentSearches();
+  const { data: popularSearches = [] } = usePopularSearches();
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchQuery.trim()) {
+      addSearch(searchQuery.trim());
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setDropdownOpen(false);
     }
+  };
+
+  const handleSelectSuggestion = (query: string) => {
+    setSearchQuery(query);
+    addSearch(query);
+    navigate(`/search?q=${encodeURIComponent(query)}`);
+    setDropdownOpen(false);
   };
 
   const isHidden = isMobile && scrollDirection === 'down';
@@ -55,16 +86,39 @@ export function HomeHeader() {
           </button>
 
           {/* Search Bar */}
-          <div className="flex-1 max-w-4xl">
-            <SearchBar
-              value={searchQuery}
-              onChange={setSearchQuery}
-              onSearch={handleSearch}
-              placeholder="Search Shofz"
-              showDropdown={true}
-              className="w-full"
-            />
-          </div>
+          <form onSubmit={handleSubmit} className="flex-1 max-w-3xl">
+            <div ref={containerRef} className="relative">
+              <div className="flex items-center bg-white rounded-md overflow-hidden shadow-sm">
+                <Input
+                  type="text"
+                  placeholder="Search Shofz"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setDropdownOpen(true)}
+                  className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-gray-900 placeholder:text-gray-500"
+                />
+                <Button
+                  type="submit"
+                  className="bg-primary hover:bg-primary/90 text-white rounded-none h-10 px-4"
+                >
+                  <Search className="w-5 h-5" />
+                </Button>
+              </div>
+              
+              <SearchDropdown
+                isOpen={dropdownOpen}
+                query={searchQuery}
+                suggestions={suggestions}
+                recentSearches={recentSearches}
+                popularSearches={popularSearches}
+                isLoadingSuggestions={isLoadingSuggestions}
+                onSelectSuggestion={handleSelectSuggestion}
+                onSelectRecent={handleSelectSuggestion}
+                onClearRecent={clearSearches}
+                onClose={() => setDropdownOpen(false)}
+              />
+            </div>
+          </form>
 
           {/* Right Side Actions */}
           <div className="flex items-center gap-2">

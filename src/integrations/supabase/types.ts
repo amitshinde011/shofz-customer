@@ -1004,6 +1004,7 @@ export type Database = {
           is_active: boolean | null
           is_featured: boolean | null
           offer_type: string | null
+          search_vector: unknown
           shop_id: string
           terms_conditions: string | null
           title: string
@@ -1026,6 +1027,7 @@ export type Database = {
           is_active?: boolean | null
           is_featured?: boolean | null
           offer_type?: string | null
+          search_vector?: unknown
           shop_id: string
           terms_conditions?: string | null
           title: string
@@ -1048,6 +1050,7 @@ export type Database = {
           is_active?: boolean | null
           is_featured?: boolean | null
           offer_type?: string | null
+          search_vector?: unknown
           shop_id?: string
           terms_conditions?: string | null
           title?: string
@@ -1439,6 +1442,7 @@ export type Database = {
           meta_title: string | null
           name: string
           price: number
+          search_vector: unknown
           shop_id: string
           sku: string | null
           specifications: Json | null
@@ -1466,6 +1470,7 @@ export type Database = {
           meta_title?: string | null
           name: string
           price: number
+          search_vector?: unknown
           shop_id: string
           sku?: string | null
           specifications?: Json | null
@@ -1493,6 +1498,7 @@ export type Database = {
           meta_title?: string | null
           name?: string
           price?: number
+          search_vector?: unknown
           shop_id?: string
           sku?: string | null
           specifications?: Json | null
@@ -4134,6 +4140,21 @@ export type Database = {
         Returns: unknown
       }
       stop_featuring: { Args: { p_featured_item_id: string }; Returns: Json }
+      unified_search: {
+        Args: {
+          category_filter?: string[]
+          price_max?: number
+          price_min?: number
+          radius_km?: number
+          rating_min?: number
+          result_limit?: number
+          result_offset?: number
+          search_query: string
+          user_lat?: number
+          user_lng?: number
+        }
+        Returns: Json
+      }
       unlockrows: { Args: { "": string }; Returns: number }
       update_shop_location: {
         Args: { p_latitude: number; p_longitude: number; p_shop_id: string }
