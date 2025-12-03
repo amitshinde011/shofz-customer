@@ -88,20 +88,21 @@ export function HomeHeader() {
           {/* Search Bar */}
           <form onSubmit={handleSubmit} className="flex-1 max-w-3xl">
             <div ref={containerRef} className="relative">
-              <div className="flex items-center bg-white rounded-md overflow-hidden shadow-sm">
+              <div className="flex items-center bg-white rounded-full overflow-hidden shadow-sm pr-1">
                 <Input
                   type="text"
                   placeholder="Search Shofz"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => setDropdownOpen(true)}
-                  className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-gray-900 placeholder:text-gray-500"
+                  className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-gray-900 placeholder:text-gray-500 rounded-full"
                 />
                 <Button
                   type="submit"
-                  className="bg-primary hover:bg-primary/90 text-white rounded-none h-10 px-4"
+                  size="icon"
+                  className="bg-amber-400 hover:bg-amber-500 text-gray-800 rounded-full h-8 w-8 flex-shrink-0"
                 >
-                  <Search className="w-5 h-5" />
+                  <Search className="w-4 h-4" />
                 </Button>
               </div>
               
