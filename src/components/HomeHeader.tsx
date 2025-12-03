@@ -95,12 +95,12 @@ export function HomeHeader() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onFocus={() => setDropdownOpen(true)}
-                  className="flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-gray-900 placeholder:text-gray-500 rounded-full"
+                  className="flex-1 h-9 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-gray-900 placeholder:text-gray-500 rounded-full"
                 />
                 <Button
                   type="submit"
                   size="icon"
-                  className="bg-amber-400 hover:bg-amber-500 text-gray-800 rounded-full h-8 w-8 flex-shrink-0"
+                  className="bg-amber-400 hover:bg-amber-500 text-gray-800 rounded-full h-7 w-7 flex-shrink-0"
                 >
                   <Search className="w-4 h-4" />
                 </Button>
