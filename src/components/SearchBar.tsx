@@ -1,4 +1,4 @@
-import { Search, Mic, Camera } from "lucide-react";
+import { Search } from "lucide-react";
 import { useRef, useState, useEffect } from "react";
 import { SearchDropdown } from "./SearchDropdown";
 import { useSearchSuggestions, useRecentSearches, usePopularSearches } from "@/hooks/useSearch";
@@ -114,13 +114,12 @@ export default function SearchBar({
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       <div
-        className={`flex items-center bg-white rounded-lg px-4 py-2.5 border-2 transition-all duration-300 ${
+        className={`flex items-center bg-white rounded-full px-4 py-2 pr-1 border-2 transition-all duration-300 ${
           isFocused
-            ? "border-primary shadow-md scale-[1.01]"
+            ? "border-primary shadow-md"
             : "border-border hover:border-primary/50"
         }`}
       >
-        <Search className="w-5 h-5 text-muted-foreground mr-3 flex-shrink-0" />
         <input
           ref={inputRef}
           type="text"
@@ -132,21 +131,12 @@ export default function SearchBar({
           placeholder={placeholder}
           className="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
         />
-        {/* Voice Search Button - Future Feature */}
         <button
           type="button"
-          className="p-1.5 hover:bg-accent rounded-md transition-colors ml-2"
-          title="Voice search (coming soon)"
+          onClick={handleSearch}
+          className="bg-amber-400 hover:bg-amber-500 text-gray-800 rounded-full h-8 w-8 flex items-center justify-center flex-shrink-0 ml-2"
         >
-          <Mic className="w-4 h-4 text-muted-foreground" />
-        </button>
-        {/* Visual Search Button - Future Feature */}
-        <button
-          type="button"
-          className="p-1.5 hover:bg-accent rounded-md transition-colors"
-          title="Image search (coming soon)"
-        >
-          <Camera className="w-4 h-4 text-muted-foreground" />
+          <Search className="w-4 h-4" />
         </button>
       </div>
 
