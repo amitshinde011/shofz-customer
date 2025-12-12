@@ -1,14 +1,10 @@
 import { motion } from "framer-motion";
 import { Star, MapPin } from "lucide-react";
-import { Offer } from "@/hooks/useOffers";
+import { EnhancedOffer } from "@/hooks/useSmartOffers";
 import UniversalImage from "./UniversalImage";
 
 interface OfferStoryCardProps {
-  offer: Offer & {
-    distanceKm?: number;
-    formattedDistance?: string;
-    isFavoriteShop?: boolean;
-  };
+  offer: EnhancedOffer;
   isViewed?: boolean;
   onView?: (offerId: string) => void;
   onClick?: () => void;
@@ -110,9 +106,9 @@ export default function OfferStoryCard({ offer, isViewed = false, onView, onClic
   const shopLogo = offer.shops?.logo_url;
   const shopName = offer.shops?.name || "Shop";
   const offerImage = offer.image_url || "/placeholder.svg";
-  const isFavorite = (offer as any).isFavoriteShop;
-  const formattedDistance = (offer as any).formattedDistance;
-  const distanceKm = (offer as any).distanceKm;
+  const isFavorite = offer.isFavoriteShop;
+  const formattedDistance = offer.formattedDistance;
+  const distanceKm = offer.distanceKm;
 
   // Dynamic ring background based on viewed state
   const ringStyle: React.CSSProperties = {

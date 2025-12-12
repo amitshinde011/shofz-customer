@@ -1,7 +1,9 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Offer } from "@/hooks/useOffers";
 import { EnhancedOffer } from "@/hooks/useSmartOffers";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import OfferStoryCard from "./OfferStoryCard";
 import OfferStoriesViewer from "./OfferStoriesViewer";
 
@@ -10,6 +12,8 @@ interface OfferStoriesCarouselProps {
   onLoadMore?: () => void;
   hasMore?: boolean;
   isLoadingMore?: boolean;
+  isLoading?: boolean;
+  error?: Error | null;
 }
 
 // FORCE INLINE STYLES FOR CONTAINER
@@ -49,22 +53,39 @@ const CONTAINER_STYLE: React.CSSProperties = {
   whiteSpace: 'nowrap',
 };
 
+// Skeleton card for loading state
+function OfferStoryCardSkeleton() {
+  return (
+    <div style={{ width: '80px', minWidth: '80px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <Skeleton className="w-[80px] h-[80px] rounded-full mb-1" />
+      <Skeleton className="w-[60px] h-3 rounded" />
+    </div>
+  );
+}
+
 export default function OfferStoriesCarousel({ 
   offers, 
   onLoadMore, 
   hasMore = false, 
-  isLoadingMore = false 
+  isLoadingMore = false,
+  isLoading = false,
+  error = null,
 }: OfferStoriesCarouselProps) {
   const [viewedOffers, setViewedOffers] = useState<Set<string>>(new Set());
   const [viewerVisible, setViewerVisible] = useState(false);
   const [selectedOfferIndex, setSelectedOfferIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const isLoadingMoreRef = useRef(false);
 
   const handleOfferView = (offerId: string) => {
     setViewedOffers((prev) => new Set(prev).add(offerId));
     const viewed = Array.from(viewedOffers);
     viewed.push(offerId);
-    localStorage.setItem("viewedOffers", JSON.stringify(viewed));
+    try {
+      localStorage.setItem("viewedOffers", JSON.stringify(viewed));
+    } catch {
+      // Ignore localStorage errors
+    }
   };
 
   const handleOfferClick = (index: number) => {
@@ -72,28 +93,35 @@ export default function OfferStoriesCarousel({
     setViewerVisible(true);
   };
 
-  // Infinite scroll detection
+  // Throttled infinite scroll detection
   const handleScroll = useCallback(() => {
-    if (!containerRef.current || !onLoadMore || !hasMore || isLoadingMore) return;
+    if (!containerRef.current || !onLoadMore || !hasMore || isLoadingMore || isLoadingMoreRef.current) return;
 
     const { scrollLeft, scrollWidth, clientWidth } = containerRef.current;
     const isNearEnd = scrollLeft + clientWidth >= scrollWidth - 150;
     
     if (isNearEnd) {
+      isLoadingMoreRef.current = true;
       onLoadMore();
+      // Reset the flag after a short delay to prevent rapid calls
+      setTimeout(() => {
+        isLoadingMoreRef.current = false;
+      }, 500);
     }
   }, [onLoadMore, hasMore, isLoadingMore]);
 
   useEffect(() => {
     // Load viewed offers from localStorage
-    const stored = localStorage.getItem("viewedOffers");
-    if (stored) {
-      try {
+    try {
+      const stored = localStorage.getItem("viewedOffers");
+      if (stored) {
         const viewed = JSON.parse(stored);
-        setViewedOffers(new Set(viewed));
-      } catch (e) {
-        console.error("Failed to parse viewed offers", e);
+        if (Array.isArray(viewed)) {
+          setViewedOffers(new Set(viewed));
+        }
       }
+    } catch {
+      // Ignore localStorage errors
     }
   }, []);
 
@@ -107,6 +135,48 @@ export default function OfferStoriesCarousel({
       container.removeEventListener("scroll", handleScroll);
     };
   }, [handleScroll]);
+
+  // Show loading skeletons
+  if (isLoading && offers.length === 0) {
+    return (
+      <div style={WRAPPER_STYLE}>
+        <div style={HEADER_STYLE}>
+          <h3 style={HEADING_STYLE}>🔥 Hot Offers</h3>
+        </div>
+        <div style={{ position: 'relative', width: '100%' }}>
+          <div style={CONTAINER_STYLE}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <OfferStoryCardSkeleton key={i} />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state with retry
+  if (error && offers.length === 0) {
+    return (
+      <div style={WRAPPER_STYLE}>
+        <div style={HEADER_STYLE}>
+          <h3 style={HEADING_STYLE}>🔥 Hot Offers</h3>
+        </div>
+        <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+          <AlertCircle className="w-8 h-8 text-muted-foreground mb-2" />
+          <p className="text-sm text-muted-foreground mb-3">Failed to load offers</p>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => window.location.reload()}
+            className="gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (!offers || offers.length === 0) {
     return null;
@@ -129,7 +199,7 @@ export default function OfferStoriesCarousel({
           {offers.map((offer, index) => (
             <OfferStoryCard
               key={offer.id}
-              offer={offer}
+              offer={offer as EnhancedOffer}
               isViewed={viewedOffers.has(offer.id)}
               onView={handleOfferView}
               onClick={() => handleOfferClick(index)}
