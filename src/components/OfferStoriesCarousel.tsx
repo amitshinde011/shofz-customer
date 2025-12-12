@@ -1,19 +1,23 @@
-import { useState, useRef, useEffect } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Loader2 } from "lucide-react";
 import { Offer } from "@/hooks/useOffers";
+import { EnhancedOffer } from "@/hooks/useSmartOffers";
 import OfferStoryCard from "./OfferStoryCard";
 import OfferStoriesViewer from "./OfferStoriesViewer";
 
 interface OfferStoriesCarouselProps {
-  offers: Offer[];
+  offers: (Offer | EnhancedOffer)[];
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
 }
 
 // FORCE INLINE STYLES FOR CONTAINER
 const WRAPPER_STYLE: React.CSSProperties = {
   width: '100%',
   marginBottom: 0,
-  background: 'linear-gradient(180deg, #fafafa 0%, #ffffff 100%)',
-  borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+  background: 'linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 100%)',
+  borderBottom: '1px solid hsl(var(--border) / 0.5)',
   overflow: 'hidden',
 };
 
@@ -25,7 +29,7 @@ const HEADING_STYLE: React.CSSProperties = {
   margin: 0,
   fontSize: '16px',
   fontWeight: 700,
-  color: '#262626',
+  color: 'hsl(var(--foreground))',
   letterSpacing: '-0.01em',
 };
 
@@ -45,17 +49,19 @@ const CONTAINER_STYLE: React.CSSProperties = {
   whiteSpace: 'nowrap',
 };
 
-export default function OfferStoriesCarousel({ offers }: OfferStoriesCarouselProps) {
+export default function OfferStoriesCarousel({ 
+  offers, 
+  onLoadMore, 
+  hasMore = false, 
+  isLoadingMore = false 
+}: OfferStoriesCarouselProps) {
   const [viewedOffers, setViewedOffers] = useState<Set<string>>(new Set());
-  const [showLeftArrow, setShowLeftArrow] = useState(false);
-  const [showRightArrow, setShowRightArrow] = useState(false);
   const [viewerVisible, setViewerVisible] = useState(false);
   const [selectedOfferIndex, setSelectedOfferIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const handleOfferView = (offerId: string) => {
     setViewedOffers((prev) => new Set(prev).add(offerId));
-    // Persist to localStorage
     const viewed = Array.from(viewedOffers);
     viewed.push(offerId);
     localStorage.setItem("viewedOffers", JSON.stringify(viewed));
@@ -66,28 +72,17 @@ export default function OfferStoriesCarousel({ offers }: OfferStoriesCarouselPro
     setViewerVisible(true);
   };
 
-  const checkScrollPosition = () => {
-    if (!containerRef.current) return;
+  // Infinite scroll detection
+  const handleScroll = useCallback(() => {
+    if (!containerRef.current || !onLoadMore || !hasMore || isLoadingMore) return;
 
     const { scrollLeft, scrollWidth, clientWidth } = containerRef.current;
-    setShowLeftArrow(scrollLeft > 0);
-    setShowRightArrow(scrollLeft < scrollWidth - clientWidth - 10);
-  };
-
-  const scroll = (direction: "left" | "right") => {
-    if (!containerRef.current) return;
-
-    const scrollAmount = 300;
-    const newScrollLeft =
-      direction === "left"
-        ? containerRef.current.scrollLeft - scrollAmount
-        : containerRef.current.scrollLeft + scrollAmount;
-
-    containerRef.current.scrollTo({
-      left: newScrollLeft,
-      behavior: "smooth",
-    });
-  };
+    const isNearEnd = scrollLeft + clientWidth >= scrollWidth - 150;
+    
+    if (isNearEnd) {
+      onLoadMore();
+    }
+  }, [onLoadMore, hasMore, isLoadingMore]);
 
   useEffect(() => {
     // Load viewed offers from localStorage
@@ -100,23 +95,18 @@ export default function OfferStoriesCarousel({ offers }: OfferStoriesCarouselPro
         console.error("Failed to parse viewed offers", e);
       }
     }
-
-    // Check scroll position on mount
-    checkScrollPosition();
   }, []);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    container.addEventListener("scroll", checkScrollPosition);
-    window.addEventListener("resize", checkScrollPosition);
+    container.addEventListener("scroll", handleScroll);
 
     return () => {
-      container.removeEventListener("scroll", checkScrollPosition);
-      window.removeEventListener("resize", checkScrollPosition);
+      container.removeEventListener("scroll", handleScroll);
     };
-  }, []);
+  }, [handleScroll]);
 
   if (!offers || offers.length === 0) {
     return null;
@@ -125,7 +115,7 @@ export default function OfferStoriesCarousel({ offers }: OfferStoriesCarouselPro
   return (
     <div style={WRAPPER_STYLE}>
       <div style={HEADER_STYLE}>
-        <h3 style={HEADING_STYLE}>Hot Offers</h3>
+        <h3 style={HEADING_STYLE}>🔥 Hot Offers</h3>
       </div>
 
       <div style={{ position: 'relative', width: '100%' }}>        
@@ -145,6 +135,22 @@ export default function OfferStoriesCarousel({ offers }: OfferStoriesCarouselPro
               onClick={() => handleOfferClick(index)}
             />
           ))}
+          
+          {/* Loading indicator for infinite scroll */}
+          {isLoadingMore && (
+            <div 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '60px',
+                minWidth: '60px',
+                height: '80px',
+              }}
+            >
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
+          )}
         </div>        
       </div>
 
