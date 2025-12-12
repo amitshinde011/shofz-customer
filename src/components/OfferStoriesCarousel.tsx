@@ -1,19 +1,27 @@
-import { useState, useRef, useEffect } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Offer } from "@/hooks/useOffers";
+import { EnhancedOffer } from "@/hooks/useSmartOffers";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import OfferStoryCard from "./OfferStoryCard";
 import OfferStoriesViewer from "./OfferStoriesViewer";
 
 interface OfferStoriesCarouselProps {
-  offers: Offer[];
+  offers: (Offer | EnhancedOffer)[];
+  onLoadMore?: () => void;
+  hasMore?: boolean;
+  isLoadingMore?: boolean;
+  isLoading?: boolean;
+  error?: Error | null;
 }
 
 // FORCE INLINE STYLES FOR CONTAINER
 const WRAPPER_STYLE: React.CSSProperties = {
   width: '100%',
   marginBottom: 0,
-  background: 'linear-gradient(180deg, #fafafa 0%, #ffffff 100%)',
-  borderBottom: '1px solid rgba(0, 0, 0, 0.05)',
+  background: 'linear-gradient(180deg, hsl(var(--background)) 0%, hsl(var(--background)) 100%)',
+  borderBottom: '1px solid hsl(var(--border) / 0.5)',
   overflow: 'hidden',
 };
 
@@ -25,7 +33,7 @@ const HEADING_STYLE: React.CSSProperties = {
   margin: 0,
   fontSize: '16px',
   fontWeight: 700,
-  color: '#262626',
+  color: 'hsl(var(--foreground))',
   letterSpacing: '-0.01em',
 };
 
@@ -45,20 +53,39 @@ const CONTAINER_STYLE: React.CSSProperties = {
   whiteSpace: 'nowrap',
 };
 
-export default function OfferStoriesCarousel({ offers }: OfferStoriesCarouselProps) {
+// Skeleton card for loading state
+function OfferStoryCardSkeleton() {
+  return (
+    <div style={{ width: '80px', minWidth: '80px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+      <Skeleton className="w-[80px] h-[80px] rounded-full mb-1" />
+      <Skeleton className="w-[60px] h-3 rounded" />
+    </div>
+  );
+}
+
+export default function OfferStoriesCarousel({ 
+  offers, 
+  onLoadMore, 
+  hasMore = false, 
+  isLoadingMore = false,
+  isLoading = false,
+  error = null,
+}: OfferStoriesCarouselProps) {
   const [viewedOffers, setViewedOffers] = useState<Set<string>>(new Set());
-  const [showLeftArrow, setShowLeftArrow] = useState(false);
-  const [showRightArrow, setShowRightArrow] = useState(false);
   const [viewerVisible, setViewerVisible] = useState(false);
   const [selectedOfferIndex, setSelectedOfferIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
+  const isLoadingMoreRef = useRef(false);
 
   const handleOfferView = (offerId: string) => {
     setViewedOffers((prev) => new Set(prev).add(offerId));
-    // Persist to localStorage
     const viewed = Array.from(viewedOffers);
     viewed.push(offerId);
-    localStorage.setItem("viewedOffers", JSON.stringify(viewed));
+    try {
+      localStorage.setItem("viewedOffers", JSON.stringify(viewed));
+    } catch {
+      // Ignore localStorage errors
+    }
   };
 
   const handleOfferClick = (index: number) => {
@@ -66,57 +93,90 @@ export default function OfferStoriesCarousel({ offers }: OfferStoriesCarouselPro
     setViewerVisible(true);
   };
 
-  const checkScrollPosition = () => {
-    if (!containerRef.current) return;
+  // Throttled infinite scroll detection
+  const handleScroll = useCallback(() => {
+    if (!containerRef.current || !onLoadMore || !hasMore || isLoadingMore || isLoadingMoreRef.current) return;
 
     const { scrollLeft, scrollWidth, clientWidth } = containerRef.current;
-    setShowLeftArrow(scrollLeft > 0);
-    setShowRightArrow(scrollLeft < scrollWidth - clientWidth - 10);
-  };
-
-  const scroll = (direction: "left" | "right") => {
-    if (!containerRef.current) return;
-
-    const scrollAmount = 300;
-    const newScrollLeft =
-      direction === "left"
-        ? containerRef.current.scrollLeft - scrollAmount
-        : containerRef.current.scrollLeft + scrollAmount;
-
-    containerRef.current.scrollTo({
-      left: newScrollLeft,
-      behavior: "smooth",
-    });
-  };
+    const isNearEnd = scrollLeft + clientWidth >= scrollWidth - 150;
+    
+    if (isNearEnd) {
+      isLoadingMoreRef.current = true;
+      onLoadMore();
+      // Reset the flag after a short delay to prevent rapid calls
+      setTimeout(() => {
+        isLoadingMoreRef.current = false;
+      }, 500);
+    }
+  }, [onLoadMore, hasMore, isLoadingMore]);
 
   useEffect(() => {
     // Load viewed offers from localStorage
-    const stored = localStorage.getItem("viewedOffers");
-    if (stored) {
-      try {
+    try {
+      const stored = localStorage.getItem("viewedOffers");
+      if (stored) {
         const viewed = JSON.parse(stored);
-        setViewedOffers(new Set(viewed));
-      } catch (e) {
-        console.error("Failed to parse viewed offers", e);
+        if (Array.isArray(viewed)) {
+          setViewedOffers(new Set(viewed));
+        }
       }
+    } catch {
+      // Ignore localStorage errors
     }
-
-    // Check scroll position on mount
-    checkScrollPosition();
   }, []);
 
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
 
-    container.addEventListener("scroll", checkScrollPosition);
-    window.addEventListener("resize", checkScrollPosition);
+    container.addEventListener("scroll", handleScroll);
 
     return () => {
-      container.removeEventListener("scroll", checkScrollPosition);
-      window.removeEventListener("resize", checkScrollPosition);
+      container.removeEventListener("scroll", handleScroll);
     };
-  }, []);
+  }, [handleScroll]);
+
+  // Show loading skeletons
+  if (isLoading && offers.length === 0) {
+    return (
+      <div style={WRAPPER_STYLE}>
+        <div style={HEADER_STYLE}>
+          <h3 style={HEADING_STYLE}>🔥 Hot Offers</h3>
+        </div>
+        <div style={{ position: 'relative', width: '100%' }}>
+          <div style={CONTAINER_STYLE}>
+            {Array.from({ length: 6 }).map((_, i) => (
+              <OfferStoryCardSkeleton key={i} />
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show error state with retry
+  if (error && offers.length === 0) {
+    return (
+      <div style={WRAPPER_STYLE}>
+        <div style={HEADER_STYLE}>
+          <h3 style={HEADING_STYLE}>🔥 Hot Offers</h3>
+        </div>
+        <div className="flex flex-col items-center justify-center py-8 px-4 text-center">
+          <AlertCircle className="w-8 h-8 text-muted-foreground mb-2" />
+          <p className="text-sm text-muted-foreground mb-3">Failed to load offers</p>
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={() => window.location.reload()}
+            className="gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Retry
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   if (!offers || offers.length === 0) {
     return null;
@@ -125,7 +185,7 @@ export default function OfferStoriesCarousel({ offers }: OfferStoriesCarouselPro
   return (
     <div style={WRAPPER_STYLE}>
       <div style={HEADER_STYLE}>
-        <h3 style={HEADING_STYLE}>Hot Offers</h3>
+        <h3 style={HEADING_STYLE}>🔥 Hot Offers</h3>
       </div>
 
       <div style={{ position: 'relative', width: '100%' }}>        
@@ -139,12 +199,28 @@ export default function OfferStoriesCarousel({ offers }: OfferStoriesCarouselPro
           {offers.map((offer, index) => (
             <OfferStoryCard
               key={offer.id}
-              offer={offer}
+              offer={offer as EnhancedOffer}
               isViewed={viewedOffers.has(offer.id)}
               onView={handleOfferView}
               onClick={() => handleOfferClick(index)}
             />
           ))}
+          
+          {/* Loading indicator for infinite scroll */}
+          {isLoadingMore && (
+            <div 
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: '60px',
+                minWidth: '60px',
+                height: '80px',
+              }}
+            >
+              <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            </div>
+          )}
         </div>        
       </div>
 
