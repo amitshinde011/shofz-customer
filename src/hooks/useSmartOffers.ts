@@ -72,9 +72,7 @@ export function useSmartOffers(options: UseSmartOffersOptions) {
             id,
             name,
             address,
-            logo_url,
-            latitude,
-            longitude
+            logo_url
           )
         `)
         .eq('is_active', true)
