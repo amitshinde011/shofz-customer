@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { NavLink } from "react-router-dom";
 import * as Icons from "lucide-react";
 import { useShopCategories, useShops } from "@/hooks/useShops";
-import { useActiveOffers } from "@/hooks/useOffers";
+import { useSmartOffers } from "@/hooks/useSmartOffers";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFeaturedShops, useFeaturedProducts, useFeaturedOffers } from "@/hooks/useFeaturedContent";
 import OfferStoriesCarousel from "@/components/OfferStoriesCarousel";
@@ -59,7 +59,15 @@ export default function Home() {
   const { data: featuredShopsData } = useFeaturedShops(15, locationParams);
   const { data: featuredProductsData } = useFeaturedProducts(15, locationParams);
   const { data: featuredOffersData } = useFeaturedOffers(15, locationParams);
-  const { data: offersResponse, isLoading: offersLoading } = useActiveOffers(10, locationParams);
+  
+  // Smart offers with favorites first, distance sorting, and infinite scroll
+  const { 
+    offers: smartOffers, 
+    fetchNextPage, 
+    hasNextPage, 
+    isFetchingNextPage 
+  } = useSmartOffers({ location: locationParams, initialLimit: 15 });
+  
   const { data: categoriesResponse } = useShopCategories();
   const { data: shopsResponse } = useShops({ 
     location: locationParams,
@@ -85,7 +93,6 @@ export default function Home() {
   const rawFeaturedShops = featuredShopsData?.data || [];
   const featuredProducts = featuredProductsData?.data || [];
   const featuredOffers = featuredOffersData?.data || [];
-  const currentOffers = offersResponse?.data || [];
   const allShops = shopsResponse?.data || [];
   
   // Transform featured shops to include location object for FeaturedShopCard
@@ -139,10 +146,15 @@ export default function Home() {
       {/* Amazon-Inspired Header */}
       <HomeHeader />
 
-      {/* Offer Stories Carousel - Instagram Style */}
-      {currentOffers.length > 0 && (
+      {/* Offer Stories Carousel - Instagram Style with Smart Sorting */}
+      {smartOffers.length > 0 && (
         <div className="py-3 sm:py-4 bg-background">
-          <OfferStoriesCarousel offers={currentOffers} />
+          <OfferStoriesCarousel 
+            offers={smartOffers} 
+            onLoadMore={fetchNextPage}
+            hasMore={hasNextPage}
+            isLoadingMore={isFetchingNextPage}
+          />
         </div>
       )}
 
@@ -270,8 +282,8 @@ export default function Home() {
         {/* Ad Banner after Featured Products */}
         <AdBanner placement="after-featured-products" className="my-6" />
 
-        {/* Featured Offers */}
-        {currentOffers.length > 0 && (
+        {/* Hot Deals Section - Uses smart sorted offers */}
+        {smartOffers.length > 0 && (
           <section>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-section-header text-foreground">
@@ -285,7 +297,7 @@ export default function Home() {
               </NavLink>
             </div>
             <div className="grid-offers grid-gap">
-              {currentOffers.slice(0, 6).map((offer) => (
+              {smartOffers.slice(0, 6).map((offer) => (
                 <div key={offer.id}>
                   <OfferCard offer={offer} hideButton={true} />
                 </div>
