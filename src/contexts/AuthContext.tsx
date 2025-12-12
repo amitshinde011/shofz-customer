@@ -673,8 +673,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       if (!roleData) {
-        await supabase.auth.signOut();
-        return { success: false, error: 'This app is for customers only. Please use the Shop Owner app.' };
+        // User exists but doesn't have customer role - add it (cross-app authentication)
+        console.log('[AuthContext] User from business app - adding customer role');
+        
+        const { error: roleInsertError } = await supabase.from('user_roles').insert({
+          user_id: data.user.id,
+          role: 'customer'
+        });
+
+        if (roleInsertError) {
+          console.error('[AuthContext] Failed to add customer role:', roleInsertError);
+          await supabase.auth.signOut();
+          return { success: false, error: 'Failed to set up customer access. Please try again.' };
+        }
+
+        // Create customer profile if it doesn't exist
+        const { error: profileInsertError } = await supabase.from('customer_profiles').insert({
+          user_id: data.user.id
+        });
+
+        if (profileInsertError && !profileInsertError.message.includes('duplicate')) {
+          console.error('[AuthContext] Failed to create customer profile:', profileInsertError);
+          // Don't fail - profile can be created later
+        }
+        
+        // Return as "new user" to this app for profile setup
+        return { success: true, user: data.user, isNewUser: true };
       }
 
       return { success: true, user: data.user, isNewUser: false };
@@ -756,10 +780,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           .single();
 
         if (!roleData) {
-          // ✅ INTENTIONAL: Sign out users who don't belong in this app
-          // This is security enforcement, not a session bug
-          await supabase.auth.signOut();
-          return { success: false, error: 'This app is for customers only. Please use the Shop Owner app.' };
+          // User exists but doesn't have customer role - add it (cross-app authentication)
+          console.log('[AuthContext] Cross-app user detected - adding customer role');
+          
+          const { error: roleInsertError } = await supabase.from('user_roles').insert({
+            user_id: signInData.user.id,
+            role: 'customer'
+          });
+
+          if (roleInsertError) {
+            console.error('[AuthContext] Failed to add customer role:', roleInsertError);
+            await supabase.auth.signOut();
+            return { success: false, error: 'Failed to set up customer access. Please try again.' };
+          }
+
+          // Create customer profile if needed
+          await supabase.from('customer_profiles').insert({
+            user_id: signInData.user.id
+          });
+
+          // Treat as new user to this app for profile setup
+          return { success: true, isNewUser: true, user: signInData.user };
         }
 
         return { success: true, isNewUser: false, user: signInData.user };
