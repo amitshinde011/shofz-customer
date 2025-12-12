@@ -1,4 +1,4 @@
-export type StructuredMessageType = 'QUOTE' | 'PAYMENT_REQUEST' | 'TEXT';
+export type StructuredMessageType = 'QUOTE' | 'PAYMENT_REQUEST' | 'LOCATION_SHARE' | 'TEXT';
 
 export interface QuoteData {
   quoted_price: number;
@@ -13,9 +13,16 @@ export interface PaymentRequestData {
   description?: string;
 }
 
+export interface LocationShareData {
+  lat: number;
+  lng: number;
+  address?: string;
+  formattedAddress?: string;
+}
+
 export interface ParsedMessage {
   type: StructuredMessageType;
-  data: QuoteData | PaymentRequestData | string;
+  data: QuoteData | PaymentRequestData | LocationShareData | string;
   raw: string;
 }
 
@@ -50,4 +57,8 @@ export const isQuoteMessage = (parsed: ParsedMessage): parsed is ParsedMessage &
 
 export const isPaymentRequestMessage = (parsed: ParsedMessage): parsed is ParsedMessage & { data: PaymentRequestData } => {
   return parsed.type === 'PAYMENT_REQUEST';
+};
+
+export const isLocationShareMessage = (parsed: ParsedMessage): parsed is ParsedMessage & { data: LocationShareData } => {
+  return parsed.type === 'LOCATION_SHARE';
 };

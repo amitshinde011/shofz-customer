@@ -1,26 +1,56 @@
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Search, MessageCircleHeart, MapPin, Menu, User, Bell, Heart, ShoppingBag } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { useAuth } from '@/contexts/AuthContext';
 import { useScrollDirection } from '@/hooks/useScrollDirection';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { InstallPWAButton } from '@/components/InstallPWAButton';
+import { SearchDropdown } from '@/components/SearchDropdown';
+import { useSearchSuggestions, useRecentSearches, usePopularSearches } from '@/hooks/useSearch';
 
 export function HomeHeader() {
   const [searchQuery, setSearchQuery] = useState('');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
   const { user } = useAuth();
   const scrollDirection = useScrollDirection();
   const isMobile = useIsMobile();
 
-  const handleSearch = (e: React.FormEvent) => {
+  // Autocomplete hooks
+  const { data: suggestions = [], isLoading: isLoadingSuggestions } = useSearchSuggestions(searchQuery, dropdownOpen);
+  const { searches: recentSearches, addSearch, clearSearches } = useRecentSearches();
+  const { data: popularSearches = [] } = usePopularSearches();
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (searchQuery.trim()) {
-      navigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
+      addSearch(searchQuery.trim());
+      navigate(`/search?q=${encodeURIComponent(searchQuery.trim())}`);
+      setDropdownOpen(false);
     }
+  };
+
+  const handleSelectSuggestion = (query: string) => {
+    setSearchQuery(query);
+    addSearch(query);
+    navigate(`/search?q=${encodeURIComponent(query)}`);
+    setDropdownOpen(false);
   };
 
   const isHidden = isMobile && scrollDirection === 'down';
@@ -56,31 +86,38 @@ export function HomeHeader() {
           </button>
 
           {/* Search Bar */}
-          <form onSubmit={handleSearch} className="flex-1 max-w-4xl">
-            <div className="flex items-center bg-white rounded-md overflow-hidden shadow-sm">
-              <Input
-                type="text"
-                placeholder="Search Shofz"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="text-sm flex-1 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-gray-900 placeholder:text-gray-500 h-8"
+          <form onSubmit={handleSubmit} className="flex-1 max-w-3xl">
+            <div ref={containerRef} className="relative">
+              <div className="flex items-center bg-white rounded-full overflow-hidden shadow-sm pr-1">
+                <Input
+                  type="text"
+                  placeholder="Search Shofz"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onFocus={() => setDropdownOpen(true)}
+                  className="flex-1 h-9 border-0 focus-visible:ring-0 focus-visible:ring-offset-0 text-gray-900 placeholder:text-gray-500 rounded-full"
+                />
+                <Button
+                  type="submit"
+                  size="icon"
+                  className="bg-amber-400 hover:bg-amber-500 text-gray-800 rounded-full h-7 w-7 flex-shrink-0"
+                >
+                  <Search className="w-4 h-4" />
+                </Button>
+              </div>
+              
+              <SearchDropdown
+                isOpen={dropdownOpen}
+                query={searchQuery}
+                suggestions={suggestions}
+                recentSearches={recentSearches}
+                popularSearches={popularSearches}
+                isLoadingSuggestions={isLoadingSuggestions}
+                onSelectSuggestion={handleSelectSuggestion}
+                onSelectRecent={handleSelectSuggestion}
+                onClearRecent={clearSearches}
+                onClose={() => setDropdownOpen(false)}
               />
-              <Button
-                type="submit"
-                className="
-                relative
-                flex items-center
-                bg-[#ffe066] hover:bg-[#fad02e] text-[#640800] font-semibold uppercase
-                rounded-l-xl rounded-r-none
-                px-5 py-1.5 h-full
-                shadow-lg border-none
-                before:content-[''] before:absolute before:left-0 before:top-1/2 before:-translate-y-1/2 before:w-3 before:h-3 before:bg-white before:rounded-full before:-ml-2 before:border-4 before:border-[#fad02e]
-                after:content-[''] after:absolute after:right-[-16px] after:top-1/2 after:-translate-y-1/2 after:border-t-[16px] after:border-b-[16px] after:border-l-[18px] after:border-t-transparent after:border-b-transparent after:border-l-[#ffe066]
-                "
-              >
-                <Search className="w-5 h-5 mr-2" />
-              </Button>
-
             </div>
           </form>
 

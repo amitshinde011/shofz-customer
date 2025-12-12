@@ -20,3 +20,15 @@ export const createPaymentRequestMessage = (data: {
     data
   });
 };
+
+export const createLocationShareMessage = (data: {
+  lat: number;
+  lng: number;
+  address?: string;
+  formattedAddress?: string;
+}): string => {
+  return JSON.stringify({
+    type: 'LOCATION_SHARE',
+    data
+  });
+};

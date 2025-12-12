@@ -22,15 +22,19 @@ import { useToast } from "@/hooks/use-toast";
 import { useRealtimeChat } from "@/hooks/useRealtimeChat";
 import { useRealtimeInquiry } from "@/hooks/useRealtimeInquiry";
 import { useAuth } from "@/contexts/AuthContext";
+import { useUserLocation } from "@/contexts/LocationContext";
 import { TypingIndicator } from "@/components/TypingIndicator";
 import { MultiAttachmentUpload, Attachment } from "@/components/MultiAttachmentUpload";
 import { MessageAttachments } from "@/components/MessageAttachments";
 import { ReviewEligibilityChecker } from "@/components/reviews/ReviewEligibilityChecker";
 import { inquiryService } from "@/services/inquiryService";
-import { parseMessage, isQuoteMessage, isPaymentRequestMessage } from '@/lib/messageParser';
+import { parseMessage, isQuoteMessage, isPaymentRequestMessage, isLocationShareMessage } from '@/lib/messageParser';
+import { createLocationShareMessage } from '@/lib/messageHelpers';
 import { QuoteMessageBubble } from '@/components/chat/QuoteMessageBubble';
 import { PaymentRequestBubble } from '@/components/chat/PaymentRequestBubble';
+import { LocationShareBubble } from '@/components/chat/LocationShareBubble';
 import { checkDeliveryAvailability } from '@/lib/deliveryCalculations';
+import { reverseGeocode } from '@/lib/geocoding';
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -49,7 +53,9 @@ export default function InquiryDetail() {
   
   const [newMessage, setNewMessage] = useState("");
   const [messageAttachments, setMessageAttachments] = useState<Attachment[]>([]);
+  const [isShareLocationLoading, setIsShareLocationLoading] = useState(false);
   const { user } = useAuth();
+  const { location: userLocation, requestLocation } = useUserLocation();
 
   // Real-time inquiry hook with live status updates
   const { inquiry, isLoading, error, isConnected: inquiryConnected } = useRealtimeInquiry({
@@ -151,6 +157,67 @@ export default function InquiryDetail() {
         description: "Failed to mark inquiry as complete.",
         variant: "destructive",
       });
+    }
+  };
+
+  const handleShareLocation = async () => {
+    if (!user || !isConnected) return;
+    
+    setIsShareLocationLoading(true);
+    
+    try {
+      // Get current location
+      let currentLocation = userLocation;
+      
+      if (!currentLocation) {
+        await requestLocation();
+        // Wait a bit for location to update
+        await new Promise(resolve => setTimeout(resolve, 500));
+        currentLocation = userLocation;
+      }
+      
+      if (!currentLocation) {
+        toast({
+          title: "Location unavailable",
+          description: "Please enable location access to share your location.",
+          variant: "destructive",
+        });
+        return;
+      }
+      
+      // Reverse geocode to get address
+      const formattedAddress = await reverseGeocode(currentLocation.lat, currentLocation.lng);
+      
+      // Create and send location share message
+      const locationMessage = createLocationShareMessage({
+        lat: currentLocation.lat,
+        lng: currentLocation.lng,
+        formattedAddress: formattedAddress || undefined,
+      });
+      
+      const success = await sendMessage(locationMessage, 'text', []);
+      
+      if (success) {
+        toast({
+          title: "Location shared",
+          description: "Your location has been shared with the shop.",
+        });
+      } else {
+        toast({
+          title: "Failed to share",
+          description: "Could not share your location. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } catch (error) {
+      console.error('[InquiryDetail] Error sharing location:', error);
+      toast({
+        title: "Error",
+        description: "Failed to share location. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsShareLocationLoading(false);
     }
   };
 
@@ -508,6 +575,23 @@ export default function InquiryDetail() {
                               })}
                             </p>
                           </div>
+                        ) : isLocationShareMessage(parsedMessage) ? (
+                          <div className="max-w-[85%]">
+                            <LocationShareBubble
+                              lat={parsedMessage.data.lat}
+                              lng={parsedMessage.data.lng}
+                              address={parsedMessage.data.address}
+                              formattedAddress={parsedMessage.data.formattedAddress}
+                              isCurrentUser={isCurrentUser}
+                              shop={inquiry.shops}
+                            />
+                            <p className="text-xs text-muted-foreground mt-1 px-1">
+                              {new Date(message.created_at).toLocaleTimeString([], { 
+                                hour: '2-digit', 
+                                minute: '2-digit' 
+                              })}
+                            </p>
+                          </div>
                         ) : (
                           <div
                             className={`max-w-[75%] rounded-lg px-3 py-2 ${
@@ -582,6 +666,25 @@ export default function InquiryDetail() {
                         disabled={!isConnected}
                       />
                     </div>
+                    
+                    {/* Share Location Button - Only if shop offers delivery */}
+                    {inquiry.shops?.delivery_available && (
+                      <Button 
+                        type="button"
+                        variant="outline"
+                        size="icon"
+                        onClick={handleShareLocation}
+                        disabled={!isConnected || isShareLocationLoading}
+                        title="Share your location for delivery"
+                      >
+                        {isShareLocationLoading ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <MapPin className="w-4 h-4" />
+                        )}
+                      </Button>
+                    )}
+                    
                     <Button 
                       type="submit" 
                       size="icon"

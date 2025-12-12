@@ -14,14 +14,17 @@ export interface SearchOptions {
 export interface SearchResult {
   products: any[];
   shops: any[];
+  offers: any[];
   totalProducts: number;
   totalShops: number;
+  totalOffers: number;
 }
 
 class SearchService {
   /**
    * Enhanced full-text search across products and shops
-   * Uses PostgreSQL tsvector for fast text search
+   * Uses PostgreSQL tsvector for fast text search via unified_search function
+   * Falls back to client-side filtering if function doesn't exist
    */
   async search(options: SearchOptions): Promise<{ data: SearchResult | null; error: any }> {
     try {
@@ -35,6 +38,43 @@ class SearchService {
         limit = 20,
         offset = 0,
       } = options;
+
+      // Try using the unified_search database function for better performance
+      if (query && query.trim()) {
+        try {
+          const { data: unifiedResult, error: unifiedError } = await (supabase as any).rpc('unified_search', {
+            search_query: query,
+            user_lat: location?.lat || null,
+            user_lng: location?.lng || null,
+            radius_km: radius,
+            category_filter: categories || null,
+            price_min: priceRange?.min || null,
+            price_max: priceRange?.max || null,
+            rating_min: rating || null,
+            result_limit: limit,
+            result_offset: offset,
+          });
+
+          // If unified search succeeds, parse and return results
+          if (!unifiedError && unifiedResult) {
+            const parsed = typeof unifiedResult === 'string' ? JSON.parse(unifiedResult) : unifiedResult;
+            return {
+              data: {
+                products: parsed.products || [],
+                shops: parsed.shops || [],
+                offers: parsed.offers || [],
+                totalProducts: parsed.products?.length || 0,
+                totalShops: parsed.shops?.length || 0,
+                totalOffers: parsed.offers?.length || 0,
+              },
+              error: null,
+            };
+          }
+        } catch (rpcError) {
+          // Function doesn't exist or failed, fall back to client-side filtering
+          console.log('Unified search not available, using fallback method');
+        }
+      }
 
       // Search products with full-text search
       let productsQuery = (supabase as any)
@@ -53,9 +93,19 @@ class SearchService {
         .eq('is_active', true)
         .order('is_featured', { ascending: false });
 
-      // Full-text search on products
+      // Full-text search on products - search all important fields
       if (query) {
-        productsQuery = productsQuery.or(`name.ilike.%${query}%,description.ilike.%${query}%,brand.ilike.%${query}%,tags.cs.{${query}}`);
+        productsQuery = productsQuery.or(
+          `name.ilike.%${query}%,` +
+          `description.ilike.%${query}%,` +
+          `brand.ilike.%${query}%,` +
+          `category.ilike.%${query}%,` +
+          `subcategory.ilike.%${query}%,` +
+          `sku.ilike.%${query}%,` +
+          `meta_title.ilike.%${query}%,` +
+          `meta_description.ilike.%${query}%,` +
+          `tags.cs.{${query}}`
+        );
       }
 
       // Category filter
@@ -89,14 +139,50 @@ class SearchService {
         .eq('is_active', true)
         .order('is_featured', { ascending: false });
 
-      // Full-text search on shops
+      // Full-text search on shops - search all important fields
       if (query) {
-        shopsQuery = shopsQuery.or(`name.ilike.%${query}%,description.ilike.%${query}%,categories.cs.{${query}}`);
+        shopsQuery = shopsQuery.or(
+          `name.ilike.%${query}%,` +
+          `description.ilike.%${query}%,` +
+          `address.ilike.%${query}%,` +
+          `slug.ilike.%${query}%,` +
+          `delivery_notes.ilike.%${query}%,` +
+          `categories.cs.{${query}}`
+        );
       }
 
       // Rating filter
       if (rating && rating > 0) {
         shopsQuery = shopsQuery.gte('rating', rating);
+      }
+
+      // Search offers
+      let offersQuery = (supabase as any)
+        .from('offers')
+        .select(`
+          *,
+          shops (
+            id,
+            name,
+            rating,
+            location,
+            address,
+            logo_url
+          )
+        `, { count: 'exact' })
+        .eq('is_active', true)
+        .order('is_featured', { ascending: false });
+
+      // Full-text search on offers - search all important fields
+      if (query) {
+        offersQuery = offersQuery.or(
+          `title.ilike.%${query}%,` +
+          `description.ilike.%${query}%,` +
+          `terms_conditions.ilike.%${query}%,` +
+          `offer_type.ilike.%${query}%,` +
+          `discount_type.ilike.%${query}%,` +
+          `applicable_categories.cs.{${query}}`
+        );
       }
 
       // Geospatial filtering using PostGIS
@@ -112,34 +198,69 @@ class SearchService {
           console.error('Error searching nearby shops:', shopsError);
         }
 
+        // Filter nearby shops by query text if query exists
+        let filteredShops = nearbyShops || [];
+        if (query && nearbyShops) {
+          const lowerQuery = query.toLowerCase();
+          filteredShops = nearbyShops.filter((shop: any) => {
+            return (
+              shop.name?.toLowerCase().includes(lowerQuery) ||
+              shop.description?.toLowerCase().includes(lowerQuery) ||
+              shop.address?.toLowerCase().includes(lowerQuery) ||
+              shop.slug?.toLowerCase().includes(lowerQuery) ||
+              shop.delivery_notes?.toLowerCase().includes(lowerQuery) ||
+              shop.categories?.some((cat: string) => cat.toLowerCase().includes(lowerQuery))
+            );
+          });
+        }
+
+        // Apply rating filter to nearby shops if specified
+        if (rating && rating > 0 && filteredShops) {
+          filteredShops = filteredShops.filter((shop: any) => shop.rating >= rating);
+        }
+
+        // Fetch offers without location filtering
+        offersQuery = offersQuery.range(offset, offset + limit - 1);
+        const { data: offersNearby, error: offersErrorNearby, count: offerCountNearby } = await offersQuery;
+
         return {
           data: {
             products: products || [],
-            shops: nearbyShops || [],
+            shops: filteredShops || [],
+            offers: offersNearby || [],
             totalProducts: productCount || 0,
-            totalShops: nearbyShops?.length || 0,
+            totalShops: filteredShops?.length || 0,
+            totalOffers: offerCountNearby || 0,
           },
-          error: productsError || shopsError,
+          error: productsError || shopsError || offersErrorNearby,
         };
       }
 
-      // Apply limit for shops
+      // Apply limit for shops and offers
       shopsQuery = shopsQuery.range(offset, offset + limit - 1);
+      offersQuery = offersQuery.range(offset, offset + limit - 1);
 
       const { data: shops, error: shopsError, count: shopCount } = await shopsQuery;
+      const { data: offers, error: offersError, count: offerCount } = await offersQuery;
 
       if (shopsError) {
         console.error('Error searching shops:', shopsError);
+      }
+
+      if (offersError) {
+        console.error('Error searching offers:', offersError);
       }
 
       return {
         data: {
           products: products || [],
           shops: shops || [],
+          offers: offers || [],
           totalProducts: productCount || 0,
           totalShops: shopCount || 0,
+          totalOffers: offerCount || 0,
         },
-        error: productsError || shopsError,
+        error: productsError || shopsError || offersError,
       };
     } catch (error) {
       console.error('Search error:', error);
@@ -156,25 +277,37 @@ class SearchService {
         return { data: [], error: null };
       }
 
-      // Get product name suggestions
+      // Get product suggestions - search name, brand, category
       const { data: products, error: productsError } = await (supabase as any)
         .from('products')
-        .select('name')
-        .ilike('name', `${query}%`)
+        .select('name, brand, category')
+        .or(`name.ilike.%${query}%,brand.ilike.%${query}%,category.ilike.%${query}%`)
         .eq('is_active', true)
         .limit(limit);
 
-      // Get shop name suggestions
+      // Get shop suggestions - search name, address
       const { data: shops, error: shopsError } = await supabase
         .from('shops')
-        .select('name')
-        .ilike('name', `${query}%`)
+        .select('name, address')
+        .or(`name.ilike.%${query}%,address.ilike.%${query}%`)
         .eq('is_active', true)
         .limit(limit);
 
+      // Get offer suggestions - search title
+      const { data: offers, error: offersError } = await supabase
+        .from('offers')
+        .select('title')
+        .ilike('title', `%${query}%`)
+        .eq('is_active', true)
+        .limit(Math.floor(limit / 3));
+
+      // Combine suggestions from all sources
       const suggestions = [
         ...((products as any)?.map((p: any) => p.name) || []),
+        ...((products as any)?.map((p: any) => p.brand).filter(Boolean) || []),
+        ...((products as any)?.map((p: any) => p.category).filter(Boolean) || []),
         ...((shops as any)?.map((s: any) => s.name) || []),
+        ...((offers as any)?.map((o: any) => o.title) || []),
       ];
 
       // Remove duplicates and limit
