@@ -20,9 +20,6 @@ export default function OfferCard({ offer, onInquire, variant = "default", hideB
   const navigate = useNavigate();
   const { data: viewCounts } = useEntityViewCounts('offer', offer.id);
 
-  // Debug logging
-  console.log(`[OfferCard] Offer ${offer.id} - viewCounts data:`, viewCounts, 'Type:', typeof viewCounts, 'Has view_count:', viewCounts?.view_count);
-
   const getDiscountText = () => {
     if (offer.offer_type === "promotion") {
       return "PROMO";

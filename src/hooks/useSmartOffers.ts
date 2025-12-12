@@ -2,13 +2,14 @@ import { useMemo } from 'react';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Offer } from './useOffers';
-import { calculateDistance, formatDistance } from '@/lib/distanceCalculation';
+import { formatDistance } from '@/lib/distanceCalculation';
 import { useAuth } from '@/contexts/AuthContext';
 
 export interface EnhancedOffer extends Offer {
   distanceKm?: number;
   formattedDistance?: string;
   isFavoriteShop: boolean;
+  isViewed?: boolean;
 }
 
 interface UseSmartOffersOptions {
@@ -16,27 +17,25 @@ interface UseSmartOffersOptions {
   initialLimit?: number;
 }
 
+// Safe localStorage helper
+const getViewedOffers = (): Set<string> => {
+  try {
+    const stored = localStorage.getItem('viewedOffers');
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      if (Array.isArray(parsed)) {
+        return new Set(parsed);
+      }
+    }
+  } catch {
+    // Ignore localStorage errors
+  }
+  return new Set();
+};
+
 export function useSmartOffers(options: UseSmartOffersOptions) {
   const { user } = useAuth();
   const pageSize = options.initialLimit || 15;
-
-  // Fetch favorite shop IDs
-  const { data: favoriteShopIds } = useInfiniteQuery({
-    queryKey: ['user-favorite-shop-ids', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return new Set<string>();
-      
-      const { data } = await (supabase as any)
-        .from('user_favorites')
-        .select('shop_id')
-        .eq('user_id', user.id);
-      
-      return new Set<string>((data || []).map((f: any) => f.shop_id));
-    },
-    getNextPageParam: () => undefined,
-    initialPageParam: 0,
-    enabled: !!user?.id,
-  });
 
   // Infinite offers query with smart sorting
   const infiniteQuery = useInfiniteQuery({
@@ -44,7 +43,7 @@ export function useSmartOffers(options: UseSmartOffersOptions) {
     queryFn: async ({ pageParam = 0 }) => {
       if (!options.location) return { data: [], nextOffset: undefined };
 
-      // Get nearby shops with distance
+      // Get nearby shops with distance (RPC already calculates distance_km)
       const { data: nearbyShops, error: shopsError } = await (supabase as any).rpc('get_nearby_shops', {
         user_lat: options.location.lat,
         user_lng: options.location.lng,
@@ -54,15 +53,11 @@ export function useSmartOffers(options: UseSmartOffersOptions) {
       if (shopsError) throw shopsError;
       if (!nearbyShops?.length) return { data: [], nextOffset: undefined };
 
-      // Create shop distance map
+      // Create shop distance map using RPC-provided distance_km (no recalculation)
       const shopDistanceMap = new Map<string, number>();
       nearbyShops.forEach((shop: any) => {
-        if (shop.latitude && shop.longitude && options.location) {
-          const dist = calculateDistance(
-            { lat: options.location.lat, lng: options.location.lng },
-            { lat: shop.latitude, lng: shop.longitude }
-          );
-          shopDistanceMap.set(shop.id, dist);
+        if (shop.distance_km !== undefined && shop.distance_km !== null) {
+          shopDistanceMap.set(shop.id, shop.distance_km);
         }
       });
 
@@ -100,7 +95,10 @@ export function useSmartOffers(options: UseSmartOffersOptions) {
         favoriteSet = new Set((favorites || []).map((f: any) => f.shop_id));
       }
 
-      // Enhance offers with distance and favorite status
+      // Get viewed offers from localStorage
+      const viewedOffers = getViewedOffers();
+
+      // Enhance offers with distance, favorite status, and viewed status
       const enhancedOffers: EnhancedOffer[] = (offers || []).map((offer: any) => {
         const distanceKm = shopDistanceMap.get(offer.shop_id);
         return {
@@ -108,16 +106,21 @@ export function useSmartOffers(options: UseSmartOffersOptions) {
           distanceKm,
           formattedDistance: distanceKm !== undefined ? formatDistance(distanceKm) : undefined,
           isFavoriteShop: favoriteSet.has(offer.shop_id),
+          isViewed: viewedOffers.has(offer.id),
         };
       });
 
-      // Smart sort: favorites first (by distance), then non-favorites (by distance)
+      // Smart sort: favorites first → unviewed first → by distance
       enhancedOffers.sort((a, b) => {
-        // Favorites first
+        // 1. Favorites first
         if (a.isFavoriteShop && !b.isFavoriteShop) return -1;
         if (!a.isFavoriteShop && b.isFavoriteShop) return 1;
         
-        // Then by distance (closer first)
+        // 2. Unviewed first
+        if (!a.isViewed && b.isViewed) return -1;
+        if (a.isViewed && !b.isViewed) return 1;
+        
+        // 3. Then by distance (closer first)
         const distA = a.distanceKm ?? Infinity;
         const distB = b.distanceKm ?? Infinity;
         return distA - distB;
@@ -146,6 +149,6 @@ export function useSmartOffers(options: UseSmartOffersOptions) {
     isFetchingNextPage: infiniteQuery.isFetchingNextPage,
     hasNextPage: infiniteQuery.hasNextPage,
     fetchNextPage: infiniteQuery.fetchNextPage,
-    error: infiniteQuery.error,
+    error: infiniteQuery.error as Error | null,
   };
 }

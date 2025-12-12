@@ -65,7 +65,9 @@ export default function Home() {
     offers: smartOffers, 
     fetchNextPage, 
     hasNextPage, 
-    isFetchingNextPage 
+    isFetchingNextPage,
+    isLoading: isSmartOffersLoading,
+    error: smartOffersError,
   } = useSmartOffers({ location: locationParams, initialLimit: 15 });
   
   const { data: categoriesResponse } = useShopCategories();
@@ -76,12 +78,15 @@ export default function Home() {
 
   // Pull-to-refresh handler
   const handleRefresh = async () => {
-    await queryClient.invalidateQueries({ queryKey: ['featured-shops'] });
-    await queryClient.invalidateQueries({ queryKey: ['featured-products'] });
-    await queryClient.invalidateQueries({ queryKey: ['featured-offers'] });
-    await queryClient.invalidateQueries({ queryKey: ['offers'] });
-    await queryClient.invalidateQueries({ queryKey: ['shop-categories'] });
-    await queryClient.invalidateQueries({ queryKey: ['shops'] });
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['featured-shops'] }),
+      queryClient.invalidateQueries({ queryKey: ['featured-products'] }),
+      queryClient.invalidateQueries({ queryKey: ['featured-offers'] }),
+      queryClient.invalidateQueries({ queryKey: ['offers'] }),
+      queryClient.invalidateQueries({ queryKey: ['smart-offers'] }),
+      queryClient.invalidateQueries({ queryKey: ['shop-categories'] }),
+      queryClient.invalidateQueries({ queryKey: ['shops'] }),
+    ]);
   };
 
   const pullToRefresh = usePullToRefresh({
@@ -147,13 +152,15 @@ export default function Home() {
       <HomeHeader />
 
       {/* Offer Stories Carousel - Instagram Style with Smart Sorting */}
-      {smartOffers.length > 0 && (
+      {(smartOffers.length > 0 || isSmartOffersLoading) && (
         <div className="py-3 sm:py-4 bg-background">
           <OfferStoriesCarousel 
             offers={smartOffers} 
             onLoadMore={fetchNextPage}
             hasMore={hasNextPage}
             isLoadingMore={isFetchingNextPage}
+            isLoading={isSmartOffersLoading}
+            error={smartOffersError}
           />
         </div>
       )}
