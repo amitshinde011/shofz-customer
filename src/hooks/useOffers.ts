@@ -62,7 +62,7 @@ export const useOffers = (options?: {
           `)
           .eq('shop_id', options.shopId)
           .eq('is_active', true)
-          .gte('valid_until', new Date().toISOString())
+          .or(`valid_until.is.null,valid_until.gte.${new Date().toISOString()}`)
           .order('is_featured', { ascending: false })
           .order('created_at', { ascending: false });
 
@@ -126,7 +126,7 @@ export const useOffers = (options?: {
           `)
           .eq('is_active', true)
           .in('shop_id', nearbyShopIds)
-          .gte('valid_until', new Date().toISOString())
+          .or(`valid_until.is.null,valid_until.gte.${new Date().toISOString()}`)
           .order('is_featured', { ascending: false })
           .order('created_at', { ascending: false });
 
@@ -205,7 +205,7 @@ export const useActiveOffers = (limit?: number, location?: { lat: number; lng: n
           `)
           .eq('is_active', true)
           .in('shop_id', nearbyShopIds)
-          .gte('valid_until', new Date().toISOString())
+          .or(`valid_until.is.null,valid_until.gte.${new Date().toISOString()}`)
           .order('is_featured', { ascending: false })
           .order('created_at', { ascending: false })
           .limit(limit || 10);
@@ -262,7 +262,7 @@ export const useInfiniteOffers = (options?: {
           `)
           .eq('shop_id', options.shopId)
           .eq('is_active', true)
-          .gte('valid_until', new Date().toISOString())
+          .or(`valid_until.is.null,valid_until.gte.${new Date().toISOString()}`)
           .order('is_featured', { ascending: false })
           .order('created_at', { ascending: false })
           .range(pageParam, pageParam + 19);
@@ -316,7 +316,7 @@ export const useInfiniteOffers = (options?: {
           `)
           .eq('is_active', true)
           .in('shop_id', nearbyShopIds)
-          .gte('valid_until', new Date().toISOString())
+          .or(`valid_until.is.null,valid_until.gte.${new Date().toISOString()}`)
           .order('is_featured', { ascending: false })
           .order('created_at', { ascending: false })
           .range(pageParam, pageParam + 19);
