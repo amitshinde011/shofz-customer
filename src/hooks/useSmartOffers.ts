@@ -77,7 +77,7 @@ export function useSmartOffers(options: UseSmartOffersOptions) {
         `)
         .eq('is_active', true)
         .in('shop_id', nearbyShopIds)
-        .gte('valid_until', new Date().toISOString())
+        .or(`valid_until.is.null,valid_until.gte.${new Date().toISOString()}`)
         .order('created_at', { ascending: false })
         .range(pageParam, pageParam + pageSize - 1);
 
