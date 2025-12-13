@@ -6,6 +6,7 @@ import { FeaturedBadge } from "./FeaturedBadge";
 import { ResponsiveImage } from "./ResponsiveImage";
 import { Button } from "./ui/button";
 import { formatDistanceToNow } from "date-fns";
+import { getOfferDiscountText, getOfferTypeLabel } from "@/lib/offerUtils";
 
 interface FeaturedOfferCardProps {
   offer: any;
@@ -14,29 +15,7 @@ interface FeaturedOfferCardProps {
 export const FeaturedOfferCard = ({ offer }: FeaturedOfferCardProps) => {
   const navigate = useNavigate();
   
-  const getDiscountText = () => {
-    if (offer.offer_type === "promotion") {
-      return "PROMO";
-    }
-    if (offer.discount_type === "percentage") {
-      return `${offer.discount_value}% OFF`;
-    } else if (offer.discount_type === "fixed") {
-      return `₹${offer.discount_value} OFF`;
-    }
-    return `${offer.discount_value} OFF`;
-  };
-
-  const getOfferTypeLabel = () => {
-    const typeMap: Record<string, string> = {
-      'percentage': 'Percentage Off',
-      'fixed_amount': 'Fixed Amount',
-      'fixed': 'Fixed Amount',
-      'buy_x_get_y': 'Buy X Get Y',
-      'promotion': 'Promotion',
-      'discount': 'Discount',
-    };
-    return typeMap[offer.offer_type] || offer.offer_type;
-  };
+  const getDiscountText = () => getOfferDiscountText(offer);
 
   const timeRemaining = offer.valid_until
     ? formatDistanceToNow(new Date(offer.valid_until), { addSuffix: true })
@@ -112,7 +91,7 @@ export const FeaturedOfferCard = ({ offer }: FeaturedOfferCardProps) => {
           {/* Offer Type & Time Remaining */}
           <div className="flex flex-wrap gap-2 mb-3">
             <Badge variant="outline" className="text-[10px] sm:text-xs">
-              {getOfferTypeLabel()}
+              {getOfferTypeLabel(offer.offer_type)}
             </Badge>
             {timeRemaining && (
               <div className="flex items-center gap-1 text-meta text-amber-600 font-medium">

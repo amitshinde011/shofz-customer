@@ -32,6 +32,7 @@ import { useEntityViewCounts } from "@/hooks/useEntityViewCounts";
 import { ResponsiveImage } from "@/components/ResponsiveImage";
 import { trackEvent } from "@/lib/analytics";
 import { useEffect } from "react";
+import { getOfferDiscountText } from "@/lib/offerUtils";
 
 export default function OfferDetail() {
   const { id } = useParams<{ id: string }>();
@@ -92,15 +93,7 @@ export default function OfferDetail() {
 
   const getDiscountText = () => {
     if (!offer) return "";
-    if (offer.offer_type === "promotion") {
-      return "PROMO";
-    }
-    if (offer.discount_type === "percentage") {
-      return `${offer.discount_value}% OFF`;
-    } else if (offer.discount_type === "fixed") {
-      return `₹${offer.discount_value} OFF`;
-    }
-    return `${offer.discount_value} OFF`;
+    return getOfferDiscountText(offer);
   };
 
   const getValidUntilText = () => {
