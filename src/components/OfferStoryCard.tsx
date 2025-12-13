@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { Star, MapPin } from "lucide-react";
+import { Heart, MapPin } from "lucide-react";
 import { EnhancedOffer } from "@/hooks/useSmartOffers";
 import UniversalImage from "./UniversalImage";
 
@@ -70,7 +70,7 @@ const FAVORITE_BADGE_STYLE: React.CSSProperties = {
   width: '20px',
   height: '20px',
   borderRadius: '50%',
-  background: 'linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%)',
+  background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
   display: 'flex',
   alignItems: 'center',
   justifyContent: 'center',
@@ -140,7 +140,7 @@ export default function OfferStoryCard({ offer, isViewed = false, onView, onClic
             animate={{ scale: 1 }}
             transition={{ type: "spring", stiffness: 400, damping: 15, delay: 0.1 }}
           >
-            <Star className="w-3 h-3 text-white fill-white" />
+            <Heart className="w-3 h-3 text-white fill-white" />
           </motion.div>
         )}
 
