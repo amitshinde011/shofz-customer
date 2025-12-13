@@ -8,6 +8,7 @@ import { Offer } from "@/hooks/useOffers";
 import { useEntityViewCounts } from "@/hooks/useEntityViewCounts";
 import AmazonImage, { BannerImage } from "@/components/AmazonImage";
 import { FeaturedBadge } from "@/components/FeaturedBadge";
+import { getOfferDiscountText } from "@/lib/offerUtils";
 
 interface OfferCardProps {
   offer: Offer;
@@ -20,17 +21,7 @@ export default function OfferCard({ offer, onInquire, variant = "default", hideB
   const navigate = useNavigate();
   const { data: viewCounts } = useEntityViewCounts('offer', offer.id);
 
-  const getDiscountText = () => {
-    if (offer.offer_type === "promotion") {
-      return "PROMO";
-    }
-    if (offer.discount_type === "percentage") {
-      return `${offer.discount_value}% OFF`;
-    } else if (offer.discount_type === "fixed") {
-      return `₹${offer.discount_value} OFF`;
-    }
-    return `${offer.discount_value} OFF`;
-  };
+  const getDiscountText = () => getOfferDiscountText(offer);
 
   const getValidUntilText = () => {
     if (!offer.valid_until) return "Limited time offer";

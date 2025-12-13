@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Offer } from "@/hooks/useOffers";
 import UniversalImage from "./UniversalImage";
 import { supabase } from "@/integrations/supabase/client";
+import { getOfferDiscountText } from "@/lib/offerUtils";
 
 interface OfferStoriesViewerProps {
   offers: Offer[];
@@ -176,17 +177,7 @@ export default function OfferStoriesViewer({
   const shopName = currentOffer.shops?.name || "Shop";
   const offerImage = currentOffer.image_url || "/placeholder.svg";
 
-  const getDiscountText = () => {
-    if (currentOffer.offer_type === "promotion") {
-      return "PROMO";
-    }
-    if (currentOffer.discount_type === "percentage") {
-      return `${currentOffer.discount_value}% OFF`;
-    } else if (currentOffer.discount_type === "fixed") {
-      return `₹${currentOffer.discount_value} OFF`;
-    }
-    return `${currentOffer.discount_value} OFF`;
-  };
+  const getDiscountText = () => getOfferDiscountText(currentOffer);
 
   const getValidUntilText = () => {
     if (!currentOffer.valid_until) return "Limited time offer";
