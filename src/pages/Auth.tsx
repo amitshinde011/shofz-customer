@@ -14,6 +14,36 @@ interface AuthProps {
   onAuthComplete?: () => void;
 }
 
+// localStorage keys for OAuth referral persistence
+const REFERRAL_STORAGE_KEY = 'pending_referral_data';
+const NEW_OAUTH_USER_KEY = 'new_oauth_user';
+
+// Helper functions for referral persistence across OAuth redirect
+const saveReferralToStorage = (data: any) => {
+  try {
+    localStorage.setItem(REFERRAL_STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.warn('[Auth] Could not save referral to localStorage');
+  }
+};
+
+const getReferralFromStorage = (): any => {
+  try {
+    const data = localStorage.getItem(REFERRAL_STORAGE_KEY);
+    return data ? JSON.parse(data) : null;
+  } catch (e) {
+    return null;
+  }
+};
+
+const clearReferralFromStorage = () => {
+  try {
+    localStorage.removeItem(REFERRAL_STORAGE_KEY);
+  } catch (e) {
+    // Ignore
+  }
+};
+
 export default function Auth({ onAuthComplete }: AuthProps) {
   const [currentStep, setCurrentStep] = useState<AuthStep>("auth");
   const [referralData, setReferralData] = useState<any>(null);
@@ -23,10 +53,11 @@ export default function Auth({ onAuthComplete }: AuthProps) {
   const [isValidatingUrlReferral, setIsValidatingUrlReferral] = useState(false);
   const [pendingEmailConfirmation, setPendingEmailConfirmation] = useState(false);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [oauthCallbackProcessed, setOauthCallbackProcessed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, authenticateWithEmail } = useAuth();
+  const { user, authenticateWithEmail, signInWithGoogle } = useAuth();
   const [searchParams] = useSearchParams();
   const userRef = useRef(user);
   const authUserIdRef = useRef<string | null>(user?.id ?? null);
@@ -92,6 +123,55 @@ export default function Auth({ onAuthComplete }: AuthProps) {
     extractAndValidateReferral();
   }, [searchParams, navigate, location.pathname]);
 
+  // Handle OAuth callback (user returns to /auth after Google sign-in)
+  useEffect(() => {
+    const handleOAuthCallback = async () => {
+      // Only process once, and only when we have a user but are still on auth step
+      if (oauthCallbackProcessed || !user || currentStep !== "auth") {
+        return;
+      }
+
+      // Check if this looks like an OAuth callback (user just arrived with session)
+      // We detect this by checking if we have a user but haven't processed auth success yet
+      const savedReferral = getReferralFromStorage();
+      const isNewOAuthUser = localStorage.getItem(NEW_OAUTH_USER_KEY) === user.id;
+      
+      // Clean up localStorage flags immediately
+      try {
+        localStorage.removeItem(NEW_OAUTH_USER_KEY);
+        clearReferralFromStorage();
+      } catch (e) {
+        // Ignore
+      }
+      
+      // If we have saved referral data, restore it to state for UI display
+      if (savedReferral && !referralData) {
+        console.log('[Auth] Restoring referral data from OAuth redirect:', savedReferral);
+        setReferralData(savedReferral);
+        setUrlReferralCode(savedReferral.referralCode);
+      }
+
+      console.log('[Auth] OAuth callback detected - isNewOAuthUser:', isNewOAuthUser);
+      setOauthCallbackProcessed(true);
+
+      // Pass savedReferral directly to avoid race condition with setState
+      // handleAuthSuccess will use directReferralData if provided
+      handleAuthSuccess(isNewOAuthUser, { id: user.id, email: user.email }, false, savedReferral);
+    };
+
+    handleOAuthCallback();
+  }, [user, currentStep, oauthCallbackProcessed, referralData]);
+
+  // Save referral before Google OAuth redirect
+  const handleGoogleSignInWithReferral = async () => {
+    // Persist referral data before redirect
+    if (referralData) {
+      console.log('[Auth] Saving referral data before Google OAuth redirect:', referralData);
+      saveReferralToStorage(referralData);
+    }
+    return signInWithGoogle();
+  };
+
   const handleAuthComplete = async () => {
     // Wait for user data if needed
     let resolvedUserId = userRef.current?.id ?? authUserIdRef.current;
@@ -131,7 +211,12 @@ export default function Auth({ onAuthComplete }: AuthProps) {
     }
   };
 
-  const handleAuthSuccess = (newUser: boolean, authUser?: { id?: string; email?: string }, requiresEmailConfirmation?: boolean) => {
+  const handleAuthSuccess = (
+    newUser: boolean, 
+    authUser?: { id?: string; email?: string }, 
+    requiresEmailConfirmation?: boolean,
+    directReferralData?: any  // Direct referral data for OAuth flow (avoids state race condition)
+  ) => {
     // Handle email confirmation requirement
     if (requiresEmailConfirmation && authUser?.email) {
       setPendingEmailConfirmation(true);
@@ -150,10 +235,13 @@ export default function Auth({ onAuthComplete }: AuthProps) {
 
     setIsNewUser(newUser);
     
+    // Use directReferralData if provided (OAuth flow), otherwise use state (email flow)
+    const effectiveReferralData = directReferralData || referralData;
+    
     // Process referral in background for BOTH new users and returning users
-    if (referralData && authUser?.id) {
-      console.log('[Auth] Processing referral in background:', referralData);
-      processReferralInBackground(authUser.id, referralData);
+    if (effectiveReferralData && authUser?.id) {
+      console.log('[Auth] Processing referral in background:', effectiveReferralData);
+      processReferralInBackground(authUser.id, effectiveReferralData);
     }
     
     if (newUser) {
@@ -236,6 +324,7 @@ export default function Auth({ onAuthComplete }: AuthProps) {
             onBack={handleSkip}
             onAuthSuccess={handleAuthSuccess}
             onAuthenticate={authenticateWithEmail}
+            onGoogleSignIn={handleGoogleSignInWithReferral}
             emailConfirmationPending={pendingEmailConfirmation}
             pendingEmail={pendingEmail}
             referralBanner={

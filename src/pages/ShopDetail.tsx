@@ -42,7 +42,7 @@ import { useOffers } from "@/hooks/useOffers";
 import OfferCard from "@/components/OfferCard";
 import { useUserLocation } from "@/contexts/LocationContext";
 import { useAuth } from "@/contexts/AuthContext";
-import { calculateShopStatus, getTodayHours } from "@/lib/businessHours";
+import { calculateShopStatus, getTodayHours, parseBusinessHours } from "@/lib/businessHours";
 import { getFormattedDistance, estimateTravelTime, calculateDistance } from "@/lib/distanceCalculation";
 import ImageGallery from "@/components/ImageGallery";
 import { ResponsiveImage } from "@/components/ResponsiveImage";
@@ -235,7 +235,15 @@ export default function ShopDetail() {
   const todayHoursDisplay = getTodayHours(shop.business_hours as any);
   const dayNames = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'];
   const dayDisplayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
-  const businessHours = shop.business_hours as any;
+  const businessHours = parseBusinessHours(shop.business_hours);
+  
+  // Helper to format business hours time (09:00 -> 9:00 AM)
+  const formatBusinessHoursTime = (time: string): string => {
+    const [hours, minutes] = time.split(':').map(Number);
+    const period = hours >= 12 ? 'PM' : 'AM';
+    const displayHours = hours > 12 ? hours - 12 : hours === 0 ? 12 : hours;
+    return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+  };
 
   // Get unique categories to avoid duplicates
   const uniqueCategories = shop.categories ? [...new Set(shop.categories)] as string[] : [];
@@ -607,8 +615,8 @@ export default function ShopDetail() {
                           <div key={day} className="flex justify-between text-xs">
                             <span className="text-muted-foreground">{dayDisplayNames[index]}</span>
                             <span className="font-medium">
-                              {businessHours[day]?.isOpen
-                                ? `${businessHours[day].open} - ${businessHours[day].close}`
+                              {businessHours?.[day as keyof typeof businessHours]?.isOpen
+                                ? `${formatBusinessHoursTime(businessHours[day as keyof typeof businessHours].open!)} - ${formatBusinessHoursTime(businessHours[day as keyof typeof businessHours].close!)}`
                                 : 'Closed'
                               }
                             </span>

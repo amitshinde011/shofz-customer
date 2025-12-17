@@ -256,6 +256,109 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  // Helper function to set up OAuth users (create profile and customer role if needed)
+  const setupOAuthUser = async (userId: string, userEmail: string, userName?: string): Promise<boolean> => {
+    try {
+      console.log('[AuthContext] Setting up OAuth user:', userId);
+      
+      // Track if user is new to the customer app (for profile setup)
+      let isNewToCustomerApp = false;
+
+      // Check if user exists in users table
+      const { data: existingUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', userId)
+        .single();
+
+      if (!existingUser) {
+        // User doesn't exist - create user profile
+        console.log('[AuthContext] Creating user profile for OAuth user');
+        isNewToCustomerApp = true; // Completely new user
+        
+        const { error: userError } = await supabase
+          .from('users')
+          .insert({
+            id: userId,
+            email: userEmail,
+            name: userName || userEmail.split('@')[0],
+            is_active: true
+          });
+
+        if (userError) {
+          console.error('[AuthContext] Failed to create user profile:', userError);
+          return false;
+        }
+      }
+
+      // Check if user has customer role
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .eq('role', 'customer')
+        .eq('is_active', true)
+        .single();
+
+      if (!roleData) {
+        // User doesn't have customer role - this is a cross-app user or new user
+        console.log('[AuthContext] Adding customer role for OAuth user');
+        isNewToCustomerApp = true; // Either new user or existing user from business app
+        
+        const { error: roleError } = await supabase
+          .from('user_roles')
+          .insert({
+            user_id: userId,
+            role: 'customer'
+          });
+
+        if (roleError && !roleError.message?.includes('duplicate')) {
+          console.error('[AuthContext] Failed to add customer role:', roleError);
+          return false;
+        }
+      }
+
+      // Check if customer profile exists
+      const { data: profileData } = await supabase
+        .from('customer_profiles')
+        .select('id')
+        .eq('user_id', userId)
+        .single();
+
+      if (!profileData) {
+        // Create customer profile
+        console.log('[AuthContext] Creating customer profile for OAuth user');
+        const { error: profileError } = await supabase
+          .from('customer_profiles')
+          .insert({
+            user_id: userId
+          });
+
+        if (profileError && !profileError.message?.includes('duplicate')) {
+          console.error('[AuthContext] Failed to create customer profile:', profileError);
+          // Don't fail - customer profile is optional
+        }
+      }
+
+      // Mark as new to customer app for profile setup detection in Auth.tsx
+      // This includes BOTH completely new users AND cross-app users (business -> customer)
+      if (isNewToCustomerApp) {
+        try {
+          localStorage.setItem('new_oauth_user', userId);
+          console.log('[AuthContext] Marked user as new to customer app for profile setup');
+        } catch (e) {
+          console.warn('[AuthContext] Could not set new_oauth_user flag');
+        }
+      }
+
+      console.log('[AuthContext] OAuth user setup complete - isNewToCustomerApp:', isNewToCustomerApp);
+      return true;
+    } catch (error) {
+      console.error('[AuthContext] Exception in setupOAuthUser:', error);
+      return false;
+    }
+  };
+
   // Fetch user profile with retry logic
   const fetchUserProfileWithRetry = async (
     userId: string, 
@@ -321,9 +424,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (!profile) {
             console.warn('[AuthContext] Cannot load profile after retries');
             
-            // For SIGNED_IN, keep the session even if profile fails
+            // For SIGNED_IN, this could be an OAuth user who needs profile setup
             if (event === 'SIGNED_IN') {
-              console.warn('[AuthContext] SIGNED_IN profile fetch failed - keeping session active');
+              console.log('[AuthContext] SIGNED_IN with no profile - attempting OAuth user setup');
+              
+              // Try to set up OAuth user (creates profile + role if needed)
+              const setupSuccess = await setupOAuthUser(
+                session.user.id,
+                session.user.email || '',
+                session.user.user_metadata?.name || session.user.user_metadata?.full_name
+              );
+              
+              if (setupSuccess) {
+                // Retry fetching profile after setup
+                const retryProfile = await fetchUserProfileWithRetry(session.user.id, session);
+                
+                if (retryProfile) {
+                  console.log('[AuthContext] OAuth user setup successful - profile loaded');
+                  if (mounted) {
+                    setAuthState({
+                      user: retryProfile,
+                      session,
+                      loading: false,
+                    });
+                  }
+                  return;
+                }
+              }
+              
+              // Setup failed or profile still not available
+              console.warn('[AuthContext] SIGNED_IN profile setup failed - keeping session active');
               toastRef.current({
                 title: "Profile data unavailable",
                 description: "You're signed in but profile couldn't load. Try refreshing.",
@@ -831,7 +961,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/`,
+          redirectTo: `${window.location.origin}/auth`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
