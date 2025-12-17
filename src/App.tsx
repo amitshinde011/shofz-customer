@@ -12,6 +12,7 @@ import { usePageTracking } from "@/hooks/useAnalytics";
 import { initializeAnalytics } from "@/lib/analytics";
 import { LocationProvider } from "@/contexts/LocationContext";
 import { LocationPermissionGate } from "@/components/LocationPermissionGate";
+import { ScrollToTop } from "@/components/ScrollToTop";
 import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { useEffect } from "react";
 import Auth from "./pages/Auth";
@@ -70,6 +71,7 @@ const App = () => {
               <Toaster />
               <Sonner />
               <BrowserRouter>
+                <ScrollToTop />
                 <AppContent />
               </BrowserRouter>
             </LocationPermissionGate>
