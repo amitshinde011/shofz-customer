@@ -261,6 +261,42 @@ export function UnifiedAuth({ onBack, onAuthSuccess, onAuthenticate, onGoogleSig
           <p className="text-muted-foreground mb-6">Enter your email to continue</p>
 
           <div className="space-y-4">
+            {/* Google Sign-In First */}
+            {onGoogleSignIn && (
+              <>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleGoogleSignIn}
+                  disabled={loading || googleLoading}
+                  className="w-full h-12 text-base font-medium rounded-xl"
+                >
+                  {googleLoading ? (
+                    <>
+                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                      Connecting...
+                    </>
+                  ) : (
+                    <>
+                      <GoogleIcon />
+                      Continue with Google
+                    </>
+                  )}
+                </Button>
+
+                <div className="relative my-4">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-border" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-gradient-to-br from-primary/5 to-secondary/5 px-2 text-muted-foreground">
+                      Or continue with email
+                    </span>
+                  </div>
+                </div>
+              </>
+            )}
+
             {showNameField && (
               <div className="space-y-2">
                 <Label htmlFor="name" className="text-foreground">Name</Label>
@@ -363,45 +399,9 @@ export function UnifiedAuth({ onBack, onAuthSuccess, onAuthenticate, onGoogleSig
                   Please wait...
                 </>
               ) : (
-                "Continue"
+                "Continue with Email"
               )}
             </Button>
-
-            {/* Separator */}
-            {onGoogleSignIn && (
-              <>
-                <div className="relative my-4">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-border" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-gradient-to-br from-primary/5 to-secondary/5 px-2 text-muted-foreground">
-                      Or continue with
-                    </span>
-                  </div>
-                </div>
-
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleGoogleSignIn}
-                  disabled={loading || googleLoading}
-                  className="w-full h-12 text-base font-medium rounded-xl"
-                >
-                  {googleLoading ? (
-                    <>
-                      <Loader2 className="w-5 h-5 mr-2 animate-spin" />
-                      Connecting...
-                    </>
-                  ) : (
-                    <>
-                      <GoogleIcon />
-                      Continue with Google
-                    </>
-                  )}
-                </Button>
-              </>
-            )}
           </div>
         </motion.div>
       </div>
