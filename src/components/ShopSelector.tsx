@@ -257,93 +257,118 @@ export default function ShopSelector({ selectedShops, onShopsChange, userLocatio
                       }`}
                       onClick={() => toggleShopSelection(shop)}
                     >
-                      <CardContent className="p-4">
-                        <div className="flex items-center space-x-4">
-                          {/* Shop Logo */}
-                          <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center overflow-hidden">
-                            {shop.logo_url ? (
-                              <img 
-                                src={shop.logo_url} 
-                                alt={shop.name}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className="text-lg font-bold text-muted-foreground">
-                                {shop.name.charAt(0)}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Shop Info */}
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2 mb-1">
-                              <h3 className="font-semibold text-foreground truncate">
-                                {shop.name}
-                              </h3>
-                              {shop.is_verified && (
-                                <Badge variant="outline" className="text-xs">
-                                  ✓ Verified
-                                </Badge>
+                      <CardContent className="p-3 sm:p-4">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                          {/* Top row: Logo, Name, Add Button */}
+                          <div className="flex items-center gap-3 w-full sm:w-auto sm:flex-1">
+                            {/* Shop Logo */}
+                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-muted flex items-center justify-center overflow-hidden flex-shrink-0">
+                              {shop.logo_url ? (
+                                <img 
+                                  src={shop.logo_url} 
+                                  alt={shop.name}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className="text-base sm:text-lg font-bold text-muted-foreground">
+                                  {shop.name.charAt(0)}
+                                </div>
                               )}
                             </div>
-                            
-                            <div className="space-y-1">
-                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+
+                            {/* Shop Name & Verified Badge */}
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <h3 className="font-semibold text-sm sm:text-base text-foreground truncate">
+                                  {shop.name}
+                                </h3>
+                                {shop.is_verified && (
+                                  <Badge variant="outline" className="text-[10px] sm:text-xs flex-shrink-0">
+                                    ✓
+                                  </Badge>
+                                )}
+                              </div>
+                              {/* Rating & Distance - visible on desktop only in this row */}
+                              <div className="hidden sm:flex items-center gap-3 text-sm text-muted-foreground mt-0.5">
                                 {(shop.rating && shop.rating > 0) && (
                                   <div className="flex items-center gap-1">
                                     <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
                                     <span>{shop.rating.toFixed(1)}</span>
-                                    {(shop.total_reviews && shop.total_reviews > 0) && (
-                                      <span>({shop.total_reviews} {shop.total_reviews === 1 ? 'review' : 'reviews'})</span>
-                                    )}
                                   </div>
                                 )}
                                 {shop.distance_km < 999 && (
                                   <div className="flex items-center gap-1">
                                     <MapPin className="w-3 h-3" />
-                                    <span>{formatDistance(shop.distance_km)} away</span>
+                                    <span>{formatDistance(shop.distance_km)}</span>
                                   </div>
                                 )}
                               </div>
-                              
-                              {shop.categories && shop.categories.length > 0 && (
-                                <div className="flex flex-wrap gap-1">
-                                  {shop.categories.slice(0, 2).map((category) => (
-                                    <Badge key={category} variant="outline" className="text-xs">
-                                      {category}
-                                    </Badge>
-                                  ))}
-                                  {shop.categories.length > 2 && (
-                                    <Badge variant="outline" className="text-xs">
-                                      +{shop.categories.length - 2} more
-                                    </Badge>
-                                  )}
-                                </div>
-                              )}
                             </div>
+
+                            {/* Selection Button - always on right */}
+                            <Button
+                              variant={selected ? "default" : "outline"}
+                              size="sm"
+                              className="flex-shrink-0 h-8 px-2 sm:px-3"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                toggleShopSelection(shop);
+                              }}
+                            >
+                              {selected ? (
+                                <>
+                                  <Check className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-1" />
+                                  <span className="hidden sm:inline">Added</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Plus className="w-3 h-3 sm:w-4 sm:h-4 sm:mr-1" />
+                                  <span className="hidden sm:inline">Add</span>
+                                </>
+                              )}
+                            </Button>
                           </div>
 
-                          {/* Selection Button */}
-                          <Button
-                            variant={selected ? "default" : "outline"}
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              toggleShopSelection(shop);
-                            }}
-                          >
-                            {selected ? (
+                          {/* Bottom row on mobile: Rating, Distance, Categories */}
+                          <div className="flex items-center flex-wrap gap-2 text-xs text-muted-foreground sm:hidden">
+                            {(shop.rating && shop.rating > 0) && (
+                              <div className="flex items-center gap-1">
+                                <Star className="w-3 h-3 fill-yellow-400 text-yellow-400" />
+                                <span>{shop.rating.toFixed(1)}</span>
+                              </div>
+                            )}
+                            {shop.distance_km < 999 && (
+                              <div className="flex items-center gap-1">
+                                <MapPin className="w-3 h-3" />
+                                <span>{formatDistance(shop.distance_km)}</span>
+                              </div>
+                            )}
+                            {shop.categories && shop.categories.length > 0 && (
                               <>
-                                <Check className="w-4 h-4 mr-1" />
-                                Added
-                              </>
-                            ) : (
-                              <>
-                                <Plus className="w-4 h-4 mr-1" />
-                                Add
+                                {shop.categories.slice(0, 2).map((category) => (
+                                  <Badge key={category} variant="outline" className="text-[10px]">
+                                    {category}
+                                  </Badge>
+                                ))}
                               </>
                             )}
-                          </Button>
+                          </div>
+
+                          {/* Categories - desktop only */}
+                          {shop.categories && shop.categories.length > 0 && (
+                            <div className="hidden sm:flex flex-wrap gap-1">
+                              {shop.categories.slice(0, 2).map((category) => (
+                                <Badge key={category} variant="outline" className="text-xs">
+                                  {category}
+                                </Badge>
+                              ))}
+                              {shop.categories.length > 2 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{shop.categories.length - 2}
+                                </Badge>
+                              )}
+                            </div>
+                          )}
                         </div>
                       </CardContent>
                     </Card>

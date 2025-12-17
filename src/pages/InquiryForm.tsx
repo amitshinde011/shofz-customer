@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/breadcrumb";
 
 const inquirySchema = z.object({
-  product_name: z.string().min(1, "Product name is required").max(100, "Product name too long"),
+  subject: z.string().max(100, "Subject too long").optional(),
   description: z.string().max(500, "Description must be less than 500 characters").optional(),
   quantity: z.number().min(1, "Quantity must be at least 1").max(100, "Quantity too high"),
   budget_min: z.number().min(0, "Budget must be positive").optional(),
@@ -71,7 +71,7 @@ export default function InquiryForm() {
   const createInquiry = useCreateInquiry();
 
   const [formData, setFormData] = useState<InquiryFormData>({
-    product_name: productName,
+    subject: productName,
     description: prefilledDescription,
     quantity: 1,
     budget_min: 0,
@@ -92,7 +92,7 @@ export default function InquiryForm() {
   useEffect(() => {
     setFormData(prev => ({
       ...prev,
-      product_name: productName,
+      subject: productName,
       description: prefilledDescription,
     }));
   }, [productName, prefilledDescription]);
@@ -200,7 +200,7 @@ export default function InquiryForm() {
       const inquiryPromises = selectedShops.map(shop => {
         const inquiryData = {
           shop_id: shop.id,
-          product_name: formData.product_name,
+          product_name: formData.subject || 'General Inquiry', // Map subject to product_name for API
           description: formData.description,
           quantity: formData.quantity,
           budget_min: formData.budget_min,
@@ -222,7 +222,7 @@ export default function InquiryForm() {
 
       const searchParams = new URLSearchParams({
         shop_count: selectedShops.length.toString(),
-        product_name: formData.product_name
+        subject: formData.subject || 'General Inquiry'
       });
       
       navigate(`/inquiry/success?${searchParams.toString()}`);
@@ -315,22 +315,22 @@ export default function InquiryForm() {
         >
           <Card>
             <CardHeader>
-              <CardTitle>Product Inquiry Details</CardTitle>
+              <CardTitle>Inquiry Details</CardTitle>
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Product Name */}
+                {/* Subject */}
                 <div className="space-y-2">
-                  <Label htmlFor="product_name">Product Name *</Label>
+                  <Label htmlFor="subject">Subject (Optional)</Label>
                   <Input
-                    id="product_name"
-                    value={formData.product_name}
-                    onChange={(e) => setFormData(prev => ({ ...prev, product_name: e.target.value }))}
-                    placeholder="What are you looking for?"
-                    className={errors.product_name ? "border-destructive" : ""}
+                    id="subject"
+                    value={formData.subject}
+                    onChange={(e) => setFormData(prev => ({ ...prev, subject: e.target.value }))}
+                    placeholder="e.g., Looking for wedding sarees, Need bulk electronics..."
+                    className={errors.subject ? "border-destructive" : ""}
                   />
-                  {errors.product_name && (
-                    <p className="text-sm text-destructive">{errors.product_name}</p>
+                  {errors.subject && (
+                    <p className="text-sm text-destructive">{errors.subject}</p>
                   )}
                 </div>
 
