@@ -14,6 +14,36 @@ interface AuthProps {
   onAuthComplete?: () => void;
 }
 
+// localStorage keys for OAuth referral persistence
+const REFERRAL_STORAGE_KEY = 'pending_referral_data';
+const NEW_OAUTH_USER_KEY = 'new_oauth_user';
+
+// Helper functions for referral persistence across OAuth redirect
+const saveReferralToStorage = (data: any) => {
+  try {
+    localStorage.setItem(REFERRAL_STORAGE_KEY, JSON.stringify(data));
+  } catch (e) {
+    console.warn('[Auth] Could not save referral to localStorage');
+  }
+};
+
+const getReferralFromStorage = (): any => {
+  try {
+    const data = localStorage.getItem(REFERRAL_STORAGE_KEY);
+    return data ? JSON.parse(data) : null;
+  } catch (e) {
+    return null;
+  }
+};
+
+const clearReferralFromStorage = () => {
+  try {
+    localStorage.removeItem(REFERRAL_STORAGE_KEY);
+  } catch (e) {
+    // Ignore
+  }
+};
+
 export default function Auth({ onAuthComplete }: AuthProps) {
   const [currentStep, setCurrentStep] = useState<AuthStep>("auth");
   const [referralData, setReferralData] = useState<any>(null);
@@ -23,6 +53,7 @@ export default function Auth({ onAuthComplete }: AuthProps) {
   const [isValidatingUrlReferral, setIsValidatingUrlReferral] = useState(false);
   const [pendingEmailConfirmation, setPendingEmailConfirmation] = useState(false);
   const [pendingEmail, setPendingEmail] = useState<string | null>(null);
+  const [oauthCallbackProcessed, setOauthCallbackProcessed] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -91,6 +122,54 @@ export default function Auth({ onAuthComplete }: AuthProps) {
     
     extractAndValidateReferral();
   }, [searchParams, navigate, location.pathname]);
+
+  // Handle OAuth callback (user returns to /auth after Google sign-in)
+  useEffect(() => {
+    const handleOAuthCallback = async () => {
+      // Only process once, and only when we have a user but are still on auth step
+      if (oauthCallbackProcessed || !user || currentStep !== "auth") {
+        return;
+      }
+
+      // Check if this looks like an OAuth callback (user just arrived with session)
+      // We detect this by checking if we have a user but haven't processed auth success yet
+      const savedReferral = getReferralFromStorage();
+      const isNewOAuthUser = localStorage.getItem(NEW_OAUTH_USER_KEY) === user.id;
+      
+      // Clean up localStorage flags
+      try {
+        localStorage.removeItem(NEW_OAUTH_USER_KEY);
+      } catch (e) {
+        // Ignore
+      }
+      
+      // If we have saved referral data, restore it
+      if (savedReferral && !referralData) {
+        console.log('[Auth] Restoring referral data from OAuth redirect:', savedReferral);
+        setReferralData(savedReferral);
+        setUrlReferralCode(savedReferral.referralCode);
+        clearReferralFromStorage();
+      }
+
+      console.log('[Auth] OAuth callback detected - isNewOAuthUser:', isNewOAuthUser);
+      setOauthCallbackProcessed(true);
+
+      // Trigger the normal auth success flow
+      handleAuthSuccess(isNewOAuthUser, { id: user.id, email: user.email });
+    };
+
+    handleOAuthCallback();
+  }, [user, currentStep, oauthCallbackProcessed]);
+
+  // Save referral before Google OAuth redirect
+  const handleGoogleSignInWithReferral = async () => {
+    // Persist referral data before redirect
+    if (referralData) {
+      console.log('[Auth] Saving referral data before Google OAuth redirect:', referralData);
+      saveReferralToStorage(referralData);
+    }
+    return signInWithGoogle();
+  };
 
   const handleAuthComplete = async () => {
     // Wait for user data if needed
@@ -236,7 +315,7 @@ export default function Auth({ onAuthComplete }: AuthProps) {
             onBack={handleSkip}
             onAuthSuccess={handleAuthSuccess}
             onAuthenticate={authenticateWithEmail}
-            onGoogleSignIn={signInWithGoogle}
+            onGoogleSignIn={handleGoogleSignInWithReferral}
             emailConfirmationPending={pendingEmailConfirmation}
             pendingEmail={pendingEmail}
             referralBanner={

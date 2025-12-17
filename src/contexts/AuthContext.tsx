@@ -327,9 +327,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             user_id: userId
           });
 
-        if (profileError && !profileError.message?.includes('duplicate')) {
+      if (profileError && !profileError.message?.includes('duplicate')) {
           console.error('[AuthContext] Failed to create customer profile:', profileError);
           // Don't fail - customer profile is optional
+        }
+      }
+
+      // Mark new OAuth user for profile setup detection in Auth.tsx
+      if (!existingUser) {
+        try {
+          localStorage.setItem('new_oauth_user', userId);
+        } catch (e) {
+          console.warn('[AuthContext] Could not set new_oauth_user flag');
         }
       }
 
@@ -943,7 +952,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { data, error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/`,
+          redirectTo: `${window.location.origin}/auth`,
           queryParams: {
             access_type: 'offline',
             prompt: 'consent',
