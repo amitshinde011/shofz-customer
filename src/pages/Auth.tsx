@@ -26,7 +26,7 @@ export default function Auth({ onAuthComplete }: AuthProps) {
   const location = useLocation();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, authenticateWithEmail } = useAuth();
+  const { user, authenticateWithEmail, signInWithGoogle } = useAuth();
   const [searchParams] = useSearchParams();
   const userRef = useRef(user);
   const authUserIdRef = useRef<string | null>(user?.id ?? null);
@@ -236,6 +236,7 @@ export default function Auth({ onAuthComplete }: AuthProps) {
             onBack={handleSkip}
             onAuthSuccess={handleAuthSuccess}
             onAuthenticate={authenticateWithEmail}
+            onGoogleSignIn={signInWithGoogle}
             emailConfirmationPending={pendingEmailConfirmation}
             pendingEmail={pendingEmail}
             referralBanner={
