@@ -136,30 +136,31 @@ export default function Auth({ onAuthComplete }: AuthProps) {
       const savedReferral = getReferralFromStorage();
       const isNewOAuthUser = localStorage.getItem(NEW_OAUTH_USER_KEY) === user.id;
       
-      // Clean up localStorage flags
+      // Clean up localStorage flags immediately
       try {
         localStorage.removeItem(NEW_OAUTH_USER_KEY);
+        clearReferralFromStorage();
       } catch (e) {
         // Ignore
       }
       
-      // If we have saved referral data, restore it
+      // If we have saved referral data, restore it to state for UI display
       if (savedReferral && !referralData) {
         console.log('[Auth] Restoring referral data from OAuth redirect:', savedReferral);
         setReferralData(savedReferral);
         setUrlReferralCode(savedReferral.referralCode);
-        clearReferralFromStorage();
       }
 
       console.log('[Auth] OAuth callback detected - isNewOAuthUser:', isNewOAuthUser);
       setOauthCallbackProcessed(true);
 
-      // Trigger the normal auth success flow
-      handleAuthSuccess(isNewOAuthUser, { id: user.id, email: user.email });
+      // Pass savedReferral directly to avoid race condition with setState
+      // handleAuthSuccess will use directReferralData if provided
+      handleAuthSuccess(isNewOAuthUser, { id: user.id, email: user.email }, false, savedReferral);
     };
 
     handleOAuthCallback();
-  }, [user, currentStep, oauthCallbackProcessed]);
+  }, [user, currentStep, oauthCallbackProcessed, referralData]);
 
   // Save referral before Google OAuth redirect
   const handleGoogleSignInWithReferral = async () => {
@@ -210,7 +211,12 @@ export default function Auth({ onAuthComplete }: AuthProps) {
     }
   };
 
-  const handleAuthSuccess = (newUser: boolean, authUser?: { id?: string; email?: string }, requiresEmailConfirmation?: boolean) => {
+  const handleAuthSuccess = (
+    newUser: boolean, 
+    authUser?: { id?: string; email?: string }, 
+    requiresEmailConfirmation?: boolean,
+    directReferralData?: any  // Direct referral data for OAuth flow (avoids state race condition)
+  ) => {
     // Handle email confirmation requirement
     if (requiresEmailConfirmation && authUser?.email) {
       setPendingEmailConfirmation(true);
@@ -229,10 +235,13 @@ export default function Auth({ onAuthComplete }: AuthProps) {
 
     setIsNewUser(newUser);
     
+    // Use directReferralData if provided (OAuth flow), otherwise use state (email flow)
+    const effectiveReferralData = directReferralData || referralData;
+    
     // Process referral in background for BOTH new users and returning users
-    if (referralData && authUser?.id) {
-      console.log('[Auth] Processing referral in background:', referralData);
-      processReferralInBackground(authUser.id, referralData);
+    if (effectiveReferralData && authUser?.id) {
+      console.log('[Auth] Processing referral in background:', effectiveReferralData);
+      processReferralInBackground(authUser.id, effectiveReferralData);
     }
     
     if (newUser) {

@@ -260,6 +260,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const setupOAuthUser = async (userId: string, userEmail: string, userName?: string): Promise<boolean> => {
     try {
       console.log('[AuthContext] Setting up OAuth user:', userId);
+      
+      // Track if user is new to the customer app (for profile setup)
+      let isNewToCustomerApp = false;
 
       // Check if user exists in users table
       const { data: existingUser } = await supabase
@@ -271,6 +274,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (!existingUser) {
         // User doesn't exist - create user profile
         console.log('[AuthContext] Creating user profile for OAuth user');
+        isNewToCustomerApp = true; // Completely new user
+        
         const { error: userError } = await supabase
           .from('users')
           .insert({
@@ -296,8 +301,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       if (!roleData) {
-        // Add customer role
+        // User doesn't have customer role - this is a cross-app user or new user
         console.log('[AuthContext] Adding customer role for OAuth user');
+        isNewToCustomerApp = true; // Either new user or existing user from business app
+        
         const { error: roleError } = await supabase
           .from('user_roles')
           .insert({
@@ -327,22 +334,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             user_id: userId
           });
 
-      if (profileError && !profileError.message?.includes('duplicate')) {
+        if (profileError && !profileError.message?.includes('duplicate')) {
           console.error('[AuthContext] Failed to create customer profile:', profileError);
           // Don't fail - customer profile is optional
         }
       }
 
-      // Mark new OAuth user for profile setup detection in Auth.tsx
-      if (!existingUser) {
+      // Mark as new to customer app for profile setup detection in Auth.tsx
+      // This includes BOTH completely new users AND cross-app users (business -> customer)
+      if (isNewToCustomerApp) {
         try {
           localStorage.setItem('new_oauth_user', userId);
+          console.log('[AuthContext] Marked user as new to customer app for profile setup');
         } catch (e) {
           console.warn('[AuthContext] Could not set new_oauth_user flag');
         }
       }
 
-      console.log('[AuthContext] OAuth user setup complete');
+      console.log('[AuthContext] OAuth user setup complete - isNewToCustomerApp:', isNewToCustomerApp);
       return true;
     } catch (error) {
       console.error('[AuthContext] Exception in setupOAuthUser:', error);
