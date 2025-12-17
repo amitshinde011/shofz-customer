@@ -114,7 +114,7 @@ export default function SearchBar({
   return (
     <div ref={containerRef} className={`relative ${className}`}>
       <div
-        className={`flex items-center bg-white rounded-full px-4 py-2 pr-1 border-2 transition-all duration-300 ${
+        className={`flex items-center bg-white rounded-full px-3 sm:px-4 py-2.5 sm:py-2 pr-1.5 sm:pr-1 border-2 transition-all duration-300 ${
           isFocused
             ? "border-primary shadow-md"
             : "border-border hover:border-primary/50"
@@ -129,12 +129,12 @@ export default function SearchBar({
           onFocus={handleFocus}
           onBlur={() => setIsFocused(false)}
           placeholder={placeholder}
-          className="flex-1 bg-transparent outline-none text-sm placeholder:text-muted-foreground"
+          className="flex-1 bg-transparent outline-none text-base sm:text-sm placeholder:text-muted-foreground min-w-0"
         />
         <button
           type="button"
           onClick={handleSearch}
-          className="bg-amber-400 hover:bg-amber-500 text-gray-800 rounded-full h-8 w-8 flex items-center justify-center flex-shrink-0 ml-2"
+          className="bg-amber-400 hover:bg-amber-500 text-gray-800 rounded-full h-9 w-9 sm:h-8 sm:w-8 flex items-center justify-center flex-shrink-0 ml-2"
         >
           <Search className="w-4 h-4" />
         </button>
