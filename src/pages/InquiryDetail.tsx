@@ -667,23 +667,21 @@ export default function InquiryDetail() {
                       />
                     </div>
                     
-                    {/* Share Location Button - Only if shop offers delivery */}
-                    {inquiry.shops?.delivery_available && (
-                      <Button 
-                        type="button"
-                        variant="outline"
-                        size="icon"
-                        onClick={handleShareLocation}
-                        disabled={!isConnected || isShareLocationLoading}
-                        title="Share your location for delivery"
-                      >
-                        {isShareLocationLoading ? (
-                          <Loader2 className="w-4 h-4 animate-spin" />
-                        ) : (
-                          <MapPin className="w-4 h-4" />
-                        )}
-                      </Button>
-                    )}
+                    {/* Share Location Button */}
+                    <Button 
+                      type="button"
+                      variant="outline"
+                      size="icon"
+                      onClick={handleShareLocation}
+                      disabled={!isConnected || isShareLocationLoading}
+                      title="Share your location"
+                    >
+                      {isShareLocationLoading ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <MapPin className="w-4 h-4" />
+                      )}
+                    </Button>
                     
                     <Button 
                       type="submit" 
