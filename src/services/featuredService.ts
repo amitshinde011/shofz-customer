@@ -220,9 +220,10 @@ export const featuredService = {
           return { data: [], error: null };
         }
 
+        // Include shop data in the query
         const result = await (supabase as any)
           .from('offers')
-          .select('*')
+          .select('*, shops(id, name, logo_url, location, address)')
           .eq('is_featured', true)
           .eq('is_active', true)
           .in('shop_id', nearbyShopIds)
@@ -232,15 +233,19 @@ export const featuredService = {
 
         if (result.error) return { data: [], error: result.error };
 
-        return { 
-          data: (result.data || []).map((offer: any, index: number) => ({
+        // Enrich with distance from nearby shops
+        const enrichedOffers = (result.data || []).map((offer: any, index: number) => {
+          const shopDistance = nearbyShops.find((s: any) => s.id === offer.shop_id);
+          return {
             ...offer,
             featured_priority: (limit - index) * 10,
             featured_until: offer.valid_until || '',
             products: [],
-          })), 
-          error: null 
-        };
+            distance_km: shopDistance?.distance_km,
+          };
+        });
+
+        return { data: enrichedOffers, error: null };
       }
 
       return { data: [], error: new Error('Location is required') };

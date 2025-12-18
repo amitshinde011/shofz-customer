@@ -138,6 +138,7 @@ class SearchService {
         .from('shops')
         .select('*', { count: 'exact' })
         .eq('is_active', true)
+        .eq('is_verified', true)
         .order('is_featured', { ascending: false });
 
       // Full-text search on shops - search all important fields
@@ -293,6 +294,7 @@ class SearchService {
         .select('name, address, description, categories')
         .or(`name.ilike.%${query}%,address.ilike.%${query}%,description.ilike.%${query}%,categories.cs.{${query}}`)
         .eq('is_active', true)
+        .eq('is_verified', true)
         .limit(limit);
 
       // Get offer suggestions - search title, description
