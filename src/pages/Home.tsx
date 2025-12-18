@@ -4,20 +4,17 @@ import { ChevronRight } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import * as Icons from "lucide-react";
 import { useMemo } from "react";
-import { useShopCategories, useShops } from "@/hooks/useShops";
+import { useShopCategories } from "@/hooks/useShops";
 import { useSmartOffers } from "@/hooks/useSmartOffers";
 import { useAuth } from "@/contexts/AuthContext";
 import { useInfiniteFeaturedShops, useInfiniteFeaturedProducts, useInfiniteFeaturedOffers } from "@/hooks/useFeaturedContent";
 import OfferStoriesCarousel from "@/components/OfferStoriesCarousel";
 import { HomeHeader } from "@/components/HomeHeader";
 import OfferCard from "@/components/OfferCard";
-import ShopCard from "@/components/ShopCard";
 import { FeaturedShopCard } from "@/components/FeaturedShopCard";
 import { FeaturedProductCard } from "@/components/FeaturedProductCard";
 import { FeaturedOfferCard } from "@/components/FeaturedOfferCard";
 import { useUserLocation } from "@/contexts/LocationContext";
-import { calculateShopStatus } from "@/lib/businessHours";
-import { formatDistance } from "@/lib/distanceCalculation";
 import { AdBannerCarousel } from "@/components/AdBannerCarousel";
 import { AdBanner } from "@/components/AdBanner";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
@@ -58,6 +55,9 @@ const AD_PLACEMENTS = [
   "home-featured-2",
 ];
 
+// Page size for featured content
+const FEATURED_PAGE_SIZE = 10;
+
 export default function Home() {
   const { user } = useAuth();
   const { location } = useUserLocation();
@@ -72,6 +72,7 @@ export default function Home() {
     hasNextPage: hasMoreShops,
     isFetchingNextPage: isFetchingShops,
     isLoading: isLoadingShops,
+    isError: isShopsError,
   } = useInfiniteFeaturedShops(locationParams);
 
   const { 
@@ -80,6 +81,7 @@ export default function Home() {
     hasNextPage: hasMoreProducts,
     isFetchingNextPage: isFetchingProducts,
     isLoading: isLoadingProducts,
+    isError: isProductsError,
   } = useInfiniteFeaturedProducts(locationParams);
 
   const { 
@@ -88,6 +90,7 @@ export default function Home() {
     hasNextPage: hasMoreOffers,
     isFetchingNextPage: isFetchingOffers,
     isLoading: isLoadingOffers,
+    isError: isOffersError,
   } = useInfiniteFeaturedOffers(locationParams);
   
   // Smart offers with favorites first, distance sorting, and infinite scroll
@@ -101,10 +104,6 @@ export default function Home() {
   } = useSmartOffers({ location: locationParams, initialLimit: 15 });
   
   const { data: categoriesResponse } = useShopCategories();
-  const { data: shopsResponse } = useShops({ 
-    location: locationParams,
-    limit: 10 
-  });
 
   // Pull-to-refresh handler
   const handleRefresh = async () => {
@@ -115,7 +114,6 @@ export default function Home() {
       queryClient.invalidateQueries({ queryKey: ['offers'] }),
       queryClient.invalidateQueries({ queryKey: ['smart-offers'] }),
       queryClient.invalidateQueries({ queryKey: ['shop-categories'] }),
-      queryClient.invalidateQueries({ queryKey: ['shops'] }),
     ]);
   };
 
@@ -125,55 +123,40 @@ export default function Home() {
   });
 
   const shopCategories = categoriesResponse?.data || [];
-  const allShops = shopsResponse?.data || [];
 
-  // Flatten paginated data
-  const featuredShops = useMemo(() => {
-    const shops = shopsData?.pages.flatMap(page => page.data) || [];
-    return shops.map(shop => ({
+  // First page data only - for initial display sections (fixed batch)
+  const firstPageShops = useMemo(() => {
+    const shops = shopsData?.pages[0]?.data || [];
+    return shops.map((shop: any) => ({
       ...shop,
       location: shop.latitude && shop.longitude ? { lat: shop.latitude, lng: shop.longitude } : null
     }));
   }, [shopsData]);
 
-  const featuredProducts = useMemo(() => {
+  const firstPageProducts = useMemo(() => {
+    return productsData?.pages[0]?.data || [];
+  }, [productsData]);
+
+  const firstPageOffers = useMemo(() => {
+    return offersData?.pages[0]?.data || [];
+  }, [offersData]);
+
+  // All flattened data for additional rounds
+  const allFeaturedShops = useMemo(() => {
+    const shops = shopsData?.pages.flatMap(page => page.data) || [];
+    return shops.map((shop: any) => ({
+      ...shop,
+      location: shop.latitude && shop.longitude ? { lat: shop.latitude, lng: shop.longitude } : null
+    }));
+  }, [shopsData]);
+
+  const allFeaturedProducts = useMemo(() => {
     return productsData?.pages.flatMap(page => page.data) || [];
   }, [productsData]);
 
-  const featuredOffers = useMemo(() => {
+  const allFeaturedOffers = useMemo(() => {
     return offersData?.pages.flatMap(page => page.data) || [];
   }, [offersData]);
-  
-  // Filter out featured shops from regular shops list and transform for ShopCard
-  const featuredShopIds = new Set(featuredShops.map(shop => shop.id));
-  const regularShops = allShops
-    .filter(shop => !featuredShopIds.has(shop.id))
-    .slice(0, 5)
-    .map(shop => {
-      const shopStatus = calculateShopStatus(shop.business_hours);
-      return {
-        id: shop.id,
-        name: shop.name,
-        image: shop.logo_url || '/placeholder.svg',
-        category: shop.categories?.[0] || 'Shop',
-        categories: shop.categories || [],
-        rating: shop.rating || 0,
-        distance: shop.distance_km ? formatDistance(shop.distance_km) : 'N/A',
-        address: shop.address || '',
-        isOpen: shopStatus.isOpen,
-        nextStatusChange: shopStatus.nextStatusChange,
-        isFavorite: false,
-        coordinates: shop.latitude && shop.longitude ? { lat: shop.latitude, lng: shop.longitude } : null,
-        phone: shop.phone_number || '',
-        reviewCount: shop.total_reviews || 0,
-        delivery_available: shop.delivery_available,
-        delivery_coverage_km: shop.delivery_coverage_km,
-        delivery_charge_per_km: shop.delivery_charge_per_km,
-        free_delivery_above: shop.free_delivery_above,
-        delivery_notes: shop.delivery_notes,
-        distance_km: shop.distance_km,
-      };
-    });
 
   // Combined infinite load handler
   const handleLoadMore = () => {
@@ -230,7 +213,7 @@ export default function Home() {
 
       <div className="max-w-screen-xl mx-auto page-container section-spacing">
         {/* Featured Shops Grid */}
-        {(featuredShops.length > 0 || isLoadingShops) && (
+        {(firstPageShops.length > 0 || isLoadingShops) && (
           <section>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-section-header text-foreground">
@@ -248,8 +231,10 @@ export default function Home() {
                 Array.from({ length: 6 }).map((_, i) => (
                   <Skeleton key={i} className="aspect-[4/3] rounded-lg" />
                 ))
+              ) : isShopsError ? (
+                <p className="text-destructive col-span-full text-center py-4">Failed to load shops</p>
               ) : (
-                featuredShops.map((shop) => (
+                firstPageShops.map((shop) => (
                   <div key={shop.id}>
                     <FeaturedShopCard shop={shop} />
                   </div>
@@ -263,7 +248,7 @@ export default function Home() {
         <AdBanner placement="after-featured-shops" className="my-6" />
 
         {/* Featured Offers Grid */}
-        {(featuredOffers.length > 0 || isLoadingOffers) && (
+        {(firstPageOffers.length > 0 || isLoadingOffers) && (
           <section>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-section-header text-foreground">
@@ -281,8 +266,10 @@ export default function Home() {
                 Array.from({ length: 6 }).map((_, i) => (
                   <Skeleton key={i} className="aspect-[4/3] rounded-lg" />
                 ))
+              ) : isOffersError ? (
+                <p className="text-destructive col-span-full text-center py-4">Failed to load offers</p>
               ) : (
-                featuredOffers.map((offer) => (
+                firstPageOffers.map((offer) => (
                   <div key={offer.id}>
                     <FeaturedOfferCard offer={offer} />
                   </div>
@@ -335,7 +322,7 @@ export default function Home() {
         </section>
 
         {/* Featured Products */}
-        {(featuredProducts.length > 0 || isLoadingProducts) && (
+        {(firstPageProducts.length > 0 || isLoadingProducts) && (
           <section>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-section-header text-foreground">
@@ -353,8 +340,10 @@ export default function Home() {
                 Array.from({ length: 6 }).map((_, i) => (
                   <Skeleton key={i} className="aspect-[4/3] rounded-lg" />
                 ))
+              ) : isProductsError ? (
+                <p className="text-destructive col-span-full text-center py-4">Failed to load products</p>
               ) : (
-                featuredProducts.map((product) => (
+                firstPageProducts.map((product) => (
                   <div key={product.id}>
                     <FeaturedProductCard product={product} />
                   </div>
@@ -391,39 +380,15 @@ export default function Home() {
           </section>
         )}
 
-        
-        {/* Regular Shops - Show non-featured shops */}
-        {regularShops.length > 0 && (
-          <section>
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-section-header text-foreground">
-                Popular Shops Near You
-              </h3>
-              <NavLink to="/shops">
-                <Button variant="ghost" size="sm" className="text-xs sm:text-sm h-9 touch-target">
-                  View All
-                  <ChevronRight className="w-3 h-3 ml-1" />
-                </Button>
-              </NavLink>
-            </div>
-            <div className="grid-shops grid-gap">
-              {regularShops.map((shop) => (
-                <div key={shop.id}>
-                  <ShopCard shop={shop} variant="compact" />
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
 
         {/* Additional rounds of featured content with ads */}
         {pageCount > 1 && Array.from({ length: pageCount - 1 }).map((_, roundIndex) => {
           const roundNum = roundIndex + 1;
-          const startIdx = roundNum * 10;
+          const startIdx = roundNum * FEATURED_PAGE_SIZE;
           
-          const roundShops = featuredShops.slice(startIdx, startIdx + 10);
-          const roundProducts = featuredProducts.slice(startIdx, startIdx + 10);
-          const roundOffers = featuredOffers.slice(startIdx, startIdx + 10);
+          const roundShops = allFeaturedShops.slice(startIdx, startIdx + FEATURED_PAGE_SIZE);
+          const roundProducts = allFeaturedProducts.slice(startIdx, startIdx + FEATURED_PAGE_SIZE);
+          const roundOffers = allFeaturedOffers.slice(startIdx, startIdx + FEATURED_PAGE_SIZE);
           
           if (roundShops.length === 0 && roundProducts.length === 0 && roundOffers.length === 0) {
             return null;
