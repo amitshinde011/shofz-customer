@@ -1,30 +1,31 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Star, ChevronRight, MapPin, Phone, Store } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { ChevronRight } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import * as Icons from "lucide-react";
+import { useMemo } from "react";
 import { useShopCategories, useShops } from "@/hooks/useShops";
 import { useSmartOffers } from "@/hooks/useSmartOffers";
 import { useAuth } from "@/contexts/AuthContext";
-import { useFeaturedShops, useFeaturedProducts, useFeaturedOffers } from "@/hooks/useFeaturedContent";
+import { useInfiniteFeaturedShops, useInfiniteFeaturedProducts, useInfiniteFeaturedOffers } from "@/hooks/useFeaturedContent";
 import OfferStoriesCarousel from "@/components/OfferStoriesCarousel";
 import { HomeHeader } from "@/components/HomeHeader";
-import ProductCard from "@/components/ProductCard";
 import OfferCard from "@/components/OfferCard";
 import ShopCard from "@/components/ShopCard";
 import { FeaturedShopCard } from "@/components/FeaturedShopCard";
 import { FeaturedProductCard } from "@/components/FeaturedProductCard";
 import { FeaturedOfferCard } from "@/components/FeaturedOfferCard";
-import { ResponsiveImage } from "@/components/ResponsiveImage";
 import { useUserLocation } from "@/contexts/LocationContext";
 import { calculateShopStatus } from "@/lib/businessHours";
-import { calculateDistance, formatDistance } from "@/lib/distanceCalculation";
+import { formatDistance } from "@/lib/distanceCalculation";
 import { AdBannerCarousel } from "@/components/AdBannerCarousel";
 import { AdBanner } from "@/components/AdBanner";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
 import { useQueryClient } from "@tanstack/react-query";
+import { InfiniteScrollTrigger } from "@/components/InfiniteScrollTrigger";
+import { InfiniteScrollLoader } from "@/components/InfiniteScrollLoader";
+import { Skeleton } from "@/components/ui/skeleton";
 
 // Helper function to get icon for category
 const getCategoryIcon = (categoryName: string): keyof typeof Icons => {
@@ -48,6 +49,15 @@ const getCategoryIcon = (categoryName: string): keyof typeof Icons => {
   return iconMap[categoryName] || "Store";
 };
 
+// Ad placements that cycle
+const AD_PLACEMENTS = [
+  "after-featured-shops",
+  "after-featured-offers", 
+  "after-featured-products",
+  "home-featured-1",
+  "home-featured-2",
+];
+
 export default function Home() {
   const { user } = useAuth();
   const { location } = useUserLocation();
@@ -55,17 +65,37 @@ export default function Home() {
   
   const locationParams = location ? { lat: location.lat, lng: location.lng, radius: 50 } : undefined;
   
-  // Fetch enough items for 3 rows × 5 columns (max large desktop view)
-  const { data: featuredShopsData } = useFeaturedShops(15, locationParams);
-  const { data: featuredProductsData } = useFeaturedProducts(15, locationParams);
-  const { data: featuredOffersData } = useFeaturedOffers(15, locationParams);
+  // Infinite scroll for featured content
+  const { 
+    data: shopsData, 
+    fetchNextPage: fetchNextShops, 
+    hasNextPage: hasMoreShops,
+    isFetchingNextPage: isFetchingShops,
+    isLoading: isLoadingShops,
+  } = useInfiniteFeaturedShops(locationParams);
+
+  const { 
+    data: productsData, 
+    fetchNextPage: fetchNextProducts, 
+    hasNextPage: hasMoreProducts,
+    isFetchingNextPage: isFetchingProducts,
+    isLoading: isLoadingProducts,
+  } = useInfiniteFeaturedProducts(locationParams);
+
+  const { 
+    data: offersData, 
+    fetchNextPage: fetchNextOffers, 
+    hasNextPage: hasMoreOffers,
+    isFetchingNextPage: isFetchingOffers,
+    isLoading: isLoadingOffers,
+  } = useInfiniteFeaturedOffers(locationParams);
   
   // Smart offers with favorites first, distance sorting, and infinite scroll
   const { 
     offers: smartOffers, 
-    fetchNextPage, 
-    hasNextPage, 
-    isFetchingNextPage,
+    fetchNextPage: fetchSmartOffers, 
+    hasNextPage: hasMoreSmartOffers, 
+    isFetchingNextPage: isFetchingSmartOffers,
     isLoading: isSmartOffersLoading,
     error: smartOffersError,
   } = useSmartOffers({ location: locationParams, initialLimit: 15 });
@@ -79,9 +109,9 @@ export default function Home() {
   // Pull-to-refresh handler
   const handleRefresh = async () => {
     await Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['featured-shops'] }),
-      queryClient.invalidateQueries({ queryKey: ['featured-products'] }),
-      queryClient.invalidateQueries({ queryKey: ['featured-offers'] }),
+      queryClient.invalidateQueries({ queryKey: ['infinite-featured-shops'] }),
+      queryClient.invalidateQueries({ queryKey: ['infinite-featured-products'] }),
+      queryClient.invalidateQueries({ queryKey: ['infinite-featured-offers'] }),
       queryClient.invalidateQueries({ queryKey: ['offers'] }),
       queryClient.invalidateQueries({ queryKey: ['smart-offers'] }),
       queryClient.invalidateQueries({ queryKey: ['shop-categories'] }),
@@ -95,16 +125,24 @@ export default function Home() {
   });
 
   const shopCategories = categoriesResponse?.data || [];
-  const rawFeaturedShops = featuredShopsData?.data || [];
-  const featuredProducts = featuredProductsData?.data || [];
-  const featuredOffers = featuredOffersData?.data || [];
   const allShops = shopsResponse?.data || [];
-  
-  // Transform featured shops to include location object for FeaturedShopCard
-  const featuredShops = rawFeaturedShops.map(shop => ({
-    ...shop,
-    location: shop.latitude && shop.longitude ? { lat: shop.latitude, lng: shop.longitude } : null
-  }));
+
+  // Flatten paginated data
+  const featuredShops = useMemo(() => {
+    const shops = shopsData?.pages.flatMap(page => page.data) || [];
+    return shops.map(shop => ({
+      ...shop,
+      location: shop.latitude && shop.longitude ? { lat: shop.latitude, lng: shop.longitude } : null
+    }));
+  }, [shopsData]);
+
+  const featuredProducts = useMemo(() => {
+    return productsData?.pages.flatMap(page => page.data) || [];
+  }, [productsData]);
+
+  const featuredOffers = useMemo(() => {
+    return offersData?.pages.flatMap(page => page.data) || [];
+  }, [offersData]);
   
   // Filter out featured shops from regular shops list and transform for ShopCard
   const featuredShopIds = new Set(featuredShops.map(shop => shop.id));
@@ -137,6 +175,28 @@ export default function Home() {
       };
     });
 
+  // Combined infinite load handler
+  const handleLoadMore = () => {
+    if (hasMoreShops && !isFetchingShops) fetchNextShops();
+    if (hasMoreOffers && !isFetchingOffers) fetchNextOffers();
+    if (hasMoreProducts && !isFetchingProducts) fetchNextProducts();
+  };
+
+  const hasMoreContent = hasMoreShops || hasMoreOffers || hasMoreProducts;
+  const isFetchingMore = isFetchingShops || isFetchingOffers || isFetchingProducts;
+
+  // Get ad placement based on page number
+  const getAdPlacement = (index: number) => {
+    return AD_PLACEMENTS[index % AD_PLACEMENTS.length];
+  };
+
+  // Calculate number of "rounds" loaded
+  const pageCount = Math.max(
+    shopsData?.pages.length || 0,
+    productsData?.pages.length || 0,
+    offersData?.pages.length || 0
+  );
+
   return (
     <div 
       ref={pullToRefresh.scrollContainerRef}
@@ -156,9 +216,9 @@ export default function Home() {
         <div className="py-3 sm:py-4 bg-background">
           <OfferStoriesCarousel 
             offers={smartOffers} 
-            onLoadMore={fetchNextPage}
-            hasMore={hasNextPage}
-            isLoadingMore={isFetchingNextPage}
+            onLoadMore={fetchSmartOffers}
+            hasMore={hasMoreSmartOffers}
+            isLoadingMore={isFetchingSmartOffers}
             isLoading={isSmartOffersLoading}
             error={smartOffersError}
           />
@@ -170,7 +230,7 @@ export default function Home() {
 
       <div className="max-w-screen-xl mx-auto page-container section-spacing">
         {/* Featured Shops Grid */}
-        {featuredShops.length > 0 && (
+        {(featuredShops.length > 0 || isLoadingShops) && (
           <section>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-section-header text-foreground">
@@ -184,11 +244,17 @@ export default function Home() {
               </NavLink>
             </div>
             <div className="grid-products grid-gap">
-              {featuredShops.slice(0, 15).map((shop) => (
-                <div key={shop.id}>
-                  <FeaturedShopCard shop={shop} />
-                </div>
-              ))}
+              {isLoadingShops ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="aspect-[4/3] rounded-lg" />
+                ))
+              ) : (
+                featuredShops.map((shop) => (
+                  <div key={shop.id}>
+                    <FeaturedShopCard shop={shop} />
+                  </div>
+                ))
+              )}
             </div>
           </section>
         )}
@@ -197,7 +263,7 @@ export default function Home() {
         <AdBanner placement="after-featured-shops" className="my-6" />
 
         {/* Featured Offers Grid */}
-        {featuredOffers.length > 0 && (
+        {(featuredOffers.length > 0 || isLoadingOffers) && (
           <section>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-section-header text-foreground">
@@ -211,11 +277,17 @@ export default function Home() {
               </NavLink>
             </div>
             <div className="grid-offers grid-gap">
-              {featuredOffers.slice(0, 15).map((offer) => (
-                <div key={offer.id}>
-                  <FeaturedOfferCard offer={offer} />
-                </div>
-              ))}
+              {isLoadingOffers ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="aspect-[4/3] rounded-lg" />
+                ))
+              ) : (
+                featuredOffers.map((offer) => (
+                  <div key={offer.id}>
+                    <FeaturedOfferCard offer={offer} />
+                  </div>
+                ))
+              )}
             </div>
           </section>
         )}
@@ -263,7 +335,7 @@ export default function Home() {
         </section>
 
         {/* Featured Products */}
-        {featuredProducts.length > 0 && (
+        {(featuredProducts.length > 0 || isLoadingProducts) && (
           <section>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-section-header text-foreground">
@@ -277,11 +349,17 @@ export default function Home() {
               </NavLink>
             </div>
             <div className="grid-products grid-gap">
-              {featuredProducts.map((product) => (
-                <div key={product.id}>
-                  <FeaturedProductCard product={product} />
-                </div>
-              ))}
+              {isLoadingProducts ? (
+                Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="aspect-[4/3] rounded-lg" />
+                ))
+              ) : (
+                featuredProducts.map((product) => (
+                  <div key={product.id}>
+                    <FeaturedProductCard product={product} />
+                  </div>
+                ))
+              )}
             </div>
           </section>
         )}
@@ -337,6 +415,103 @@ export default function Home() {
             </div>
           </section>
         )}
+
+        {/* Additional rounds of featured content with ads */}
+        {pageCount > 1 && Array.from({ length: pageCount - 1 }).map((_, roundIndex) => {
+          const roundNum = roundIndex + 1;
+          const startIdx = roundNum * 10;
+          
+          const roundShops = featuredShops.slice(startIdx, startIdx + 10);
+          const roundProducts = featuredProducts.slice(startIdx, startIdx + 10);
+          const roundOffers = featuredOffers.slice(startIdx, startIdx + 10);
+          
+          if (roundShops.length === 0 && roundProducts.length === 0 && roundOffers.length === 0) {
+            return null;
+          }
+
+          return (
+            <div key={`round-${roundNum}`}>
+              {/* More Featured Shops */}
+              {roundShops.length > 0 && (
+                <section>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-section-header text-foreground">
+                      More Featured Shops
+                    </h3>
+                  </div>
+                  <div className="grid-products grid-gap">
+                    {roundShops.map((shop) => (
+                      <div key={shop.id}>
+                        <FeaturedShopCard shop={shop} />
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Ad after shops */}
+              <AdBanner placement={getAdPlacement(roundNum * 3)} className="my-6" />
+
+              {/* More Featured Offers */}
+              {roundOffers.length > 0 && (
+                <section>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-section-header text-foreground">
+                      More Hot Offers
+                    </h3>
+                  </div>
+                  <div className="grid-offers grid-gap">
+                    {roundOffers.map((offer) => (
+                      <div key={offer.id}>
+                        <FeaturedOfferCard offer={offer} />
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Ad after offers */}
+              <AdBanner placement={getAdPlacement(roundNum * 3 + 1)} className="my-6" />
+
+              {/* More Featured Products */}
+              {roundProducts.length > 0 && (
+                <section>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-section-header text-foreground">
+                      More Featured Products
+                    </h3>
+                  </div>
+                  <div className="grid-products grid-gap">
+                    {roundProducts.map((product) => (
+                      <div key={product.id}>
+                        <FeaturedProductCard product={product} />
+                      </div>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* Ad after products */}
+              <AdBanner placement={getAdPlacement(roundNum * 3 + 2)} className="my-6" />
+            </div>
+          );
+        })}
+
+        {/* Infinite Scroll Trigger */}
+        <InfiniteScrollTrigger
+          onLoadMore={handleLoadMore}
+          enabled={!!location}
+          hasMore={hasMoreContent}
+          isLoading={isFetchingMore}
+        />
+
+        {/* Infinite Scroll Loader */}
+        <InfiniteScrollLoader
+          isLoading={isFetchingMore}
+          hasMore={hasMoreContent}
+          loadingText="Loading more featured content..."
+          endText="You've seen all featured content"
+        />
       </div>
     </div>
   );
