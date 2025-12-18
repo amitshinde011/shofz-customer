@@ -9,7 +9,7 @@ import SearchBar from "@/components/SearchBar";
 import ShopCard from "@/components/ShopCard";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { useShops, useToggleShopFavorite, useUserFavoriteShops } from "@/hooks/useShops";
+import { useInfiniteShops, useToggleShopFavorite, useUserFavoriteShops } from "@/hooks/useShops";
 import { useAuth } from "@/contexts/AuthContext";
 import { Shop } from "@/services/shopService";
 import { useUserLocation } from "@/contexts/LocationContext";
@@ -20,6 +20,8 @@ import { calculateShopStatus } from "@/lib/businessHours";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
 import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
 import { isWithinDeliveryRadius } from "@/lib/deliveryCalculations";
+import { InfiniteScrollTrigger } from "@/components/InfiniteScrollTrigger";
+import { InfiniteScrollLoader } from "@/components/InfiniteScrollLoader";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -80,18 +82,25 @@ export default function Shops() {
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
-  // Fetch shops and favorites
+  // Fetch shops with infinite scroll
   const shopSearchOptions = useMemo(() => ({
     search: debouncedQuery || undefined,
     location: location ? { 
       lat: location.lat, 
       lng: location.lng, 
-      radius: filters.distance // Use filter value instead of hardcoded 50
+      radius: filters.distance
     } : undefined,
-    limit: 50,
   }), [debouncedQuery, location?.lat, location?.lng, filters.distance]);
 
-  const { data: shopsResponse, isLoading, refetch } = useShops(shopSearchOptions);
+  const { 
+    data: shopsData, 
+    isLoading, 
+    refetch,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = useInfiniteShops(shopSearchOptions);
+
   const { data: favoritesResponse } = useUserFavoriteShops();
   const toggleFavoriteMutation = useToggleShopFavorite();
 
@@ -105,13 +114,16 @@ export default function Shops() {
     enabled: true,
   });
 
-  const shops = shopsResponse?.data || [];
+  // Flatten paginated data
+  const shops = useMemo(() => {
+    return shopsData?.pages.flatMap(page => page.data) || [];
+  }, [shopsData]);
+
   const favoriteShopIds = favoritesResponse?.data?.map(fav => fav.shop_id) || [];
 
   // Calculate active filter count
   const activeFilterCount = useMemo(() => {
     let count = 0;
-    // Don't count isFeatured since it's displayed separately
     if (filters.categories.length > 0) count++;
     if (filters.distance < 50) count++;
     if (filters.rating > 0) count++;
@@ -186,43 +198,33 @@ export default function Shops() {
     switch (sortBy) {
       case "rating":
         filtered.sort((a, b) => {
-          // Featured first
           if (a.is_featured !== b.is_featured) {
             return a.is_featured ? -1 : 1;
           }
-          // Then by rating
           return (b.rating || 0) - (a.rating || 0);
         });
         break;
       case "name":
         filtered.sort((a, b) => {
-          // Featured first
           if (a.is_featured !== b.is_featured) {
             return a.is_featured ? -1 : 1;
           }
-          // Then by name
           return a.name.localeCompare(b.name);
         });
         break;
       case "newest":
         filtered.sort((a, b) => {
-          // Featured first
           if (a.is_featured !== b.is_featured) {
             return a.is_featured ? -1 : 1;
           }
-          // Then by newest
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         });
         break;
       case "nearestDelivery":
-        // Filter only shops with delivery that deliver to user's location
         if (location) {
           filtered = filtered.filter(shop => {
-            // Must have delivery enabled
             if (!shop.delivery_available) return false;
-            // Must have location and coverage configured
             if (!shop.location || !shop.delivery_coverage_km) return false;
-            // Must be within delivery radius
             return isWithinDeliveryRadius(
               shop.location,
               location,
@@ -230,13 +232,10 @@ export default function Shops() {
             );
           });
           
-          // Sort by distance
           filtered.sort((a, b) => {
-            // Featured first
             if (a.is_featured !== b.is_featured) {
               return a.is_featured ? -1 : 1;
             }
-            // Then by distance
             if (!a.location || !b.location) return 0;
             const distA = calculateDistance(location, a.location);
             const distB = calculateDistance(location, b.location);
@@ -247,11 +246,9 @@ export default function Shops() {
       case "distance":
         if (location) {
           filtered.sort((a, b) => {
-            // Featured first
             if (a.is_featured !== b.is_featured) {
               return a.is_featured ? -1 : 1;
             }
-            // Then by distance
             if (!a.location || !b.location) return 0;
             const distA = calculateDistance(location, a.location);
             const distB = calculateDistance(location, b.location);
@@ -477,75 +474,44 @@ export default function Shops() {
                   }} />
                 </Badge>
               )}
+
               <Button
                 variant="ghost"
                 size="sm"
+                className="text-xs"
                 onClick={() => {
-                  setFeaturedOnly(false);
                   setFilters(defaultFilters);
+                  setFeaturedOnly(false);
                   navigate('/shops', { replace: true });
                 }}
-                className="h-7 px-2 text-xs"
               >
-                <X className="w-3 h-3 mr-1" />
-                Clear All
+                Clear all
               </Button>
             </motion.div>
           )}
         </div>
       </motion.header>
 
-      <div className="px-4 sm:px-6 lg:px-8 py-4 max-w-screen-2xl mx-auto">
-        {/* Results Header with Sort */}
+      <div className="max-w-screen-2xl mx-auto page-container py-4">
+        {/* Sort and Filter Controls */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4"
+          transition={{ delay: 0.1 }}
+          className="flex items-center justify-between mb-4 gap-2"
         >
-          <div className="flex flex-col gap-1">
-            <div className="flex items-center gap-2 flex-wrap">
-              <p className="text-sm text-muted-foreground font-medium">
-                {isLoading ? "Searching..." : (
-                  <>
-                    <span className="font-bold text-foreground">
-                      {filteredAndSortedShops.length} results
-                    </span>
-                  </>
-                )}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
+          {/* Filter Sheet */}
           <FilterSheet
             filters={filters}
-            onFiltersChange={(newFilters) => {
-              setFilters(newFilters);
-              
-              // Sync featured filter
-              if (newFilters.isFeatured !== featuredOnly) {
-                setFeaturedOnly(newFilters.isFeatured || false);
-                
-                // Update URL
-                const newParams = new URLSearchParams(searchParams);
-                if (newFilters.isFeatured) {
-                  newParams.set('featured', 'true');
-                } else {
-                  newParams.delete('featured');
-                }
-                
-                const newSearch = newParams.toString();
-                const newPath = newSearch ? `/shops?${newSearch}` : '/shops';
-                navigate(newPath, { replace: true });
-              }
-            }}
+            onFiltersChange={setFilters}
             activeFilterCount={activeFilterCount}
           />
 
+          {/* Sort Dropdown */}
+          <div className="flex items-center gap-2">
+            <ArrowUpDown className="w-4 h-4 text-muted-foreground hidden sm:block" />
             <Select value={sortBy} onValueChange={(value: SortOption) => setSortBy(value)}>
-              <SelectTrigger className="w-[180px] rounded-full font-medium text-xs h-8">
-                <ArrowUpDown className="w-3.5 h-3.5 mr-1.5" />
+              <SelectTrigger className="w-[140px] sm:w-[180px] h-10 touch-target">
                 <SelectValue placeholder="Sort by" />
               </SelectTrigger>
               <SelectContent>
@@ -585,60 +551,78 @@ export default function Shops() {
 
         {/* Shops Display - Amazon-style responsive grid */}
         {!isLoading && viewMode !== "map" && (
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
-            className="grid-shops grid-gap"
-          >
-            {filteredAndSortedShops.map((shop) => {
-              const distanceKm = location && shop.location
-                ? calculateDistance(location, shop.location)
-                : undefined;
-              
-              const distance = distanceKm !== undefined
-                ? formatDistance(distanceKm)
-                : 'N/A';
+          <>
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="grid-shops grid-gap"
+            >
+              {filteredAndSortedShops.map((shop) => {
+                const distanceKm = location && shop.location
+                  ? calculateDistance(location, shop.location)
+                  : undefined;
+                
+                const distance = distanceKm !== undefined
+                  ? formatDistance(distanceKm)
+                  : 'N/A';
 
-              const shopStatus = calculateShopStatus(shop.business_hours as any);
+                const shopStatus = calculateShopStatus(shop.business_hours as any);
 
-              return (
-                <motion.div key={shop.id} variants={itemVariants}>
-                  <ShopCard
-                  shop={{
-                    id: shop.id,
-                    name: shop.name,
-                    image: shop.logo_url || '/placeholder.svg',
-                    category: shop.categories?.[0] || 'General',
-                    subcategories: shop.categories || [],
-                    rating: shop.rating || 0,
-                    reviewCount: shop.total_reviews || 0,
-                    distance,
-                    distance_km: distanceKm,
-                    address: shop.address || '',
-                    isOpen: shopStatus.isOpen,
-                    nextStatusChange: shopStatus.nextStatusChange,
-                    
-                    deliveryTime: '30-45 min',
-                    establishedYear: 2020,
-                    phone: shop.phone_number,
-                    coordinates: shop.location,
-                    isVerified: shop.is_verified,
-                    is_featured: shop.is_featured,
-                    delivery_available: shop.delivery_available,
-                    delivery_coverage_km: shop.delivery_coverage_km,
-                    delivery_charge_per_km: shop.delivery_charge_per_km,
-                    free_delivery_above: shop.free_delivery_above,
-                    delivery_notes: shop.delivery_notes,
-                  }}
-                    variant="grid"
-                    onToggleFavorite={toggleFavorite}
-                    isFavorite={favoriteShopIds.includes(shop.id)}
-                  />
-                </motion.div>
-              );
-            })}
-          </motion.div>
+                return (
+                  <motion.div key={shop.id} variants={itemVariants}>
+                    <ShopCard
+                    shop={{
+                      id: shop.id,
+                      name: shop.name,
+                      image: shop.logo_url || '/placeholder.svg',
+                      category: shop.categories?.[0] || 'General',
+                      subcategories: shop.categories || [],
+                      rating: shop.rating || 0,
+                      reviewCount: shop.total_reviews || 0,
+                      distance,
+                      distance_km: distanceKm,
+                      address: shop.address || '',
+                      isOpen: shopStatus.isOpen,
+                      nextStatusChange: shopStatus.nextStatusChange,
+                      
+                      deliveryTime: '30-45 min',
+                      establishedYear: 2020,
+                      phone: shop.phone_number,
+                      coordinates: shop.location,
+                      isVerified: shop.is_verified,
+                      is_featured: shop.is_featured,
+                      delivery_available: shop.delivery_available,
+                      delivery_coverage_km: shop.delivery_coverage_km,
+                      delivery_charge_per_km: shop.delivery_charge_per_km,
+                      free_delivery_above: shop.free_delivery_above,
+                      delivery_notes: shop.delivery_notes,
+                    }}
+                      variant="grid"
+                      onToggleFavorite={toggleFavorite}
+                      isFavorite={favoriteShopIds.includes(shop.id)}
+                    />
+                  </motion.div>
+                );
+              })}
+            </motion.div>
+
+            {/* Infinite Scroll Trigger */}
+            <InfiniteScrollTrigger
+              onLoadMore={fetchNextPage}
+              enabled={!!location}
+              hasMore={hasNextPage}
+              isLoading={isFetchingNextPage}
+            />
+
+            {/* Infinite Scroll Loader */}
+            <InfiniteScrollLoader
+              isLoading={isFetchingNextPage}
+              hasMore={hasNextPage}
+              loadingText="Loading more shops..."
+              endText="You've seen all shops in your area"
+            />
+          </>
         )}
 
         {/* Empty State - No Location */}

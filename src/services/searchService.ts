@@ -93,7 +93,7 @@ class SearchService {
         .eq('is_active', true)
         .order('is_featured', { ascending: false });
 
-      // Full-text search on products - search all important fields
+      // Full-text search on products - search all important fields including specifications
       if (query) {
         productsQuery = productsQuery.or(
           `name.ilike.%${query}%,` +
@@ -104,7 +104,8 @@ class SearchService {
           `sku.ilike.%${query}%,` +
           `meta_title.ilike.%${query}%,` +
           `meta_description.ilike.%${query}%,` +
-          `tags.cs.{${query}}`
+          `tags.cs.{${query}},` +
+          `specifications::text.ilike.%${query}%`
         );
       }
 
@@ -137,6 +138,7 @@ class SearchService {
         .from('shops')
         .select('*', { count: 'exact' })
         .eq('is_active', true)
+        .eq('is_verified', true)
         .order('is_featured', { ascending: false });
 
       // Full-text search on shops - search all important fields
@@ -173,7 +175,7 @@ class SearchService {
         .eq('is_active', true)
         .order('is_featured', { ascending: false });
 
-      // Full-text search on offers - search all important fields
+      // Full-text search on offers - search all important fields including applicable_products
       if (query) {
         offersQuery = offersQuery.or(
           `title.ilike.%${query}%,` +
@@ -181,7 +183,8 @@ class SearchService {
           `terms_conditions.ilike.%${query}%,` +
           `offer_type.ilike.%${query}%,` +
           `discount_type.ilike.%${query}%,` +
-          `applicable_categories.cs.{${query}}`
+          `applicable_categories.cs.{${query}},` +
+          `applicable_products.cs.{${query}}`
         );
       }
 
@@ -277,27 +280,28 @@ class SearchService {
         return { data: [], error: null };
       }
 
-      // Get product suggestions - search name, brand, category
+      // Get product suggestions - search name, brand, category, subcategory, description, tags
       const { data: products, error: productsError } = await (supabase as any)
         .from('products')
-        .select('name, brand, category')
-        .or(`name.ilike.%${query}%,brand.ilike.%${query}%,category.ilike.%${query}%`)
+        .select('name, brand, category, subcategory, description, tags')
+        .or(`name.ilike.%${query}%,brand.ilike.%${query}%,category.ilike.%${query}%,subcategory.ilike.%${query}%,description.ilike.%${query}%,tags.cs.{${query}}`)
         .eq('is_active', true)
         .limit(limit);
 
-      // Get shop suggestions - search name, address
+      // Get shop suggestions - search name, address, description, categories
       const { data: shops, error: shopsError } = await supabase
         .from('shops')
-        .select('name, address')
-        .or(`name.ilike.%${query}%,address.ilike.%${query}%`)
+        .select('name, address, description, categories')
+        .or(`name.ilike.%${query}%,address.ilike.%${query}%,description.ilike.%${query}%,categories.cs.{${query}}`)
         .eq('is_active', true)
+        .eq('is_verified', true)
         .limit(limit);
 
-      // Get offer suggestions - search title
-      const { data: offers, error: offersError } = await supabase
+      // Get offer suggestions - search title, description
+      const { data: offers, error: offersError } = await (supabase as any)
         .from('offers')
-        .select('title')
-        .ilike('title', `%${query}%`)
+        .select('title, description')
+        .or(`title.ilike.%${query}%,description.ilike.%${query}%`)
         .eq('is_active', true)
         .limit(Math.floor(limit / 3));
 
@@ -306,6 +310,7 @@ class SearchService {
         ...((products as any)?.map((p: any) => p.name) || []),
         ...((products as any)?.map((p: any) => p.brand).filter(Boolean) || []),
         ...((products as any)?.map((p: any) => p.category).filter(Boolean) || []),
+        ...((products as any)?.map((p: any) => p.subcategory).filter(Boolean) || []),
         ...((shops as any)?.map((s: any) => s.name) || []),
         ...((offers as any)?.map((o: any) => o.title) || []),
       ];
@@ -315,7 +320,7 @@ class SearchService {
 
       return {
         data: uniqueSuggestions,
-        error: productsError || shopsError,
+        error: productsError || shopsError || offersError,
       };
     } catch (error) {
       console.error('Error getting suggestions:', error);

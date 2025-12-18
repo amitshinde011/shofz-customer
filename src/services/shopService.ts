@@ -69,6 +69,11 @@ export const shopService = {
         );
       }
 
+      // Apply offset for pagination
+      if (options?.offset) {
+        filtered = filtered.slice(options.offset);
+      }
+
       if (options?.limit) {
         filtered = filtered.slice(0, options.limit);
       }
@@ -102,6 +107,53 @@ export const shopService = {
     }
 
     return await query;
+  },
+
+  // Get shops with total count for infinite scroll
+  async getShopsWithCount(options?: {
+    category?: string;
+    search?: string;
+    location?: { lat: number; lng: number; radius?: number };
+    limit?: number;
+    offset?: number;
+  }): Promise<{ data: any[]; error: any; totalCount: number }> {
+    if (options?.location) {
+      const { data, error } = await this.getNearbyShops(
+        { lat: options.location.lat, lng: options.location.lng },
+        options.location.radius || 50
+      );
+
+      if (error) {
+        return { data: [], error, totalCount: 0 };
+      }
+
+      let filtered = data || [];
+      const totalCount = filtered.length;
+
+      // Apply additional filters
+      if (options?.category) {
+        filtered = filtered.filter((shop: any) => 
+          shop.categories?.includes(options.category)
+        );
+      }
+
+      if (options?.search) {
+        const searchLower = options.search.toLowerCase();
+        filtered = filtered.filter((shop: any) =>
+          shop.name?.toLowerCase().includes(searchLower) ||
+          shop.description?.toLowerCase().includes(searchLower)
+        );
+      }
+
+      // Apply offset for pagination
+      const offset = options?.offset || 0;
+      const limit = options?.limit || 20;
+      filtered = filtered.slice(offset, offset + limit);
+
+      return { data: filtered, error: null, totalCount };
+    }
+
+    return { data: [], error: null, totalCount: 0 };
   },
 
   // Get shop by ID
