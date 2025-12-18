@@ -1,4 +1,4 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useInfiniteQuery } from '@tanstack/react-query';
 import { shopService, Shop } from '@/services/shopService';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,6 +12,8 @@ interface ShopSearchOptions {
   offset?: number;
 }
 
+const PAGE_SIZE = 20;
+
 export const useShops = (options?: ShopSearchOptions) => {
   return useQuery({
     queryKey: ['shops', options],
@@ -24,6 +26,30 @@ export const useShops = (options?: ShopSearchOptions) => {
     enabled: !!options?.location, // Only fetch if location is provided
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
+  });
+};
+
+// Infinite scroll hook for shops
+export const useInfiniteShops = (options?: Omit<ShopSearchOptions, 'offset' | 'limit'>) => {
+  return useInfiniteQuery({
+    queryKey: ['shops-infinite', options],
+    queryFn: async ({ pageParam = 0 }) => {
+      const result = await shopService.getShopsWithCount({
+        ...options,
+        offset: pageParam * PAGE_SIZE,
+        limit: PAGE_SIZE,
+      });
+      return {
+        data: result.data || [],
+        nextPage: pageParam + 1,
+        hasMore: (result.data?.length || 0) >= PAGE_SIZE,
+        totalCount: result.totalCount || 0,
+      };
+    },
+    initialPageParam: 0,
+    getNextPageParam: (lastPage) => lastPage.hasMore ? lastPage.nextPage : undefined,
+    enabled: !!options?.location,
+    staleTime: 5 * 60 * 1000,
   });
 };
 
