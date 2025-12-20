@@ -1,5 +1,6 @@
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { sortFeaturedFirst } from '@/lib/sortUtils';
 
 export interface Offer {
   id: string;
@@ -63,7 +64,6 @@ export const useOffers = (options?: {
           .eq('shop_id', options.shopId)
           .eq('is_active', true)
           .or(`valid_until.is.null,valid_until.gte.${new Date().toISOString()}`)
-          .order('is_featured', { ascending: false })
           .order('created_at', { ascending: false });
 
         if (options?.limit) {
@@ -93,7 +93,8 @@ export const useOffers = (options?: {
           })
         );
 
-        return { data: offersWithProducts, error: null };
+        // Apply client-side featured sorting
+        return { data: sortFeaturedFirst(offersWithProducts), error: null };
       }
 
       // If location is provided, filter by nearby shops
@@ -127,7 +128,6 @@ export const useOffers = (options?: {
           .eq('is_active', true)
           .in('shop_id', nearbyShopIds)
           .or(`valid_until.is.null,valid_until.gte.${new Date().toISOString()}`)
-          .order('is_featured', { ascending: false })
           .order('created_at', { ascending: false });
 
         if (options?.shopId) {
@@ -161,7 +161,8 @@ export const useOffers = (options?: {
           })
         );
 
-        return { data: offersWithProducts, error: null };
+        // Apply client-side featured sorting
+        return { data: sortFeaturedFirst(offersWithProducts), error: null };
       }
 
       // No location provided - return empty
@@ -206,7 +207,6 @@ export const useActiveOffers = (limit?: number, location?: { lat: number; lng: n
           .eq('is_active', true)
           .in('shop_id', nearbyShopIds)
           .or(`valid_until.is.null,valid_until.gte.${new Date().toISOString()}`)
-          .order('is_featured', { ascending: false })
           .order('created_at', { ascending: false })
           .limit(limit || 10);
 
@@ -227,7 +227,8 @@ export const useActiveOffers = (limit?: number, location?: { lat: number; lng: n
           })
         );
 
-        return { data: offersWithProducts, error: null };
+        // Apply client-side featured sorting
+        return { data: sortFeaturedFirst(offersWithProducts), error: null };
       }
 
       return { data: [], error: null };
@@ -263,7 +264,6 @@ export const useInfiniteOffers = (options?: {
           .eq('shop_id', options.shopId)
           .eq('is_active', true)
           .or(`valid_until.is.null,valid_until.gte.${new Date().toISOString()}`)
-          .order('is_featured', { ascending: false })
           .order('created_at', { ascending: false })
           .range(pageParam, pageParam + 19);
 
@@ -283,7 +283,8 @@ export const useInfiniteOffers = (options?: {
           })
         );
 
-        return { data: offersWithProducts, error: null };
+        // Apply client-side featured sorting
+        return { data: sortFeaturedFirst(offersWithProducts), error: null };
       }
 
       // If location is provided, filter by nearby shops
@@ -317,7 +318,6 @@ export const useInfiniteOffers = (options?: {
           .eq('is_active', true)
           .in('shop_id', nearbyShopIds)
           .or(`valid_until.is.null,valid_until.gte.${new Date().toISOString()}`)
-          .order('is_featured', { ascending: false })
           .order('created_at', { ascending: false })
           .range(pageParam, pageParam + 19);
 
@@ -341,7 +341,8 @@ export const useInfiniteOffers = (options?: {
           })
         );
 
-        return { data: offersWithProducts, error: null };
+        // Apply client-side featured sorting
+        return { data: sortFeaturedFirst(offersWithProducts), error: null };
       }
 
       return { data: [], error: null };
