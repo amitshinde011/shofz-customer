@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { sortFeaturedFirst } from '@/lib/sortUtils';
 
 export interface Shop {
   id: string;
@@ -78,7 +79,8 @@ export const shopService = {
         filtered = filtered.slice(0, options.limit);
       }
 
-      return { data: filtered, error: null };
+      // Apply client-side featured sorting after distance-based filtering
+      return { data: sortFeaturedFirst(filtered), error: null };
     }
 
     // Otherwise, use regular query - Only verified shops
@@ -87,7 +89,6 @@ export const shopService = {
       .select('*')
       .eq('is_active', true)
       .eq('is_verified', true)
-      .order('is_featured', { ascending: false })
       .order('rating', { ascending: false });
 
     if (options?.category) {
@@ -106,7 +107,11 @@ export const shopService = {
       query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
     }
 
-    return await query;
+    const result = await query;
+    if (result.data) {
+      result.data = sortFeaturedFirst(result.data);
+    }
+    return result;
   },
 
   // Get shops with total count for infinite scroll
@@ -150,7 +155,8 @@ export const shopService = {
       const limit = options?.limit || 20;
       filtered = filtered.slice(offset, offset + limit);
 
-      return { data: filtered, error: null, totalCount };
+      // Apply client-side featured sorting
+      return { data: sortFeaturedFirst(filtered), error: null, totalCount };
     }
 
     return { data: [], error: null, totalCount: 0 };
@@ -242,17 +248,11 @@ export const shopService = {
           : undefined
       }));
 
-      // Sort by featured first, then by distance
-      formattedData.sort((a, b) => {
-        // Featured items first
-        if (a.is_featured && !b.is_featured) return -1;
-        if (!a.is_featured && b.is_featured) return 1;
-        // Then by distance (already in result from RPC)
-        return 0;
-      });
+      // Apply client-side featured sorting (data comes sorted by distance from RPC)
+      const sortedData = sortFeaturedFirst(formattedData);
 
-      console.log('Formatted nearby shops:', formattedData);
-      return { data: formattedData, error: null };
+      console.log('Formatted nearby shops:', sortedData);
+      return { data: sortedData, error: null };
     } catch (error) {
       console.error('Error calling get_nearby_shops:', error);
       return { data: [], error };

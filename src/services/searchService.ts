@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { sortFeaturedFirst } from '@/lib/sortUtils';
 
 export interface SearchOptions {
   query: string;
@@ -90,8 +91,7 @@ class SearchService {
             logo_url
           )
         `, { count: 'exact' })
-        .eq('is_active', true)
-        .order('is_featured', { ascending: false });
+        .eq('is_active', true);
 
       // Full-text search on products - search all important fields including specifications
       if (query) {
@@ -138,8 +138,7 @@ class SearchService {
         .from('shops')
         .select('*', { count: 'exact' })
         .eq('is_active', true)
-        .eq('is_verified', true)
-        .order('is_featured', { ascending: false });
+        .eq('is_verified', true);
 
       // Full-text search on shops - search all important fields
       if (query) {
@@ -172,8 +171,7 @@ class SearchService {
             logo_url
           )
         `, { count: 'exact' })
-        .eq('is_active', true)
-        .order('is_featured', { ascending: false });
+        .eq('is_active', true);
 
       // Full-text search on offers - search all important fields including applicable_products
       if (query) {
@@ -228,9 +226,9 @@ class SearchService {
 
         return {
           data: {
-            products: products || [],
-            shops: filteredShops || [],
-            offers: offersNearby || [],
+            products: sortFeaturedFirst(products || []),
+            shops: sortFeaturedFirst(filteredShops || []),
+            offers: sortFeaturedFirst(offersNearby || []),
             totalProducts: productCount || 0,
             totalShops: filteredShops?.length || 0,
             totalOffers: offerCountNearby || 0,
@@ -256,9 +254,9 @@ class SearchService {
 
       return {
         data: {
-          products: products || [],
-          shops: shops || [],
-          offers: offers || [],
+          products: sortFeaturedFirst(products || []),
+          shops: sortFeaturedFirst(shops || []),
+          offers: sortFeaturedFirst(offers || []),
           totalProducts: productCount || 0,
           totalShops: shopCount || 0,
           totalOffers: offerCount || 0,

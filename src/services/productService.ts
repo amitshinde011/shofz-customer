@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { sortFeaturedFirst } from '@/lib/sortUtils';
 
 export interface Product {
   id: string;
@@ -88,8 +89,7 @@ export const productService = {
         query = query.eq('is_featured', true);
       }
 
-      query = query.order('is_featured', { ascending: false })
-                   .order('created_at', { ascending: false });
+      query = query.order('created_at', { ascending: false });
 
       if (options?.limit) {
         query = query.limit(options.limit);
@@ -99,7 +99,11 @@ export const productService = {
         query = query.range(options.offset, options.offset + (options.limit || 20) - 1);
       }
 
-      return await query;
+      const result = await query;
+      if (result.data) {
+        result.data = sortFeaturedFirst(result.data);
+      }
+      return result;
     }
 
     // If location is provided, filter by nearby shops first
@@ -161,8 +165,7 @@ export const productService = {
         query = query.eq('is_featured', true);
       }
 
-      query = query.order('is_featured', { ascending: false })
-                   .order('created_at', { ascending: false });
+      query = query.order('created_at', { ascending: false });
 
       if (options?.limit) {
         query = query.limit(options.limit);
@@ -185,6 +188,9 @@ export const productService = {
           }
           return product;
         });
+        
+        // Apply client-side featured sorting
+        result.data = sortFeaturedFirst(result.data);
       }
       
       return result;
@@ -235,8 +241,7 @@ export const productService = {
       query = query.eq('is_featured', options.featured);
     }
 
-    query = query.order('is_featured', { ascending: false })
-                 .order('name');
+    query = query.order('name');
 
     if (options?.limit) {
       query = query.limit(options.limit);
@@ -246,7 +251,11 @@ export const productService = {
       query = query.range(options.offset, options.offset + (options.limit || 20) - 1);
     }
 
-    return await query;
+    const result = await query;
+    if (result.data) {
+      result.data = sortFeaturedFirst(result.data);
+    }
+    return result;
   },
 
   // Get featured products
@@ -354,7 +363,7 @@ export const productService = {
 
   // Get related products (same category, different shop)
   async getRelatedProducts(productId: string, category: string, limit: number = 4) {
-    return await (supabase as any)
+    const result = await (supabase as any)
       .from('products')
       .select(`
         *,
@@ -367,7 +376,11 @@ export const productService = {
       .eq('category', category)
       .eq('is_active', true)
       .neq('id', productId)
-      .order('is_featured', { ascending: false })
       .limit(limit);
+    
+    if (result.data) {
+      result.data = sortFeaturedFirst(result.data);
+    }
+    return result;
   },
 };
