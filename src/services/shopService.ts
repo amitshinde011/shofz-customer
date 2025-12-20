@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { sortFeaturedFirst } from '@/lib/sortUtils';
+import { sortShopsBlended, sortFeaturedFirst } from '@/lib/sortUtils';
 
 export interface Shop {
   id: string;
@@ -79,8 +79,8 @@ export const shopService = {
         filtered = filtered.slice(0, options.limit);
       }
 
-      // Apply client-side featured sorting after distance-based filtering
-      return { data: sortFeaturedFirst(filtered), error: null };
+      // Data already sorted by blended ranking in getNearbyShops
+      return { data: filtered, error: null };
     }
 
     // Otherwise, use regular query - Only verified shops
@@ -108,6 +108,7 @@ export const shopService = {
     }
 
     const result = await query;
+    // No distance info without location, use simple featured-first
     if (result.data) {
       result.data = sortFeaturedFirst(result.data);
     }
@@ -133,9 +134,8 @@ export const shopService = {
       }
 
       let filtered = data || [];
-      const totalCount = filtered.length;
 
-      // Apply additional filters
+      // Apply additional filters BEFORE calculating totalCount
       if (options?.category) {
         filtered = filtered.filter((shop: any) => 
           shop.categories?.includes(options.category)
@@ -150,13 +150,16 @@ export const shopService = {
         );
       }
 
+      // Calculate totalCount AFTER filtering
+      const totalCount = filtered.length;
+
       // Apply offset for pagination
       const offset = options?.offset || 0;
       const limit = options?.limit || 20;
       filtered = filtered.slice(offset, offset + limit);
 
-      // Apply client-side featured sorting
-      return { data: sortFeaturedFirst(filtered), error: null, totalCount };
+      // Data already sorted by blended ranking in getNearbyShops
+      return { data: filtered, error: null, totalCount };
     }
 
     return { data: [], error: null, totalCount: 0 };
@@ -248,8 +251,8 @@ export const shopService = {
           : undefined
       }));
 
-      // Apply client-side featured sorting (data comes sorted by distance from RPC)
-      const sortedData = sortFeaturedFirst(formattedData);
+      // Apply blended ranking: combines featured status + distance
+      const sortedData = sortShopsBlended(formattedData);
 
       console.log('Formatted nearby shops:', sortedData);
       return { data: sortedData, error: null };
@@ -324,7 +327,7 @@ export const shopService = {
   async getFeaturedShops(limit: number = 10, location?: { lat: number; lng: number; radius?: number }) {
     try {
       if (location) {
-        // Get nearby shops first
+        // Get nearby shops first (already sorted by blended ranking)
         const { data: nearbyShops, error: nearbyError } = await this.getNearbyShops(
           { lat: location.lat, lng: location.lng },
           location.radius || 50

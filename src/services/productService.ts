@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { sortFeaturedFirst } from '@/lib/sortUtils';
+import { sortProductsBlended, enrichWithDistance, sortFeaturedFirst } from '@/lib/sortUtils';
 
 export interface Product {
   id: string;
@@ -100,6 +100,7 @@ export const productService = {
       }
 
       const result = await query;
+      // No distance info, use simple featured-first sorting
       if (result.data) {
         result.data = sortFeaturedFirst(result.data);
       }
@@ -177,7 +178,7 @@ export const productService = {
 
       const result = await query;
       
-      // Transform shop location data from nearbyShops to match Product interface
+      // Transform shop location data from nearbyShops and enrich with distance
       if (result.data && nearbyShops) {
         result.data = result.data.map((product: any) => {
           const shopWithLocation = nearbyShops.find((s: any) => s.id === product.shop_id);
@@ -186,11 +187,15 @@ export const productService = {
               ? { lat: shopWithLocation.latitude, lng: shopWithLocation.longitude }
               : undefined;
           }
-          return product;
+          // Add distance_km from shop for blended ranking
+          return {
+            ...product,
+            distance_km: shopWithLocation?.distance_km
+          };
         });
         
-        // Apply client-side featured sorting
-        result.data = sortFeaturedFirst(result.data);
+        // Apply blended ranking (featured + distance)
+        result.data = sortProductsBlended(result.data);
       }
       
       return result;
@@ -252,6 +257,7 @@ export const productService = {
     }
 
     const result = await query;
+    // No distance info for single shop, use simple featured-first
     if (result.data) {
       result.data = sortFeaturedFirst(result.data);
     }
@@ -277,7 +283,7 @@ export const productService = {
         return { data: [], error: null };
       }
 
-      return await (supabase as any)
+      const result = await (supabase as any)
         .from('products')
         .select(`
           *,
@@ -292,6 +298,14 @@ export const productService = {
         .in('shop_id', nearbyShopIds)
         .order('created_at', { ascending: false })
         .limit(limit);
+
+      // Enrich with distance and apply blended ranking
+      if (result.data && nearbyShops) {
+        const enrichedData = enrichWithDistance(result.data, nearbyShops);
+        result.data = sortProductsBlended(enrichedData);
+      }
+
+      return result;
     }
 
     return { data: [], error: null };
@@ -378,6 +392,7 @@ export const productService = {
       .neq('id', productId)
       .limit(limit);
     
+    // No distance info, use simple featured-first
     if (result.data) {
       result.data = sortFeaturedFirst(result.data);
     }
