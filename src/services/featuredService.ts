@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { sortShopsBlended, sortProductsBlended, sortOffersBlended, enrichWithDistance } from '@/lib/sortUtils';
 
 export const featuredService = {
   async getFeaturedShops(limit: number = 6, location?: { lat: number; lng: number; radius?: number }) {
@@ -12,12 +13,12 @@ export const featuredService = {
 
         if (error) return { data: [], error };
 
-        const featuredNearbyShops = (nearbyShops || [])
-          .filter((shop: any) => shop.is_featured)
-          .slice(0, limit);
+        // Filter for featured only, then apply blended ranking
+        const featuredShops = (nearbyShops || []).filter((shop: any) => shop.is_featured);
+        const sortedFeatured = sortShopsBlended(featuredShops).slice(0, limit);
 
         return {
-          data: featuredNearbyShops.map((shop: any, index: number) => ({
+          data: sortedFeatured.map((shop: any, index: number) => ({
             ...shop,
             featured_priority: (limit - index) * 10,
             featured_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -45,12 +46,12 @@ export const featuredService = {
 
         if (error) return { data: [], error };
 
-        const featuredNearbyShops = (nearbyShops || [])
-          .filter((shop: any) => shop.is_featured)
-          .slice(offset, offset + limit);
+        // Filter for featured only, apply blended ranking, then paginate
+        const featuredShops = (nearbyShops || []).filter((shop: any) => shop.is_featured);
+        const sortedFeatured = sortShopsBlended(featuredShops).slice(offset, offset + limit);
 
         return {
-          data: featuredNearbyShops.map((shop: any, index: number) => ({
+          data: sortedFeatured.map((shop: any, index: number) => ({
             ...shop,
             featured_priority: (limit - index) * 10,
             featured_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -89,12 +90,16 @@ export const featuredService = {
           .eq('is_active', true)
           .in('shop_id', nearbyShopIds)
           .order('created_at', { ascending: false })
-          .limit(limit);
+          .limit(limit * 2); // Fetch more to allow for ranking
 
         if (error) return { data: [], error };
 
+        // Enrich with distance and apply blended ranking
+        const enrichedProducts = enrichWithDistance(data || [], nearbyShops);
+        const sortedProducts = sortProductsBlended(enrichedProducts).slice(0, limit);
+
         return { 
-          data: (data || []).map((product: any, index: number) => ({
+          data: sortedProducts.map((product: any, index: number) => ({
             ...product,
             featured_priority: (limit - index) * 10,
             featured_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -134,13 +139,16 @@ export const featuredService = {
           .eq('is_featured', true)
           .eq('is_active', true)
           .in('shop_id', nearbyShopIds)
-          .order('created_at', { ascending: false })
-          .range(offset, offset + limit - 1);
+          .order('created_at', { ascending: false });
 
         if (error) return { data: [], error };
 
+        // Enrich with distance, apply blended ranking, then paginate
+        const enrichedProducts = enrichWithDistance(data || [], nearbyShops);
+        const sortedProducts = sortProductsBlended(enrichedProducts).slice(offset, offset + limit);
+
         return { 
-          data: (data || []).map((product: any, index: number) => ({
+          data: sortedProducts.map((product: any, index: number) => ({
             ...product,
             featured_priority: (limit - index) * 10,
             featured_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -180,12 +188,16 @@ export const featuredService = {
           .in('shop_id', nearbyShopIds)
           .or(`valid_until.is.null,valid_until.gte.${new Date().toISOString()}`)
           .order('created_at', { ascending: false })
-          .limit(limit);
+          .limit(limit * 2); // Fetch more to allow for ranking
 
         if (result.error) return { data: [], error: result.error };
 
+        // Enrich with distance and apply blended ranking
+        const enrichedOffers = enrichWithDistance(result.data || [], nearbyShops);
+        const sortedOffers = sortOffersBlended(enrichedOffers).slice(0, limit);
+
         return { 
-          data: (result.data || []).map((offer: any, index: number) => ({
+          data: sortedOffers.map((offer: any, index: number) => ({
             ...offer,
             featured_priority: (limit - index) * 10,
             featured_until: offer.valid_until || '',
@@ -228,24 +240,23 @@ export const featuredService = {
           .eq('is_active', true)
           .in('shop_id', nearbyShopIds)
           .or(`valid_until.is.null,valid_until.gte.${new Date().toISOString()}`)
-          .order('created_at', { ascending: false })
-          .range(offset, offset + limit - 1);
+          .order('created_at', { ascending: false });
 
         if (result.error) return { data: [], error: result.error };
 
-        // Enrich with distance from nearby shops
-        const enrichedOffers = (result.data || []).map((offer: any, index: number) => {
-          const shopDistance = nearbyShops.find((s: any) => s.id === offer.shop_id);
-          return {
+        // Enrich with distance, apply blended ranking, then paginate
+        const enrichedOffers = enrichWithDistance(result.data || [], nearbyShops);
+        const sortedOffers = sortOffersBlended(enrichedOffers).slice(offset, offset + limit);
+
+        return { 
+          data: sortedOffers.map((offer: any, index: number) => ({
             ...offer,
             featured_priority: (limit - index) * 10,
             featured_until: offer.valid_until || '',
             products: [],
-            distance_km: shopDistance?.distance_km,
-          };
-        });
-
-        return { data: enrichedOffers, error: null };
+          })), 
+          error: null 
+        };
       }
 
       return { data: [], error: new Error('Location is required') };
