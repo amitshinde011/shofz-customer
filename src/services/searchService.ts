@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { sortFeaturedFirst } from '@/lib/sortUtils';
+import { sortShopsBlended, sortProductsBlended, sortOffersBlended, enrichWithDistance } from '@/lib/sortUtils';
 
 export interface SearchOptions {
   query: string;
@@ -224,11 +224,15 @@ class SearchService {
         offersQuery = offersQuery.range(offset, offset + limit - 1);
         const { data: offersNearby, error: offersErrorNearby, count: offerCountNearby } = await offersQuery;
 
+        // Enrich products and offers with distance
+        const enrichedProducts = products ? enrichWithDistance(products, nearbyShops || []) : [];
+        const enrichedOffers = offersNearby ? enrichWithDistance(offersNearby, nearbyShops || []) : [];
+
         return {
           data: {
-            products: sortFeaturedFirst(products || []),
-            shops: sortFeaturedFirst(filteredShops || []),
-            offers: sortFeaturedFirst(offersNearby || []),
+            products: sortProductsBlended(enrichedProducts),
+            shops: sortShopsBlended(filteredShops || []),
+            offers: sortOffersBlended(enrichedOffers),
             totalProducts: productCount || 0,
             totalShops: filteredShops?.length || 0,
             totalOffers: offerCountNearby || 0,
@@ -252,11 +256,12 @@ class SearchService {
         console.error('Error searching offers:', offersError);
       }
 
+      // No location, use simple blended ranking (will just use featured status)
       return {
         data: {
-          products: sortFeaturedFirst(products || []),
-          shops: sortFeaturedFirst(shops || []),
-          offers: sortFeaturedFirst(offers || []),
+          products: sortProductsBlended(products || []),
+          shops: sortShopsBlended(shops || []),
+          offers: sortOffersBlended(offers || []),
           totalProducts: productCount || 0,
           totalShops: shopCount || 0,
           totalOffers: offerCount || 0,

@@ -1,6 +1,6 @@
 import { useQuery, useInfiniteQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { sortFeaturedFirst } from '@/lib/sortUtils';
+import { sortOffersBlended, enrichWithDistance, sortFeaturedFirst } from '@/lib/sortUtils';
 
 export interface Offer {
   id: string;
@@ -93,7 +93,7 @@ export const useOffers = (options?: {
           })
         );
 
-        // Apply client-side featured sorting
+        // No distance info, use simple featured-first sorting
         return { data: sortFeaturedFirst(offersWithProducts), error: null };
       }
 
@@ -161,8 +161,9 @@ export const useOffers = (options?: {
           })
         );
 
-        // Apply client-side featured sorting
-        return { data: sortFeaturedFirst(offersWithProducts), error: null };
+        // Enrich with distance and apply blended ranking
+        const enrichedOffers = enrichWithDistance(offersWithProducts, nearbyShops);
+        return { data: sortOffersBlended(enrichedOffers), error: null };
       }
 
       // No location provided - return empty
@@ -227,8 +228,9 @@ export const useActiveOffers = (limit?: number, location?: { lat: number; lng: n
           })
         );
 
-        // Apply client-side featured sorting
-        return { data: sortFeaturedFirst(offersWithProducts), error: null };
+        // Enrich with distance and apply blended ranking
+        const enrichedOffers = enrichWithDistance(offersWithProducts, nearbyShops);
+        return { data: sortOffersBlended(enrichedOffers), error: null };
       }
 
       return { data: [], error: null };
@@ -283,7 +285,7 @@ export const useInfiniteOffers = (options?: {
           })
         );
 
-        // Apply client-side featured sorting
+        // No distance info, use simple featured-first sorting
         return { data: sortFeaturedFirst(offersWithProducts), error: null };
       }
 
@@ -341,8 +343,9 @@ export const useInfiniteOffers = (options?: {
           })
         );
 
-        // Apply client-side featured sorting
-        return { data: sortFeaturedFirst(offersWithProducts), error: null };
+        // Enrich with distance and apply blended ranking
+        const enrichedOffers = enrichWithDistance(offersWithProducts, nearbyShops);
+        return { data: sortOffersBlended(enrichedOffers), error: null };
       }
 
       return { data: [], error: null };
