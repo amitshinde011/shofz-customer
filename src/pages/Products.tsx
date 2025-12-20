@@ -19,6 +19,7 @@ import { useUserLocation } from "@/contexts/LocationContext";
 import { useShop } from "@/hooks/useShops";
 import { calculateDistance } from "@/lib/distanceCalculation";
 import { usePullToRefresh } from "@/hooks/usePullToRefresh";
+import { calculateCombinedScore, DEFAULT_RANKING_CONFIG } from "@/lib/sortUtils";
 import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
 import {
   Breadcrumb,
@@ -200,35 +201,38 @@ export default function Products() {
       });
     }
 
-    // Sort products with featured priority
+    // Helper to get blended score using pre-calculated distance_km or calculate on the fly
+    const getBlendedScore = (product: Product) => {
+      const shopLocation = (product.shops as any)?.location;
+      const distance = (product as any).distance_km ?? (location && shopLocation 
+        ? calculateDistance(location, shopLocation) 
+        : DEFAULT_RANKING_CONFIG.maxDistanceKm);
+      return calculateCombinedScore({ is_featured: product.is_featured, distance_km: distance });
+    };
+
+    // Sort products with blended featured + distance ranking
     switch (sortBy) {
       case "price-low":
         filtered.sort((a, b) => {
-          // Featured first
-          if (a.is_featured !== b.is_featured) {
-            return a.is_featured ? -1 : 1;
-          }
-          // Then by price
+          const scoreA = getBlendedScore(a);
+          const scoreB = getBlendedScore(b);
+          if (Math.abs(scoreA - scoreB) > 0.1) return scoreB - scoreA;
           return a.price - b.price;
         });
         break;
       case "price-high":
         filtered.sort((a, b) => {
-          // Featured first
-          if (a.is_featured !== b.is_featured) {
-            return a.is_featured ? -1 : 1;
-          }
-          // Then by price
+          const scoreA = getBlendedScore(a);
+          const scoreB = getBlendedScore(b);
+          if (Math.abs(scoreA - scoreB) > 0.1) return scoreB - scoreA;
           return b.price - a.price;
         });
         break;
       case "rating":
         filtered.sort((a, b) => {
-          // Featured first
-          if (a.is_featured !== b.is_featured) {
-            return a.is_featured ? -1 : 1;
-          }
-          // Then by shop rating (products inherit shop rating)
+          const scoreA = getBlendedScore(a);
+          const scoreB = getBlendedScore(b);
+          if (Math.abs(scoreA - scoreB) > 0.1) return scoreB - scoreA;
           const aRating = (a.shops as any)?.rating || 0;
           const bRating = (b.shops as any)?.rating || 0;
           return bRating - aRating;
@@ -236,59 +240,16 @@ export default function Products() {
         break;
       case "newest":
         filtered.sort((a, b) => {
-          // Featured first
-          if (a.is_featured !== b.is_featured) {
-            return a.is_featured ? -1 : 1;
-          }
-          // Then by newest
+          const scoreA = getBlendedScore(a);
+          const scoreB = getBlendedScore(b);
+          if (Math.abs(scoreA - scoreB) > 0.1) return scoreB - scoreA;
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         });
         break;
       case "distance":
-        if (location) {
-          filtered.sort((a, b) => {
-            // Featured first
-            if (a.is_featured !== b.is_featured) {
-              return a.is_featured ? -1 : 1;
-            }
-            // Then by shop distance
-            const aShopLocation = (a.shops as any)?.location;
-            const bShopLocation = (b.shops as any)?.location;
-            
-            if (!aShopLocation || !bShopLocation) return 0;
-            
-            const distA = calculateDistance(location, aShopLocation);
-            const distB = calculateDistance(location, bShopLocation);
-            return distA - distB;
-          });
-        }
-        break;
-      default: // relevance (with distance priority when available)
-        if (location) {
-          filtered.sort((a, b) => {
-            // Featured first
-            if (a.is_featured !== b.is_featured) {
-              return a.is_featured ? -1 : 1;
-            }
-            // Then by shop distance
-            const aShopLocation = (a.shops as any)?.location;
-            const bShopLocation = (b.shops as any)?.location;
-            
-            if (!aShopLocation || !bShopLocation) return 0;
-            
-            const distA = calculateDistance(location, aShopLocation);
-            const distB = calculateDistance(location, bShopLocation);
-            return distA - distB;
-          });
-        } else {
-          // No location: just featured first, keep rest as-is
-          filtered.sort((a, b) => {
-            if (a.is_featured !== b.is_featured) {
-              return a.is_featured ? -1 : 1;
-            }
-            return 0;
-          });
-        }
+      default:
+        // Sort by blended score (combines featured + distance)
+        filtered.sort((a, b) => getBlendedScore(b) - getBlendedScore(a));
         break;
     }
 

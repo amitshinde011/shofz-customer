@@ -182,7 +182,7 @@ export const featuredService = {
 
         const result = await (supabase as any)
           .from('offers')
-          .select('*')
+          .select('*, shops(id, name, logo_url, location, address)')
           .eq('is_featured', true)
           .eq('is_active', true)
           .in('shop_id', nearbyShopIds)

@@ -22,6 +22,7 @@ import { PullToRefreshIndicator } from "@/components/PullToRefreshIndicator";
 import { isWithinDeliveryRadius } from "@/lib/deliveryCalculations";
 import { InfiniteScrollTrigger } from "@/components/InfiniteScrollTrigger";
 import { InfiniteScrollLoader } from "@/components/InfiniteScrollLoader";
+import { calculateCombinedScore, DEFAULT_RANKING_CONFIG } from "@/lib/sortUtils";
 import {
   Breadcrumb,
   BreadcrumbItem,
@@ -194,29 +195,37 @@ export default function Shops() {
       });
     }
 
-    // Sort shops with featured priority
+    // Helper to get blended score using pre-calculated distance_km or calculate on the fly
+    const getBlendedScore = (shop: Shop & { distance_km?: number; is_featured?: boolean }) => {
+      const distance = shop.distance_km ?? (location && shop.location 
+        ? calculateDistance(location, shop.location) 
+        : DEFAULT_RANKING_CONFIG.maxDistanceKm);
+      return calculateCombinedScore({ is_featured: shop.is_featured, distance_km: distance });
+    };
+
+    // Sort shops with blended featured + distance ranking
     switch (sortBy) {
       case "rating":
         filtered.sort((a, b) => {
-          if (a.is_featured !== b.is_featured) {
-            return a.is_featured ? -1 : 1;
-          }
+          const scoreA = getBlendedScore(a);
+          const scoreB = getBlendedScore(b);
+          if (Math.abs(scoreA - scoreB) > 0.1) return scoreB - scoreA;
           return (b.rating || 0) - (a.rating || 0);
         });
         break;
       case "name":
         filtered.sort((a, b) => {
-          if (a.is_featured !== b.is_featured) {
-            return a.is_featured ? -1 : 1;
-          }
+          const scoreA = getBlendedScore(a);
+          const scoreB = getBlendedScore(b);
+          if (Math.abs(scoreA - scoreB) > 0.1) return scoreB - scoreA;
           return a.name.localeCompare(b.name);
         });
         break;
       case "newest":
         filtered.sort((a, b) => {
-          if (a.is_featured !== b.is_featured) {
-            return a.is_featured ? -1 : 1;
-          }
+          const scoreA = getBlendedScore(a);
+          const scoreB = getBlendedScore(b);
+          if (Math.abs(scoreA - scoreB) > 0.1) return scoreB - scoreA;
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         });
         break;
@@ -232,29 +241,14 @@ export default function Shops() {
             );
           });
           
-          filtered.sort((a, b) => {
-            if (a.is_featured !== b.is_featured) {
-              return a.is_featured ? -1 : 1;
-            }
-            if (!a.location || !b.location) return 0;
-            const distA = calculateDistance(location, a.location);
-            const distB = calculateDistance(location, b.location);
-            return distA - distB;
-          });
+          // Sort by blended score (combines featured + distance)
+          filtered.sort((a, b) => getBlendedScore(b) - getBlendedScore(a));
         }
         break;
       case "distance":
-        if (location) {
-          filtered.sort((a, b) => {
-            if (a.is_featured !== b.is_featured) {
-              return a.is_featured ? -1 : 1;
-            }
-            if (!a.location || !b.location) return 0;
-            const distA = calculateDistance(location, a.location);
-            const distB = calculateDistance(location, b.location);
-            return distA - distB;
-          });
-        }
+      default:
+        // Sort by blended score (combines featured + distance)
+        filtered.sort((a, b) => getBlendedScore(b) - getBlendedScore(a));
         break;
     }
 
