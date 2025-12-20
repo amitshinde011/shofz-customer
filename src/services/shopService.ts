@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { sortShopsBlended } from '@/lib/sortUtils';
+import { sortShopsBlended, sortFeaturedFirst } from '@/lib/sortUtils';
 
 export interface Shop {
   id: string;
@@ -108,9 +108,9 @@ export const shopService = {
     }
 
     const result = await query;
-    // No distance info without location, use simple featured-first for non-location queries
+    // No distance info without location, use simple featured-first
     if (result.data) {
-      result.data = sortShopsBlended(result.data);
+      result.data = sortFeaturedFirst(result.data);
     }
     return result;
   },
@@ -134,9 +134,8 @@ export const shopService = {
       }
 
       let filtered = data || [];
-      const totalCount = filtered.length;
 
-      // Apply additional filters
+      // Apply additional filters BEFORE calculating totalCount
       if (options?.category) {
         filtered = filtered.filter((shop: any) => 
           shop.categories?.includes(options.category)
@@ -150,6 +149,9 @@ export const shopService = {
           shop.description?.toLowerCase().includes(searchLower)
         );
       }
+
+      // Calculate totalCount AFTER filtering
+      const totalCount = filtered.length;
 
       // Apply offset for pagination
       const offset = options?.offset || 0;
