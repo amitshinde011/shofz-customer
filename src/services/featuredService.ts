@@ -1,10 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { enrichWithDistance } from '@/lib/sortUtils';
-
-// Sort by distance only (ascending - closest first)
-const sortByDistance = <T extends { distance_km?: number }>(items: T[]): T[] => {
-  return [...items].sort((a, b) => (a.distance_km ?? Infinity) - (b.distance_km ?? Infinity));
-};
+import { enrichWithDistance, sortShopsBlended, sortProductsBlended, sortOffersBlended } from '@/lib/sortUtils';
 
 export const featuredService = {
   async getFeaturedShops(limit: number = 6, location?: { lat: number; lng: number; radius?: number }) {
@@ -18,12 +13,11 @@ export const featuredService = {
 
         if (error) return { data: [], error };
 
-        // Filter for featured only, sort by distance (closest first)
-        const featuredShops = (nearbyShops || []).filter((shop: any) => shop.is_featured);
-        const sortedFeatured = sortByDistance(featuredShops).slice(0, limit);
+        // Sort all shops by blended ranking (featured + distance)
+        const sortedShops = sortShopsBlended(nearbyShops || []).slice(0, limit);
 
         return {
-          data: sortedFeatured.map((shop: any, index: number) => ({
+          data: sortedShops.map((shop: any, index: number) => ({
             ...shop,
             featured_priority: (limit - index) * 10,
             featured_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -51,12 +45,11 @@ export const featuredService = {
 
         if (error) return { data: [], error };
 
-        // Filter for featured only, sort by distance, then paginate
-        const featuredShops = (nearbyShops || []).filter((shop: any) => shop.is_featured);
-        const sortedFeatured = sortByDistance(featuredShops).slice(offset, offset + limit);
+        // Sort all shops by blended ranking, then paginate
+        const sortedShops = sortShopsBlended(nearbyShops || []).slice(offset, offset + limit);
 
         return {
-          data: sortedFeatured.map((shop: any, index: number) => ({
+          data: sortedShops.map((shop: any, index: number) => ({
             ...shop,
             featured_priority: (limit - index) * 10,
             featured_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
@@ -91,17 +84,16 @@ export const featuredService = {
         const { data, error } = await (supabase as any)
           .from('products')
           .select('*, shops!inner(id, name, address, logo_url, is_verified)')
-          .eq('is_featured', true)
           .eq('is_active', true)
           .in('shop_id', nearbyShopIds)
           .order('created_at', { ascending: false })
-          .limit(limit * 2); // Fetch more to allow for ranking
+          .limit(limit * 3); // Fetch more to allow for blended ranking
 
         if (error) return { data: [], error };
 
-        // Enrich with distance and sort by distance (closest first)
+        // Enrich with distance and sort by blended ranking
         const enrichedProducts = enrichWithDistance(data || [], nearbyShops);
-        const sortedProducts = sortByDistance(enrichedProducts).slice(0, limit);
+        const sortedProducts = sortProductsBlended(enrichedProducts).slice(0, limit);
 
         return { 
           data: sortedProducts.map((product: any, index: number) => ({
@@ -141,16 +133,15 @@ export const featuredService = {
         const { data, error } = await (supabase as any)
           .from('products')
           .select('*, shops!inner(id, name, address, logo_url, is_verified)')
-          .eq('is_featured', true)
           .eq('is_active', true)
           .in('shop_id', nearbyShopIds)
           .order('created_at', { ascending: false });
 
         if (error) return { data: [], error };
 
-        // Enrich with distance, sort by distance, then paginate
+        // Enrich with distance, sort by blended ranking, then paginate
         const enrichedProducts = enrichWithDistance(data || [], nearbyShops);
-        const sortedProducts = sortByDistance(enrichedProducts).slice(offset, offset + limit);
+        const sortedProducts = sortProductsBlended(enrichedProducts).slice(offset, offset + limit);
 
         return { 
           data: sortedProducts.map((product: any, index: number) => ({
@@ -188,18 +179,17 @@ export const featuredService = {
         const result = await (supabase as any)
           .from('offers')
           .select('*, shops(id, name, logo_url, location, address)')
-          .eq('is_featured', true)
           .eq('is_active', true)
           .in('shop_id', nearbyShopIds)
           .or(`valid_until.is.null,valid_until.gte.${new Date().toISOString()}`)
           .order('created_at', { ascending: false })
-          .limit(limit * 2); // Fetch more to allow for ranking
+          .limit(limit * 3); // Fetch more to allow for blended ranking
 
         if (result.error) return { data: [], error: result.error };
 
-        // Enrich with distance and sort by distance (closest first)
+        // Enrich with distance and sort by blended ranking
         const enrichedOffers = enrichWithDistance(result.data || [], nearbyShops);
-        const sortedOffers = sortByDistance(enrichedOffers).slice(0, limit);
+        const sortedOffers = sortOffersBlended(enrichedOffers).slice(0, limit);
 
         return { 
           data: sortedOffers.map((offer: any, index: number) => ({
@@ -241,7 +231,6 @@ export const featuredService = {
         const result = await (supabase as any)
           .from('offers')
           .select('*, shops(id, name, logo_url, location, address)')
-          .eq('is_featured', true)
           .eq('is_active', true)
           .in('shop_id', nearbyShopIds)
           .or(`valid_until.is.null,valid_until.gte.${new Date().toISOString()}`)
@@ -249,9 +238,9 @@ export const featuredService = {
 
         if (result.error) return { data: [], error: result.error };
 
-        // Enrich with distance, sort by distance, then paginate
+        // Enrich with distance, sort by blended ranking, then paginate
         const enrichedOffers = enrichWithDistance(result.data || [], nearbyShops);
-        const sortedOffers = sortByDistance(enrichedOffers).slice(offset, offset + limit);
+        const sortedOffers = sortOffersBlended(enrichedOffers).slice(offset, offset + limit);
 
         return { 
           data: sortedOffers.map((offer: any, index: number) => ({
