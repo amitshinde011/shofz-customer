@@ -203,29 +203,26 @@ export default function Shops() {
       return calculateCombinedScore({ is_featured: shop.is_featured, distance_km: distance });
     };
 
-    // Sort shops with blended featured + distance ranking
+    // Sort shops - blended score first, then secondary criteria for ties
     switch (sortBy) {
       case "rating":
         filtered.sort((a, b) => {
-          const scoreA = getBlendedScore(a);
-          const scoreB = getBlendedScore(b);
-          if (Math.abs(scoreA - scoreB) > 0.1) return scoreB - scoreA;
+          const scoreDiff = getBlendedScore(b) - getBlendedScore(a);
+          if (scoreDiff !== 0) return scoreDiff;
           return (b.rating || 0) - (a.rating || 0);
         });
         break;
       case "name":
         filtered.sort((a, b) => {
-          const scoreA = getBlendedScore(a);
-          const scoreB = getBlendedScore(b);
-          if (Math.abs(scoreA - scoreB) > 0.1) return scoreB - scoreA;
+          const scoreDiff = getBlendedScore(b) - getBlendedScore(a);
+          if (scoreDiff !== 0) return scoreDiff;
           return a.name.localeCompare(b.name);
         });
         break;
       case "newest":
         filtered.sort((a, b) => {
-          const scoreA = getBlendedScore(a);
-          const scoreB = getBlendedScore(b);
-          if (Math.abs(scoreA - scoreB) > 0.1) return scoreB - scoreA;
+          const scoreDiff = getBlendedScore(b) - getBlendedScore(a);
+          if (scoreDiff !== 0) return scoreDiff;
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         });
         break;
@@ -240,14 +237,11 @@ export default function Shops() {
               shop.delivery_coverage_km
             );
           });
-          
-          // Sort by blended score (combines featured + distance)
-          filtered.sort((a, b) => getBlendedScore(b) - getBlendedScore(a));
         }
+        filtered.sort((a, b) => getBlendedScore(b) - getBlendedScore(a));
         break;
       case "distance":
       default:
-        // Sort by blended score (combines featured + distance)
         filtered.sort((a, b) => getBlendedScore(b) - getBlendedScore(a));
         break;
     }
