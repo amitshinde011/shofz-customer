@@ -1,4 +1,4 @@
-import { useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback, useMemo, useState } from "react";
 import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Offer } from "@/hooks/useOffers";
 import { EnhancedOffer, useMarkOfferViewed, useViewedOffers } from "@/hooks/useSmartOffers";
@@ -6,7 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import OfferStoryCard from "./OfferStoryCard";
 import OfferStoriesViewer from "./OfferStoriesViewer";
-import { useState } from "react";
 
 interface OfferStoriesCarouselProps {
   offers: (Offer | EnhancedOffer)[];
@@ -76,6 +75,9 @@ export default function OfferStoriesCarousel({
   const [selectedOfferIndex, setSelectedOfferIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const isLoadingMoreRef = useRef(false);
+  
+  // Stabilize offers array reference to prevent unnecessary re-renders in viewer
+  const stableOffers = useMemo(() => offers, [JSON.stringify(offers.map(o => o.id))]);
   
   // Use React Query cache for viewed offers
   const { data: viewedOffers } = useViewedOffers();
@@ -208,7 +210,7 @@ export default function OfferStoriesCarousel({
 
       {/* Full-Screen Stories Viewer */}
       <OfferStoriesViewer
-        offers={offers}
+        offers={stableOffers}
         initialIndex={selectedOfferIndex}
         isVisible={viewerVisible}
         onClose={() => setViewerVisible(false)}
