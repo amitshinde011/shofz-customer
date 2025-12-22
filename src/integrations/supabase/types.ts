@@ -3382,6 +3382,87 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_nearby_offers: {
+        Args: {
+          p_limit?: number
+          p_offset?: number
+          radius_km?: number
+          user_lat: number
+          user_lng: number
+        }
+        Returns: {
+          applicable_categories: string[]
+          applicable_products: string[]
+          applicable_to: string
+          created_at: string
+          description: string
+          discount_percentage: number
+          discount_type: string
+          discount_value: number
+          distance_km: number
+          featured_until: string
+          id: string
+          image_url: string
+          is_active: boolean
+          is_featured: boolean
+          offer_type: string
+          shop_address: string
+          shop_id: string
+          shop_is_featured: boolean
+          shop_is_verified: boolean
+          shop_logo_url: string
+          shop_name: string
+          terms_conditions: string
+          title: string
+          updated_at: string
+          valid_from: string
+          valid_until: string
+        }[]
+      }
+      get_nearby_products: {
+        Args: {
+          p_category?: string
+          p_featured?: boolean
+          p_limit?: number
+          p_max_price?: number
+          p_min_price?: number
+          p_offset?: number
+          p_query?: string
+          radius_km?: number
+          user_lat: number
+          user_lng: number
+        }
+        Returns: {
+          brand: string
+          category: string
+          compare_at_price: number
+          created_at: string
+          description: string
+          distance_km: number
+          featured_until: string
+          id: string
+          images: string[]
+          inventory_tracking: boolean
+          is_active: boolean
+          is_featured: boolean
+          low_stock_threshold: number
+          name: string
+          price: number
+          shop_address: string
+          shop_id: string
+          shop_is_featured: boolean
+          shop_is_verified: boolean
+          shop_logo_url: string
+          shop_name: string
+          shop_rating: number
+          sku: string
+          specifications: Json
+          stock_quantity: number
+          subcategory: string
+          tags: string[]
+          updated_at: string
+        }[]
+      }
       get_nearby_shops: {
         Args: { radius_km?: number; user_lat: number; user_lng: number }
         Returns: {
