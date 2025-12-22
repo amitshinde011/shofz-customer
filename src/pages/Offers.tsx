@@ -214,43 +214,38 @@ export default function Offers() {
       return calculateCombinedScore({ is_featured: offer.is_featured, distance_km: distance });
     };
 
-    // Sort offers with blended featured + distance ranking
+    // Sort offers - blended score first, then secondary criteria for ties
     switch (sortBy) {
       case "newest":
         filtered.sort((a, b) => {
-          const scoreA = getBlendedScore(a);
-          const scoreB = getBlendedScore(b);
-          if (Math.abs(scoreA - scoreB) > 0.1) return scoreB - scoreA;
+          const scoreDiff = getBlendedScore(b) - getBlendedScore(a);
+          if (scoreDiff !== 0) return scoreDiff;
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         });
         break;
       case "ending-soon":
         filtered.sort((a, b) => {
-          const scoreA = getBlendedScore(a);
-          const scoreB = getBlendedScore(b);
-          if (Math.abs(scoreA - scoreB) > 0.1) return scoreB - scoreA;
+          const scoreDiff = getBlendedScore(b) - getBlendedScore(a);
+          if (scoreDiff !== 0) return scoreDiff;
           if (!a.valid_until || !b.valid_until) return 0;
           return new Date(a.valid_until).getTime() - new Date(b.valid_until).getTime();
         });
         break;
       case "discount-high":
         filtered.sort((a, b) => {
-          const scoreA = getBlendedScore(a);
-          const scoreB = getBlendedScore(b);
-          if (Math.abs(scoreA - scoreB) > 0.1) return scoreB - scoreA;
+          const scoreDiff = getBlendedScore(b) - getBlendedScore(a);
+          if (scoreDiff !== 0) return scoreDiff;
           return b.discount_value - a.discount_value;
         });
         break;
       case "discount-low":
         filtered.sort((a, b) => {
-          const scoreA = getBlendedScore(a);
-          const scoreB = getBlendedScore(b);
-          if (Math.abs(scoreA - scoreB) > 0.1) return scoreB - scoreA;
+          const scoreDiff = getBlendedScore(b) - getBlendedScore(a);
+          if (scoreDiff !== 0) return scoreDiff;
           return a.discount_value - b.discount_value;
         });
         break;
       default: // nearest
-        // Sort by blended score (combines featured + distance)
         filtered.sort((a, b) => getBlendedScore(b) - getBlendedScore(a));
         break;
     }

@@ -210,29 +210,26 @@ export default function Products() {
       return calculateCombinedScore({ is_featured: product.is_featured, distance_km: distance });
     };
 
-    // Sort products with blended featured + distance ranking
+    // Sort products - blended score first, then secondary criteria for ties
     switch (sortBy) {
       case "price-low":
         filtered.sort((a, b) => {
-          const scoreA = getBlendedScore(a);
-          const scoreB = getBlendedScore(b);
-          if (Math.abs(scoreA - scoreB) > 0.1) return scoreB - scoreA;
+          const scoreDiff = getBlendedScore(b) - getBlendedScore(a);
+          if (scoreDiff !== 0) return scoreDiff;
           return a.price - b.price;
         });
         break;
       case "price-high":
         filtered.sort((a, b) => {
-          const scoreA = getBlendedScore(a);
-          const scoreB = getBlendedScore(b);
-          if (Math.abs(scoreA - scoreB) > 0.1) return scoreB - scoreA;
+          const scoreDiff = getBlendedScore(b) - getBlendedScore(a);
+          if (scoreDiff !== 0) return scoreDiff;
           return b.price - a.price;
         });
         break;
       case "rating":
         filtered.sort((a, b) => {
-          const scoreA = getBlendedScore(a);
-          const scoreB = getBlendedScore(b);
-          if (Math.abs(scoreA - scoreB) > 0.1) return scoreB - scoreA;
+          const scoreDiff = getBlendedScore(b) - getBlendedScore(a);
+          if (scoreDiff !== 0) return scoreDiff;
           const aRating = (a.shops as any)?.rating || 0;
           const bRating = (b.shops as any)?.rating || 0;
           return bRating - aRating;
@@ -240,15 +237,13 @@ export default function Products() {
         break;
       case "newest":
         filtered.sort((a, b) => {
-          const scoreA = getBlendedScore(a);
-          const scoreB = getBlendedScore(b);
-          if (Math.abs(scoreA - scoreB) > 0.1) return scoreB - scoreA;
+          const scoreDiff = getBlendedScore(b) - getBlendedScore(a);
+          if (scoreDiff !== 0) return scoreDiff;
           return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
         });
         break;
       case "distance":
       default:
-        // Sort by blended score (combines featured + distance)
         filtered.sort((a, b) => getBlendedScore(b) - getBlendedScore(a));
         break;
     }
