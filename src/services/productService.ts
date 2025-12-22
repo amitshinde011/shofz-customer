@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { sortProductsBlended, enrichWithDistance, sortFeaturedFirst } from '@/lib/sortUtils';
+import { sortProductsBlended, sortFeaturedFirst } from '@/lib/sortUtils';
 
 export interface Product {
   id: string;
@@ -107,98 +107,43 @@ export const productService = {
       return result;
     }
 
-    // If location is provided, filter by nearby shops first
+    // If location is provided, use RPC to get nearby products
     if (options?.location) {
-      const { data: nearbyShops, error: shopsError } = await (supabase as any).rpc('get_nearby_shops', {
+      const { data, error } = await (supabase as any).rpc('get_nearby_products', {
         user_lat: options.location.lat,
         user_lng: options.location.lng,
-        radius_km: options.location.radius || 50
+        radius_km: options.location.radius || 50,
+        p_category: options?.category || null,
+        p_query: options?.query || null,
+        p_min_price: options?.minPrice || null,
+        p_max_price: options?.maxPrice || null,
+        p_featured: options?.featured || null,
+        p_limit: options?.limit || 100,
+        p_offset: options?.offset || 0
       });
 
-      if (shopsError) {
-        console.error('Error fetching nearby shops:', shopsError);
-        return { data: [], error: shopsError };
+      if (error) {
+        console.error('Error fetching nearby products:', error);
+        return { data: [], error };
       }
 
-      const nearbyShopIds = nearbyShops?.map((s: any) => s.id) || [];
-      
-      if (nearbyShopIds.length === 0) {
-        return { data: [], error: null };
-      }
+      // Transform RPC response to match expected format
+      const transformedProducts = (data || []).map((p: any) => ({
+        ...p,
+        shops: {
+          id: p.shop_id,
+          name: p.shop_name,
+          address: p.shop_address,
+          logo_url: p.shop_logo_url,
+          is_verified: p.shop_is_verified,
+          rating: p.shop_rating,
+        }
+      }));
 
-      let query = (supabase as any)
-        .from('products')
-        .select(`
-          *,
-          shops (
-            id,
-            name,
-            address,
-            rating,
-            business_hours,
-            total_reviews
-          )
-        `)
-        .eq('is_active', true)
-        .in('shop_id', nearbyShopIds);
+      // Apply blended ranking (featured + distance)
+      const sortedProducts = sortProductsBlended(transformedProducts);
 
-      if (options?.query) {
-        query = query.or(`name.ilike.%${options.query}%,description.ilike.%${options.query}%`);
-      }
-
-      if (options?.category) {
-        query = query.eq('category', options.category);
-      }
-
-      if (options?.minPrice !== undefined) {
-        query = query.gte('price', options.minPrice);
-      }
-
-      if (options?.maxPrice !== undefined) {
-        query = query.lte('price', options.maxPrice);
-      }
-
-      if (options?.shopId) {
-        query = query.eq('shop_id', options.shopId);
-      }
-
-      if (options?.featured) {
-        query = query.eq('is_featured', true);
-      }
-
-      query = query.order('created_at', { ascending: false });
-
-      if (options?.limit) {
-        query = query.limit(options.limit);
-      }
-
-      if (options?.offset) {
-        query = query.range(options.offset, options.offset + (options.limit || 20) - 1);
-      }
-
-      const result = await query;
-      
-      // Transform shop location data from nearbyShops and enrich with distance
-      if (result.data && nearbyShops) {
-        result.data = result.data.map((product: any) => {
-          const shopWithLocation = nearbyShops.find((s: any) => s.id === product.shop_id);
-          if (product.shops && shopWithLocation) {
-            product.shops.location = shopWithLocation.latitude && shopWithLocation.longitude
-              ? { lat: shopWithLocation.latitude, lng: shopWithLocation.longitude }
-              : undefined;
-          }
-          // Add distance_km from shop for blended ranking
-          return {
-            ...product,
-            distance_km: shopWithLocation?.distance_km
-          };
-        });
-        
-        // Apply blended ranking (featured + distance)
-        result.data = sortProductsBlended(result.data);
-      }
-      
-      return result;
+      return { data: sortedProducts, error: null };
     }
 
     // No location provided - return empty (enforce location-based filtering)
@@ -267,45 +212,34 @@ export const productService = {
   // Get featured products
   async getFeaturedProducts(limit: number = 10, location?: { lat: number; lng: number; radius?: number }) {
     if (location) {
-      const { data: nearbyShops, error: shopsError } = await (supabase as any).rpc('get_nearby_shops', {
+      const { data, error } = await (supabase as any).rpc('get_nearby_products', {
         user_lat: location.lat,
         user_lng: location.lng,
-        radius_km: location.radius || 50
+        radius_km: location.radius || 50,
+        p_featured: true,
+        p_limit: limit
       });
 
-      if (shopsError) {
-        return { data: [], error: shopsError };
+      if (error) {
+        return { data: [], error };
       }
 
-      const nearbyShopIds = nearbyShops?.map((s: any) => s.id) || [];
-      
-      if (nearbyShopIds.length === 0) {
-        return { data: [], error: null };
-      }
+      // Transform RPC response to match expected format
+      const transformedProducts = (data || []).map((p: any) => ({
+        ...p,
+        shops: {
+          id: p.shop_id,
+          name: p.shop_name,
+          address: p.shop_address,
+          logo_url: p.shop_logo_url,
+          is_verified: p.shop_is_verified,
+        }
+      }));
 
-      const result = await (supabase as any)
-        .from('products')
-        .select(`
-          *,
-          shops (
-            id,
-            name,
-            address
-          )
-        `)
-        .eq('is_active', true)
-        .eq('is_featured', true)
-        .in('shop_id', nearbyShopIds)
-        .order('created_at', { ascending: false })
-        .limit(limit);
+      // Apply blended ranking
+      const sortedProducts = sortProductsBlended(transformedProducts);
 
-      // Enrich with distance and apply blended ranking
-      if (result.data && nearbyShops) {
-        const enrichedData = enrichWithDistance(result.data, nearbyShops);
-        result.data = sortProductsBlended(enrichedData);
-      }
-
-      return result;
+      return { data: sortedProducts, error: null };
     }
 
     return { data: [], error: null };
