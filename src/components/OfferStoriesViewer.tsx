@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, ChevronLeft, ChevronRight, ExternalLink } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -24,8 +24,11 @@ export default function OfferStoriesViewer({
 }: OfferStoriesViewerProps) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
   const [isPaused, setIsPaused] = useState(false);
+  const [isReady, setIsReady] = useState(false);
+  const [storyStartTime, setStoryStartTime] = useState<number>(Date.now());
   const navigate = useNavigate();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const hasInitializedRef = useRef(false);
 
   const currentOffer = offers[currentIndex];
 
@@ -121,10 +124,38 @@ export default function OfferStoriesViewer({
     navigate(`/offers/${currentOffer.id}`);
   };
 
-  // Auto-advance timer - Uses useCallback to prevent stale closures
+  // Reset story start time when currentIndex changes
   useEffect(() => {
-    if (!isVisible || isPaused) {
-      // Clear timer if paused or not visible
+    if (isVisible && isReady) {
+      setStoryStartTime(Date.now());
+    }
+  }, [currentIndex, isVisible, isReady]);
+
+  // Initialize when viewer opens - only set index ONCE per open session
+  useEffect(() => {
+    if (isVisible && !hasInitializedRef.current) {
+      setCurrentIndex(initialIndex);
+      hasInitializedRef.current = true;
+      
+      // Small delay before starting auto-advance to let component mount
+      const readyTimer = setTimeout(() => {
+        setIsReady(true);
+        setStoryStartTime(Date.now());
+      }, 150);
+      
+      return () => clearTimeout(readyTimer);
+    }
+    
+    if (!isVisible) {
+      hasInitializedRef.current = false;
+      setIsReady(false);
+    }
+  }, [isVisible, initialIndex]);
+
+  // Auto-advance timer - only starts when ready
+  useEffect(() => {
+    if (!isVisible || isPaused || !isReady) {
+      // Clear timer if paused, not visible, or not ready
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
@@ -148,14 +179,7 @@ export default function OfferStoriesViewer({
         timerRef.current = null;
       }
     };
-  }, [currentIndex, isVisible, isPaused, handleNext]);
-
-  // Reset index when viewer opens
-  useEffect(() => {
-    if (isVisible) {
-      setCurrentIndex(initialIndex);
-    }
-  }, [isVisible, initialIndex]);
+  }, [currentIndex, isVisible, isPaused, isReady, handleNext]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -265,9 +289,11 @@ export default function OfferStoriesViewer({
           {offers.map((_, index) => (
             <ProgressBar
               key={index}
-              isActive={index === currentIndex}
+              isActive={index === currentIndex && isReady}
               isCompleted={index < currentIndex}
               duration={STORY_DURATION}
+              isPaused={isPaused}
+              startTime={index === currentIndex ? storyStartTime : undefined}
             />
           ))}
         </div>
@@ -456,7 +482,7 @@ export default function OfferStoriesViewer({
           </div>
         </motion.div>
 
-        {/* Touch/Click Areas for Navigation - MAXIMIZED */}
+        {/* Touch/Click Areas for Navigation - Reduced width to prevent accidental taps */}
         {currentIndex > 0 && (
           <button
             onClick={handlePrevious}
@@ -465,7 +491,7 @@ export default function OfferStoriesViewer({
               left: 0,
               top: "100px",
               bottom: "100px",
-              width: "40%",
+              width: "25%",
               backgroundColor: "transparent",
               border: "none",
               cursor: "pointer",
@@ -510,7 +536,7 @@ export default function OfferStoriesViewer({
               right: 0,
               top: "100px",
               bottom: "100px",
-              width: "40%",
+              width: "25%",
               backgroundColor: "transparent",
               border: "none",
               cursor: "pointer",
@@ -565,18 +591,23 @@ export default function OfferStoriesViewer({
   );
 }
 
-// Progress Bar Component - Fixed to sync with timer
+// Progress Bar Component - Synced with parent timer via startTime
 function ProgressBar({
   isActive,
   isCompleted,
   duration,
+  isPaused,
+  startTime,
 }: {
   isActive: boolean;
   isCompleted: boolean;
   duration: number;
+  isPaused: boolean;
+  startTime?: number;
 }) {
   const [progress, setProgress] = useState(0);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pausedAtRef = useRef<number>(0);
 
   useEffect(() => {
     // Clear any existing interval
@@ -585,15 +616,22 @@ function ProgressBar({
       intervalRef.current = null;
     }
 
-    if (!isActive) {
+    if (!isActive || !startTime) {
       setProgress(isCompleted ? 100 : 0);
       return;
     }
 
-    // Reset progress to 0 immediately when becoming active
-    setProgress(0);
+    if (isPaused) {
+      // Store progress when paused
+      pausedAtRef.current = progress;
+      return;
+    }
 
-    const startTime = Date.now();
+    // Calculate initial progress based on startTime
+    const initialElapsed = Date.now() - startTime;
+    const initialProgress = Math.min((initialElapsed / duration) * 100, 100);
+    setProgress(initialProgress);
+
     intervalRef.current = setInterval(() => {
       const elapsed = Date.now() - startTime;
       const newProgress = Math.min((elapsed / duration) * 100, 100);
@@ -613,7 +651,7 @@ function ProgressBar({
         intervalRef.current = null;
       }
     };
-  }, [isActive, isCompleted, duration]);
+  }, [isActive, isCompleted, duration, isPaused, startTime]);
 
   return (
     <div
