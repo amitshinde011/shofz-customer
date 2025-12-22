@@ -1,11 +1,12 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useRef, useEffect, useCallback } from "react";
 import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Offer } from "@/hooks/useOffers";
-import { EnhancedOffer } from "@/hooks/useSmartOffers";
+import { EnhancedOffer, useMarkOfferViewed, useViewedOffers } from "@/hooks/useSmartOffers";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import OfferStoryCard from "./OfferStoryCard";
 import OfferStoriesViewer from "./OfferStoriesViewer";
+import { useState } from "react";
 
 interface OfferStoriesCarouselProps {
   offers: (Offer | EnhancedOffer)[];
@@ -71,22 +72,18 @@ export default function OfferStoriesCarousel({
   isLoading = false,
   error = null,
 }: OfferStoriesCarouselProps) {
-  const [viewedOffers, setViewedOffers] = useState<Set<string>>(new Set());
   const [viewerVisible, setViewerVisible] = useState(false);
   const [selectedOfferIndex, setSelectedOfferIndex] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   const isLoadingMoreRef = useRef(false);
+  
+  // Use React Query cache for viewed offers
+  const { data: viewedOffers } = useViewedOffers();
+  const markOfferViewed = useMarkOfferViewed();
 
-  const handleOfferView = (offerId: string) => {
-    setViewedOffers((prev) => new Set(prev).add(offerId));
-    const viewed = Array.from(viewedOffers);
-    viewed.push(offerId);
-    try {
-      localStorage.setItem("viewedOffers", JSON.stringify(viewed));
-    } catch {
-      // Ignore localStorage errors
-    }
-  };
+  const handleOfferView = useCallback((offerId: string) => {
+    markOfferViewed(offerId);
+  }, [markOfferViewed]);
 
   const handleOfferClick = (index: number) => {
     setSelectedOfferIndex(index);
@@ -109,21 +106,6 @@ export default function OfferStoriesCarousel({
       }, 500);
     }
   }, [onLoadMore, hasMore, isLoadingMore]);
-
-  useEffect(() => {
-    // Load viewed offers from localStorage
-    try {
-      const stored = localStorage.getItem("viewedOffers");
-      if (stored) {
-        const viewed = JSON.parse(stored);
-        if (Array.isArray(viewed)) {
-          setViewedOffers(new Set(viewed));
-        }
-      }
-    } catch {
-      // Ignore localStorage errors
-    }
-  }, []);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -200,7 +182,7 @@ export default function OfferStoriesCarousel({
             <OfferStoryCard
               key={offer.id}
               offer={offer as EnhancedOffer}
-              isViewed={viewedOffers.has(offer.id)}
+              isViewed={viewedOffers?.has(offer.id) ?? false}
               onView={handleOfferView}
               onClick={() => handleOfferClick(index)}
             />
