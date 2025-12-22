@@ -28,7 +28,6 @@ export default function OfferStoriesViewer({
   const [storyStartTime, setStoryStartTime] = useState<number>(Date.now());
   const navigate = useNavigate();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
-  const hasInitializedRef = useRef(false);
 
   const currentOffer = offers[currentIndex];
 
@@ -131,12 +130,9 @@ export default function OfferStoriesViewer({
     }
   }, [currentIndex, isVisible, isReady]);
 
-  // Initialize when viewer opens - only set index ONCE per open session
+  // Initialize when viewer opens - component remounts with correct initialIndex via key prop
   useEffect(() => {
-    if (isVisible && !hasInitializedRef.current) {
-      setCurrentIndex(initialIndex);
-      hasInitializedRef.current = true;
-      
+    if (isVisible) {
       // Small delay before starting auto-advance to let component mount
       const readyTimer = setTimeout(() => {
         setIsReady(true);
@@ -144,13 +140,10 @@ export default function OfferStoriesViewer({
       }, 150);
       
       return () => clearTimeout(readyTimer);
-    }
-    
-    if (!isVisible) {
-      hasInitializedRef.current = false;
+    } else {
       setIsReady(false);
     }
-  }, [isVisible, initialIndex]);
+  }, [isVisible]);
 
   // Auto-advance timer - only starts when ready
   useEffect(() => {
