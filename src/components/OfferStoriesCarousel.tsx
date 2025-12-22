@@ -209,7 +209,8 @@ export default function OfferStoriesCarousel({
       </div>
 
       {/* Full-Screen Stories Viewer */}
-      <OfferStoriesViewer
+      <OfferStoriesViewer 
+        key={viewerVisible ? `viewer-${selectedOfferIndex}` : 'closed'}
         offers={stableOffers}
         initialIndex={selectedOfferIndex}
         isVisible={viewerVisible}
