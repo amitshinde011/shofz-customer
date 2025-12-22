@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useMemo, useCallback } from 'react';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { Offer } from './useOffers';
 import { formatDistance } from '@/lib/distanceCalculation';
 import { useAuth } from '@/contexts/AuthContext';
+import { calculateCombinedScore } from '@/lib/sortUtils';
 
 export interface EnhancedOffer extends Offer {
   distanceKm?: number;
@@ -17,25 +18,67 @@ interface UseSmartOffersOptions {
   initialLimit?: number;
 }
 
-// Safe localStorage helper
-const getViewedOffers = (): Set<string> => {
+// Query key for viewed offers cache
+const VIEWED_OFFERS_KEY = ['viewed-offers-cache'];
+
+// Safe localStorage helper for initial load
+const getViewedOffersFromStorage = (): string[] => {
   try {
     const stored = localStorage.getItem('viewedOffers');
     if (stored) {
       const parsed = JSON.parse(stored);
       if (Array.isArray(parsed)) {
-        return new Set(parsed);
+        return parsed;
       }
     }
   } catch {
     // Ignore localStorage errors
   }
-  return new Set();
+  return [];
 };
+
+// Hook to get viewed offers from React Query cache
+export function useViewedOffers() {
+  return useQuery({
+    queryKey: VIEWED_OFFERS_KEY,
+    queryFn: () => new Set(getViewedOffersFromStorage()),
+    staleTime: Infinity, // Never refetch from localStorage, cache is source of truth
+    gcTime: Infinity, // Keep in cache forever during session
+  });
+}
+
+// Hook to mark an offer as viewed - updates cache and triggers re-sort
+export function useMarkOfferViewed() {
+  const queryClient = useQueryClient();
+
+  return useCallback((offerId: string) => {
+    // Update React Query cache
+    queryClient.setQueryData<Set<string>>(VIEWED_OFFERS_KEY, (old) => {
+      const newSet = new Set(old || []);
+      newSet.add(offerId);
+      
+      // Also persist to localStorage as backup
+      try {
+        localStorage.setItem('viewedOffers', JSON.stringify([...newSet]));
+      } catch {
+        // Ignore localStorage errors
+      }
+      
+      return newSet;
+    });
+
+    // Invalidate smart-offers to trigger re-sort with new viewed status
+    queryClient.invalidateQueries({ queryKey: ['smart-offers'] });
+  }, [queryClient]);
+}
 
 export function useSmartOffers(options: UseSmartOffersOptions) {
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const pageSize = options.initialLimit || 15;
+
+  // Get viewed offers from cache
+  const { data: viewedOffersSet } = useViewedOffers();
 
   // Infinite offers query with smart sorting
   const infiniteQuery = useInfiniteQuery({
@@ -93,8 +136,8 @@ export function useSmartOffers(options: UseSmartOffersOptions) {
         favoriteSet = new Set((favorites || []).map((f: any) => f.shop_id));
       }
 
-      // Get viewed offers from localStorage
-      const viewedOffers = getViewedOffers();
+      // Get viewed offers from React Query cache (fallback to localStorage)
+      const viewedOffers = queryClient.getQueryData<Set<string>>(VIEWED_OFFERS_KEY) || new Set(getViewedOffersFromStorage());
 
       // Enhance offers with distance, favorite status, and viewed status
       const enhancedOffers: EnhancedOffer[] = (offers || []).map((offer: any) => {
@@ -108,20 +151,40 @@ export function useSmartOffers(options: UseSmartOffersOptions) {
         };
       });
 
-      // Smart sort: favorites first → unviewed first → by distance
+      // Smart sort with blended ranking:
+      // - Check if all offers are viewed
+      // - If not all viewed: favorites+unviewed first (blended), then unviewed (blended), then viewed (blended)
+      // - If all viewed: re-sort everything by blended ranking only
+      const allViewed = enhancedOffers.length > 0 && enhancedOffers.every(o => viewedOffers.has(o.id));
+
       enhancedOffers.sort((a, b) => {
-        // 1. Favorites first
-        if (a.isFavoriteShop && !b.isFavoriteShop) return -1;
-        if (!a.isFavoriteShop && b.isFavoriteShop) return 1;
+        const aViewed = viewedOffers.has(a.id);
+        const bViewed = viewedOffers.has(b.id);
+
+        // Calculate blended scores for both
+        const scoreA = calculateCombinedScore({ is_featured: a.is_featured, distance_km: a.distanceKm });
+        const scoreB = calculateCombinedScore({ is_featured: b.is_featured, distance_km: b.distanceKm });
+
+        if (allViewed) {
+          // All offers viewed - sort by blended ranking only
+          return scoreB - scoreA;
+        }
+
+        // Not all viewed - apply grouping logic
+        // Group 1: Favorite shop + unviewed (sorted by blended)
+        // Group 2: Non-favorite + unviewed (sorted by blended)
+        // Group 3: All viewed (sorted by blended)
         
-        // 2. Unviewed first
-        if (!a.isViewed && b.isViewed) return -1;
-        if (a.isViewed && !b.isViewed) return 1;
-        
-        // 3. Then by distance (closer first)
-        const distA = a.distanceKm ?? Infinity;
-        const distB = b.distanceKm ?? Infinity;
-        return distA - distB;
+        const aGroup = aViewed ? 3 : (a.isFavoriteShop ? 1 : 2);
+        const bGroup = bViewed ? 3 : (b.isFavoriteShop ? 1 : 2);
+
+        // Sort by group first
+        if (aGroup !== bGroup) {
+          return aGroup - bGroup;
+        }
+
+        // Within same group, sort by blended score (higher = better)
+        return scoreB - scoreA;
       });
 
       const hasMore = offers?.length === pageSize;
@@ -148,5 +211,6 @@ export function useSmartOffers(options: UseSmartOffersOptions) {
     hasNextPage: infiniteQuery.hasNextPage,
     fetchNextPage: infiniteQuery.fetchNextPage,
     error: infiniteQuery.error as Error | null,
+    viewedOffers: viewedOffersSet,
   };
 }
