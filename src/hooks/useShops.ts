@@ -67,11 +67,16 @@ export const useShop = (id: string) => {
   });
 };
 
-export const useFeaturedShops = (limit?: number) => {
+// NOTE: useFeaturedShops is now in useFeaturedContent.ts with location support
+// This deprecated version is kept for backwards compatibility but should not be used
+/** @deprecated Use useFeaturedShops from useFeaturedContent.ts instead */
+export const useFeaturedShopsLegacy = (limit?: number) => {
+  console.warn('useFeaturedShopsLegacy is deprecated. Use useFeaturedShops from useFeaturedContent.ts');
   return useQuery({
-    queryKey: ['shops', 'featured', limit],
+    queryKey: ['shops', 'featured-legacy', limit],
     queryFn: () => shopService.getFeaturedShops(limit),
-    staleTime: 10 * 60 * 1000, // 10 minutes
+    staleTime: 10 * 60 * 1000,
+    enabled: false, // Disabled by default since location is required
   });
 };
 

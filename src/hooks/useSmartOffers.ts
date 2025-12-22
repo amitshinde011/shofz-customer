@@ -95,16 +95,22 @@ export function useSmartOffers(options: UseSmartOffersOptions) {
         p_offset: pageParam
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('useSmartOffers fetch error:', error);
+        throw error;
+      }
       if (!offers?.length) return { data: [], nextOffset: undefined };
 
       // Fetch favorite shop IDs for current user
       let favoriteSet = new Set<string>();
       if (user?.id) {
-        const { data: favorites } = await (supabase as any)
+        const { data: favorites, error: favError } = await (supabase as any)
           .from('user_favorites')
           .select('shop_id')
           .eq('user_id', user.id);
+        if (favError) {
+          console.error('useSmartOffers favorites error:', favError);
+        }
         favoriteSet = new Set((favorites || []).map((f: any) => f.shop_id));
       }
 
@@ -129,42 +135,6 @@ export function useSmartOffers(options: UseSmartOffersOptions) {
         isViewed: viewedOffers.has(offer.id),
       }));
 
-      // Smart sort with blended ranking:
-      // - Check if all offers are viewed
-      // - If not all viewed: favorites+unviewed first (blended), then unviewed (blended), then viewed (blended)
-      // - If all viewed: re-sort everything by blended ranking only
-      const allViewed = enhancedOffers.length > 0 && enhancedOffers.every(o => viewedOffers.has(o.id));
-
-      enhancedOffers.sort((a, b) => {
-        const aViewed = viewedOffers.has(a.id);
-        const bViewed = viewedOffers.has(b.id);
-
-        // Calculate blended scores for both
-        const scoreA = calculateCombinedScore({ is_featured: a.is_featured, distance_km: a.distanceKm });
-        const scoreB = calculateCombinedScore({ is_featured: b.is_featured, distance_km: b.distanceKm });
-
-        if (allViewed) {
-          // All offers viewed - sort by blended ranking only
-          return scoreB - scoreA;
-        }
-
-        // Not all viewed - apply grouping logic
-        // Group 1: Favorite shop + unviewed (sorted by blended)
-        // Group 2: Non-favorite + unviewed (sorted by blended)
-        // Group 3: All viewed (sorted by blended)
-        
-        const aGroup = aViewed ? 3 : (a.isFavoriteShop ? 1 : 2);
-        const bGroup = bViewed ? 3 : (b.isFavoriteShop ? 1 : 2);
-
-        // Sort by group first
-        if (aGroup !== bGroup) {
-          return aGroup - bGroup;
-        }
-
-        // Within same group, sort by blended score (higher = better)
-        return scoreB - scoreA;
-      });
-
       const hasMore = offers?.length === pageSize;
       return { 
         data: enhancedOffers, 
@@ -177,10 +147,54 @@ export function useSmartOffers(options: UseSmartOffersOptions) {
     enabled: !!options.location,
   });
 
-  // Flatten all pages into single array
+  // Flatten all pages and apply GLOBAL smart sorting
   const allOffers = useMemo(() => {
-    return infiniteQuery.data?.pages.flatMap(page => page.data) || [];
-  }, [infiniteQuery.data]);
+    const flatOffers = infiniteQuery.data?.pages.flatMap(page => page.data) || [];
+    
+    if (flatOffers.length === 0) return [];
+
+    // Get current viewed offers from cache
+    const viewedOffers = queryClient.getQueryData<Set<string>>(VIEWED_OFFERS_KEY) || new Set(getViewedOffersFromStorage());
+    
+    // Update isViewed status for all offers
+    const offersWithViewedStatus = flatOffers.map(offer => ({
+      ...offer,
+      isViewed: viewedOffers.has(offer.id),
+    }));
+
+    // Apply global smart sort
+    const allViewed = offersWithViewedStatus.length > 0 && offersWithViewedStatus.every(o => o.isViewed);
+
+    return offersWithViewedStatus.sort((a, b) => {
+      const aViewed = a.isViewed;
+      const bViewed = b.isViewed;
+
+      // Calculate blended scores for both
+      const scoreA = calculateCombinedScore({ is_featured: a.is_featured, distance_km: a.distanceKm });
+      const scoreB = calculateCombinedScore({ is_featured: b.is_featured, distance_km: b.distanceKm });
+
+      if (allViewed) {
+        // All offers viewed - sort by blended ranking only
+        return scoreB - scoreA;
+      }
+
+      // Not all viewed - apply grouping logic
+      // Group 1: Favorite shop + unviewed (sorted by blended)
+      // Group 2: Non-favorite + unviewed (sorted by blended)
+      // Group 3: All viewed (sorted by blended)
+      
+      const aGroup = aViewed ? 3 : (a.isFavoriteShop ? 1 : 2);
+      const bGroup = bViewed ? 3 : (b.isFavoriteShop ? 1 : 2);
+
+      // Sort by group first
+      if (aGroup !== bGroup) {
+        return aGroup - bGroup;
+      }
+
+      // Within same group, sort by blended score (higher = better)
+      return scoreB - scoreA;
+    });
+  }, [infiniteQuery.data, queryClient]);
 
   return {
     offers: allOffers,

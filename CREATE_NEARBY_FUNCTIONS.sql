@@ -26,9 +26,9 @@ RETURNS TABLE(
   name varchar,
   description text,
   category varchar,
-  subcategory varchar,
-  brand varchar,
-  sku varchar,
+  subcategory text,
+  brand text,
+  sku text,
   price numeric,
   compare_at_price numeric,
   images text[],
@@ -152,7 +152,7 @@ RETURNS TABLE(
   description text,
   discount_type varchar,
   discount_value numeric,
-  discount_percentage numeric,
+  discount_percentage integer,
   offer_type varchar,
   applicable_to varchar,
   applicable_categories text[],
@@ -226,7 +226,8 @@ BEGIN
     o.is_active = true
     AND s.is_active = true
     AND s.is_verified = true
-    -- Valid offers only
+    -- Valid offers only (started and not expired)
+    AND (o.valid_from IS NULL OR o.valid_from <= NOW())
     AND (o.valid_until IS NULL OR o.valid_until >= NOW())
     -- Distance filter
     AND (
