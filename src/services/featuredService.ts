@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { enrichWithDistance, sortShopsBlended, sortProductsBlended, sortOffersBlended } from '@/lib/sortUtils';
+import { sortShopsBlended, sortProductsBlended, sortOffersBlended } from '@/lib/sortUtils';
 
 export const featuredService = {
   async getFeaturedShops(limit: number = 6, location?: { lat: number; lng: number; radius?: number }) {
@@ -67,33 +67,30 @@ export const featuredService = {
   async getFeaturedProducts(limit: number = 12, location?: { lat: number; lng: number; radius?: number }) {
     try {
       if (location) {
-        const { data: nearbyShops, error: shopsError } = await (supabase as any).rpc('get_nearby_shops', {
+        // Use RPC to get products with distance - no need for shop ID filtering
+        const { data, error } = await (supabase as any).rpc('get_nearby_products', {
           user_lat: location.lat,
           user_lng: location.lng,
-          radius_km: location.radius || 50
+          radius_km: location.radius || 50,
+          p_limit: limit * 3 // Fetch more to allow for blended ranking
         });
-
-        if (shopsError) return { data: [], error: shopsError };
-
-        const nearbyShopIds = nearbyShops?.map((s: any) => s.id) || [];
-        
-        if (nearbyShopIds.length === 0) {
-          return { data: [], error: null };
-        }
-
-        const { data, error } = await (supabase as any)
-          .from('products')
-          .select('*, shops!inner(id, name, address, logo_url, is_verified)')
-          .eq('is_active', true)
-          .in('shop_id', nearbyShopIds)
-          .order('created_at', { ascending: false })
-          .limit(limit * 3); // Fetch more to allow for blended ranking
 
         if (error) return { data: [], error };
 
-        // Enrich with distance and sort by blended ranking
-        const enrichedProducts = enrichWithDistance(data || [], nearbyShops);
-        const sortedProducts = sortProductsBlended(enrichedProducts).slice(0, limit);
+        // Transform to match expected format and apply blended ranking
+        const transformedProducts = (data || []).map((p: any) => ({
+          ...p,
+          shops: {
+            id: p.shop_id,
+            name: p.shop_name,
+            address: p.shop_address,
+            logo_url: p.shop_logo_url,
+            is_verified: p.shop_is_verified,
+            is_featured: p.shop_is_featured,
+          }
+        }));
+
+        const sortedProducts = sortProductsBlended(transformedProducts).slice(0, limit);
 
         return { 
           data: sortedProducts.map((product: any, index: number) => ({
@@ -116,32 +113,31 @@ export const featuredService = {
   async getFeaturedProductsPaginated(limit: number = 10, offset: number = 0, location?: { lat: number; lng: number; radius?: number }) {
     try {
       if (location) {
-        const { data: nearbyShops, error: shopsError } = await (supabase as any).rpc('get_nearby_shops', {
+        // Use RPC - fetch a larger set for blended ranking then paginate client-side
+        const { data, error } = await (supabase as any).rpc('get_nearby_products', {
           user_lat: location.lat,
           user_lng: location.lng,
-          radius_km: location.radius || 50
+          radius_km: location.radius || 50,
+          p_limit: 500 // Fetch enough for client-side ranking
         });
-
-        if (shopsError) return { data: [], error: shopsError };
-
-        const nearbyShopIds = nearbyShops?.map((s: any) => s.id) || [];
-        
-        if (nearbyShopIds.length === 0) {
-          return { data: [], error: null };
-        }
-
-        const { data, error } = await (supabase as any)
-          .from('products')
-          .select('*, shops!inner(id, name, address, logo_url, is_verified)')
-          .eq('is_active', true)
-          .in('shop_id', nearbyShopIds)
-          .order('created_at', { ascending: false });
 
         if (error) return { data: [], error };
 
-        // Enrich with distance, sort by blended ranking, then paginate
-        const enrichedProducts = enrichWithDistance(data || [], nearbyShops);
-        const sortedProducts = sortProductsBlended(enrichedProducts).slice(offset, offset + limit);
+        // Transform to match expected format
+        const transformedProducts = (data || []).map((p: any) => ({
+          ...p,
+          shops: {
+            id: p.shop_id,
+            name: p.shop_name,
+            address: p.shop_address,
+            logo_url: p.shop_logo_url,
+            is_verified: p.shop_is_verified,
+            is_featured: p.shop_is_featured,
+          }
+        }));
+
+        // Apply blended ranking then paginate
+        const sortedProducts = sortProductsBlended(transformedProducts).slice(offset, offset + limit);
 
         return { 
           data: sortedProducts.map((product: any, index: number) => ({
@@ -162,34 +158,30 @@ export const featuredService = {
   async getFeaturedOffers(limit: number = 6, location?: { lat: number; lng: number; radius?: number }): Promise<{ data: any[]; error: any }> {
     try {
       if (location) {
-        const { data: nearbyShops, error: shopsError } = await (supabase as any).rpc('get_nearby_shops', {
+        // Use RPC to get offers with distance - no need for shop ID filtering
+        const { data, error } = await (supabase as any).rpc('get_nearby_offers', {
           user_lat: location.lat,
           user_lng: location.lng,
-          radius_km: location.radius || 50
+          radius_km: location.radius || 50,
+          p_limit: limit * 3 // Fetch more to allow for blended ranking
         });
 
-        if (shopsError) return { data: [], error: shopsError };
+        if (error) return { data: [], error };
 
-        const nearbyShopIds = nearbyShops?.map((s: any) => s.id) || [];
-        
-        if (nearbyShopIds.length === 0) {
-          return { data: [], error: null };
-        }
+        // Transform to match expected format and apply blended ranking
+        const transformedOffers = (data || []).map((o: any) => ({
+          ...o,
+          shops: {
+            id: o.shop_id,
+            name: o.shop_name,
+            address: o.shop_address,
+            logo_url: o.shop_logo_url,
+            is_verified: o.shop_is_verified,
+            is_featured: o.shop_is_featured,
+          }
+        }));
 
-        const result = await (supabase as any)
-          .from('offers')
-          .select('*, shops(id, name, logo_url, location, address)')
-          .eq('is_active', true)
-          .in('shop_id', nearbyShopIds)
-          .or(`valid_until.is.null,valid_until.gte.${new Date().toISOString()}`)
-          .order('created_at', { ascending: false })
-          .limit(limit * 3); // Fetch more to allow for blended ranking
-
-        if (result.error) return { data: [], error: result.error };
-
-        // Enrich with distance and sort by blended ranking
-        const enrichedOffers = enrichWithDistance(result.data || [], nearbyShops);
-        const sortedOffers = sortOffersBlended(enrichedOffers).slice(0, limit);
+        const sortedOffers = sortOffersBlended(transformedOffers).slice(0, limit);
 
         return { 
           data: sortedOffers.map((offer: any, index: number) => ({
@@ -213,34 +205,31 @@ export const featuredService = {
   async getFeaturedOffersPaginated(limit: number = 10, offset: number = 0, location?: { lat: number; lng: number; radius?: number }): Promise<{ data: any[]; error: any }> {
     try {
       if (location) {
-        const { data: nearbyShops, error: shopsError } = await (supabase as any).rpc('get_nearby_shops', {
+        // Use RPC - fetch a larger set for blended ranking then paginate client-side
+        const { data, error } = await (supabase as any).rpc('get_nearby_offers', {
           user_lat: location.lat,
           user_lng: location.lng,
-          radius_km: location.radius || 50
+          radius_km: location.radius || 50,
+          p_limit: 500 // Fetch enough for client-side ranking
         });
 
-        if (shopsError) return { data: [], error: shopsError };
+        if (error) return { data: [], error };
 
-        const nearbyShopIds = nearbyShops?.map((s: any) => s.id) || [];
-        
-        if (nearbyShopIds.length === 0) {
-          return { data: [], error: null };
-        }
+        // Transform to match expected format
+        const transformedOffers = (data || []).map((o: any) => ({
+          ...o,
+          shops: {
+            id: o.shop_id,
+            name: o.shop_name,
+            address: o.shop_address,
+            logo_url: o.shop_logo_url,
+            is_verified: o.shop_is_verified,
+            is_featured: o.shop_is_featured,
+          }
+        }));
 
-        // Include shop data in the query
-        const result = await (supabase as any)
-          .from('offers')
-          .select('*, shops(id, name, logo_url, location, address)')
-          .eq('is_active', true)
-          .in('shop_id', nearbyShopIds)
-          .or(`valid_until.is.null,valid_until.gte.${new Date().toISOString()}`)
-          .order('created_at', { ascending: false });
-
-        if (result.error) return { data: [], error: result.error };
-
-        // Enrich with distance, sort by blended ranking, then paginate
-        const enrichedOffers = enrichWithDistance(result.data || [], nearbyShops);
-        const sortedOffers = sortOffersBlended(enrichedOffers).slice(offset, offset + limit);
+        // Apply blended ranking then paginate
+        const sortedOffers = sortOffersBlended(transformedOffers).slice(offset, offset + limit);
 
         return { 
           data: sortedOffers.map((offer: any, index: number) => ({

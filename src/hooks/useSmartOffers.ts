@@ -86,45 +86,17 @@ export function useSmartOffers(options: UseSmartOffersOptions) {
     queryFn: async ({ pageParam = 0 }) => {
       if (!options.location) return { data: [], nextOffset: undefined };
 
-      // Get nearby shops with distance (RPC already calculates distance_km)
-      const { data: nearbyShops, error: shopsError } = await (supabase as any).rpc('get_nearby_shops', {
+      // Use RPC to get nearby offers with distance - no shop ID filtering needed
+      const { data: offers, error } = await (supabase as any).rpc('get_nearby_offers', {
         user_lat: options.location.lat,
         user_lng: options.location.lng,
-        radius_km: options.location.radius || 50
+        radius_km: options.location.radius || 50,
+        p_limit: pageSize,
+        p_offset: pageParam
       });
-
-      if (shopsError) throw shopsError;
-      if (!nearbyShops?.length) return { data: [], nextOffset: undefined };
-
-      // Create shop distance map using RPC-provided distance_km (no recalculation)
-      const shopDistanceMap = new Map<string, number>();
-      nearbyShops.forEach((shop: any) => {
-        if (shop.distance_km !== undefined && shop.distance_km !== null) {
-          shopDistanceMap.set(shop.id, shop.distance_km);
-        }
-      });
-
-      const nearbyShopIds = nearbyShops.map((s: any) => s.id);
-
-      // Fetch offers from nearby shops
-      const { data: offers, error } = await (supabase as any)
-        .from('offers')
-        .select(`
-          *,
-          shops (
-            id,
-            name,
-            address,
-            logo_url
-          )
-        `)
-        .eq('is_active', true)
-        .in('shop_id', nearbyShopIds)
-        .or(`valid_until.is.null,valid_until.gte.${new Date().toISOString()}`)
-        .order('created_at', { ascending: false })
-        .range(pageParam, pageParam + pageSize - 1);
 
       if (error) throw error;
+      if (!offers?.length) return { data: [], nextOffset: undefined };
 
       // Fetch favorite shop IDs for current user
       let favoriteSet = new Set<string>();
@@ -139,17 +111,23 @@ export function useSmartOffers(options: UseSmartOffersOptions) {
       // Get viewed offers from React Query cache (fallback to localStorage)
       const viewedOffers = queryClient.getQueryData<Set<string>>(VIEWED_OFFERS_KEY) || new Set(getViewedOffersFromStorage());
 
-      // Enhance offers with distance, favorite status, and viewed status
-      const enhancedOffers: EnhancedOffer[] = (offers || []).map((offer: any) => {
-        const distanceKm = shopDistanceMap.get(offer.shop_id);
-        return {
-          ...offer,
-          distanceKm,
-          formattedDistance: distanceKm !== undefined ? formatDistance(distanceKm) : undefined,
-          isFavoriteShop: favoriteSet.has(offer.shop_id),
-          isViewed: viewedOffers.has(offer.id),
-        };
-      });
+      // Transform RPC response and enhance offers
+      const enhancedOffers: EnhancedOffer[] = offers.map((offer: any) => ({
+        ...offer,
+        // Transform shop fields to nested object
+        shops: {
+          id: offer.shop_id,
+          name: offer.shop_name,
+          address: offer.shop_address,
+          logo_url: offer.shop_logo_url,
+          is_verified: offer.shop_is_verified,
+          is_featured: offer.shop_is_featured,
+        },
+        distanceKm: offer.distance_km,
+        formattedDistance: offer.distance_km !== undefined ? formatDistance(offer.distance_km) : undefined,
+        isFavoriteShop: favoriteSet.has(offer.shop_id),
+        isViewed: viewedOffers.has(offer.id),
+      }));
 
       // Smart sort with blended ranking:
       // - Check if all offers are viewed
