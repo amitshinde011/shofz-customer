@@ -223,6 +223,12 @@ export default function ShopDetail() {
       const origin = location ? `${location.lat},${location.lng}` : '';
       const url = `https://www.google.com/maps/dir/?api=1${origin ? `&origin=${origin}` : ''}&destination=${destination}&travelmode=driving`;
       window.open(url, '_blank');
+    } else if (shop.address) {
+      // Fallback: Use address for directions if coordinates unavailable
+      const encodedAddress = encodeURIComponent(shop.address);
+      const origin = location ? `${location.lat},${location.lng}` : '';
+      const url = `https://www.google.com/maps/dir/?api=1${origin ? `&origin=${origin}` : ''}&destination=${encodedAddress}&travelmode=driving`;
+      window.open(url, '_blank');
     } else {
       toast({
         title: "Location unavailable",
