@@ -67,8 +67,7 @@ export function useMarkOfferViewed() {
       return newSet;
     });
 
-    // Invalidate smart-offers to trigger re-sort with new viewed status
-    queryClient.invalidateQueries({ queryKey: ['smart-offers'] });
+    // No need to invalidate smart-offers - viewedOffersSet dependency will trigger re-sort
   }, [queryClient]);
 }
 
@@ -148,13 +147,14 @@ export function useSmartOffers(options: UseSmartOffersOptions) {
   });
 
   // Flatten all pages and apply GLOBAL smart sorting
+  // IMPORTANT: viewedOffersSet is a dependency to trigger re-sort when offers are viewed
   const allOffers = useMemo(() => {
     const flatOffers = infiniteQuery.data?.pages.flatMap(page => page.data) || [];
     
     if (flatOffers.length === 0) return [];
 
-    // Get current viewed offers from cache
-    const viewedOffers = queryClient.getQueryData<Set<string>>(VIEWED_OFFERS_KEY) || new Set(getViewedOffersFromStorage());
+    // Use viewedOffersSet directly since it's a dependency
+    const viewedOffers = viewedOffersSet || new Set<string>();
     
     // Update isViewed status for all offers
     const offersWithViewedStatus = flatOffers.map(offer => ({
@@ -194,7 +194,7 @@ export function useSmartOffers(options: UseSmartOffersOptions) {
       // Within same group, sort by blended score (higher = better)
       return scoreB - scoreA;
     });
-  }, [infiniteQuery.data, queryClient]);
+  }, [infiniteQuery.data, viewedOffersSet]);
 
   return {
     offers: allOffers,
