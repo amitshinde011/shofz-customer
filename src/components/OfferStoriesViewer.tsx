@@ -143,10 +143,11 @@ export default function OfferStoriesViewer({
     onClose();
   };
 
-  // Reset state when story changes
+  // Reset state when story changes - invalidate storyStartTime to prevent race condition
   useEffect(() => {
     if (isVisible) {
       setIsImageLoaded(false);
+      setStoryStartTime(0); // Invalidate start time until image loads
       accumulatedPauseRef.current = 0;
       setTotalPausedTime(0);
       pauseStartRef.current = null;
@@ -181,7 +182,8 @@ export default function OfferStoriesViewer({
 
   // Auto-advance timer with pause compensation
   useEffect(() => {
-    if (!isVisible || isPaused || !isImageLoaded) {
+    // Guard: Don't start timer if storyStartTime is not set (= 0) or image not loaded
+    if (!isVisible || isPaused || !isImageLoaded || storyStartTime === 0) {
       if (timerRef.current) {
         clearTimeout(timerRef.current);
         timerRef.current = null;
@@ -536,11 +538,11 @@ export default function OfferStoriesViewer({
             {offers.map((_, index) => (
               <ProgressBar
                 key={index}
-                isActive={index === currentIndex && isImageLoaded}
+                isActive={index === currentIndex && isImageLoaded && storyStartTime > 0}
                 isCompleted={index < currentIndex}
                 duration={STORY_DURATION}
                 isPaused={isPaused}
-                startTime={index === currentIndex ? storyStartTime : undefined}
+                startTime={index === currentIndex && storyStartTime > 0 ? storyStartTime : undefined}
                 totalPausedTime={index === currentIndex ? totalPausedTime : 0}
               />
             ))}
