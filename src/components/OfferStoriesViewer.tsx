@@ -34,6 +34,13 @@ export default function OfferStoriesViewer({
   const [showTapFeedback, setShowTapFeedback] = useState<'left' | 'right' | null>(null);
   const [totalPausedTime, setTotalPausedTime] = useState(0); // State for real-time sync
   
+  // Sync currentIndex with initialIndex when viewer opens
+  useEffect(() => {
+    if (isVisible) {
+      setCurrentIndex(initialIndex);
+    }
+  }, [isVisible, initialIndex]);
+  
   const navigate = useNavigate();
   const markOfferViewed = useMarkOfferViewed();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
