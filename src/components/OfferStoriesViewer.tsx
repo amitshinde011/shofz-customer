@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { Offer } from "@/hooks/useOffers";
 import UniversalImage from "./UniversalImage";
 import { getOfferDiscountText } from "@/lib/offerUtils";
+import { useMarkOfferViewed } from "@/hooks/useSmartOffers";
 
 interface OfferStoriesViewerProps {
   offers: Offer[];
@@ -16,6 +17,8 @@ interface OfferStoriesViewerProps {
 const STORY_DURATION = 5000; // 5 seconds per story
 const HOLD_TO_PAUSE_DELAY = 150; // ms to hold before pausing
 const SWIPE_THRESHOLD = 50; // minimum px for swipe detection
+const SWIPE_DOWN_THRESHOLD = 100; // minimum px for swipe down to close
+const VIEW_TRACKING_THRESHOLD = 0.5; // 50% progress to mark as viewed
 
 export default function OfferStoriesViewer({
   offers,
@@ -29,20 +32,44 @@ export default function OfferStoriesViewer({
   const [storyStartTime, setStoryStartTime] = useState<number>(Date.now());
   const [navigationDirection, setNavigationDirection] = useState<'left' | 'right' | null>(null);
   const [showTapFeedback, setShowTapFeedback] = useState<'left' | 'right' | null>(null);
+  const [totalPausedTime, setTotalPausedTime] = useState(0); // State for real-time sync
   
   const navigate = useNavigate();
+  const markOfferViewed = useMarkOfferViewed();
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   
   // Pause tracking refs
-  const totalPausedTimeRef = useRef<number>(0);
   const pauseStartRef = useRef<number | null>(null);
+  const accumulatedPauseRef = useRef<number>(0);
+  
+  // View tracking ref - to mark as viewed only once per story
+  const viewedCurrentRef = useRef(false);
   
   // Touch gesture refs
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
   const holdTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isHoldingRef = useRef(false);
+  
+  // Desktop mouse hold refs
+  const mouseHoldTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isMouseHoldingRef = useRef(false);
+  
+  // Preload refs
+  const preloadedImagesRef = useRef<Set<string>>(new Set());
 
   const currentOffer = offers[currentIndex];
+  const nextOffer = offers[currentIndex + 1];
+
+  // Preload next image for smooth transitions
+  useEffect(() => {
+    if (nextOffer?.image_url && !preloadedImagesRef.current.has(nextOffer.image_url)) {
+      const img = new Image();
+      img.src = nextOffer.image_url;
+      img.onload = () => {
+        preloadedImagesRef.current.add(nextOffer.image_url!);
+      };
+    }
+  }, [nextOffer?.image_url]);
 
   // Hide bottom navigation when viewer is open
   useEffect(() => {
@@ -62,13 +89,15 @@ export default function OfferStoriesViewer({
     };
   }, [isVisible]);
 
-  // Track pause duration for timer compensation
+  // Track pause duration for timer compensation - updates state for real-time sync
   useEffect(() => {
     if (isPaused) {
       pauseStartRef.current = Date.now();
     } else if (pauseStartRef.current !== null) {
-      // Add the pause duration to total paused time
-      totalPausedTimeRef.current += Date.now() - pauseStartRef.current;
+      // Add the pause duration to accumulated time
+      const pauseDuration = Date.now() - pauseStartRef.current;
+      accumulatedPauseRef.current += pauseDuration;
+      setTotalPausedTime(accumulatedPauseRef.current); // Trigger state update for ProgressBar
       pauseStartRef.current = null;
     }
   }, [isPaused]);
@@ -96,17 +125,25 @@ export default function OfferStoriesViewer({
     });
   }, []);
 
-  const handleGoToOffer = () => {
+  const handleGoToOffer = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent tap zone conflict
     onClose();
     navigate(`/offers/${currentOffer.id}`);
+  };
+
+  const handleClose = (e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent tap zone conflict
+    onClose();
   };
 
   // Reset state when story changes
   useEffect(() => {
     if (isVisible) {
       setIsImageLoaded(false);
-      totalPausedTimeRef.current = 0;
+      accumulatedPauseRef.current = 0;
+      setTotalPausedTime(0);
       pauseStartRef.current = null;
+      viewedCurrentRef.current = false;
     }
   }, [currentIndex, isVisible]);
 
@@ -116,6 +153,24 @@ export default function OfferStoriesViewer({
       setStoryStartTime(Date.now());
     }
   }, [currentIndex, isVisible, isImageLoaded]);
+
+  // Track view at 50% progress
+  useEffect(() => {
+    if (!isVisible || !isImageLoaded || isPaused || viewedCurrentRef.current) return;
+
+    const checkViewProgress = () => {
+      const elapsed = Date.now() - storyStartTime - accumulatedPauseRef.current;
+      const progress = elapsed / STORY_DURATION;
+      
+      if (progress >= VIEW_TRACKING_THRESHOLD && !viewedCurrentRef.current) {
+        viewedCurrentRef.current = true;
+        markOfferViewed(currentOffer.id);
+      }
+    };
+
+    const intervalId = setInterval(checkViewProgress, 100);
+    return () => clearInterval(intervalId);
+  }, [isVisible, isImageLoaded, isPaused, storyStartTime, currentOffer?.id, markOfferViewed]);
 
   // Auto-advance timer with pause compensation
   useEffect(() => {
@@ -132,7 +187,7 @@ export default function OfferStoriesViewer({
     }
 
     // Calculate remaining time accounting for pauses
-    const elapsed = Date.now() - storyStartTime - totalPausedTimeRef.current;
+    const elapsed = Date.now() - storyStartTime - accumulatedPauseRef.current;
     const remaining = Math.max(STORY_DURATION - elapsed, 0);
 
     timerRef.current = setTimeout(() => {
@@ -210,7 +265,14 @@ export default function OfferStoriesViewer({
     const timeDelta = Date.now() - touchStartRef.current.time;
     const screenWidth = window.innerWidth;
 
-    // Check if it's a swipe
+    // Check for swipe down to close
+    if (deltaY > SWIPE_DOWN_THRESHOLD && Math.abs(deltaY) > Math.abs(deltaX) && timeDelta < 400) {
+      onClose();
+      touchStartRef.current = null;
+      return;
+    }
+
+    // Check if it's a horizontal swipe
     if (Math.abs(deltaX) > SWIPE_THRESHOLD && Math.abs(deltaX) > Math.abs(deltaY) && timeDelta < 300) {
       if (deltaX < 0) {
         // Swipe left = next
@@ -220,25 +282,61 @@ export default function OfferStoriesViewer({
         handlePrevious();
       }
     } else if (timeDelta < 200 && Math.abs(deltaX) < 20 && Math.abs(deltaY) < 20) {
-      // It's a tap - determine left or right side
+      // It's a tap - determine left or right side (exclude middle for buttons)
       const tapX = touchStartRef.current.x;
       
-      if (tapX < screenWidth * 0.3) {
-        // Tap on left 30% = previous
+      if (tapX < screenWidth * 0.25) {
+        // Tap on left 25% = previous
         setShowTapFeedback('left');
         setTimeout(() => setShowTapFeedback(null), 150);
         handlePrevious();
-      } else if (tapX > screenWidth * 0.7) {
-        // Tap on right 30% = next
+      } else if (tapX > screenWidth * 0.75) {
+        // Tap on right 25% = next
         setShowTapFeedback('right');
         setTimeout(() => setShowTapFeedback(null), 150);
         handleNext();
       }
-      // Middle 40% - no action (allow tapping on buttons)
+      // Middle 50% - no action (allow tapping on buttons like close)
     }
 
     touchStartRef.current = null;
-  }, [handleNext, handlePrevious]);
+  }, [handleNext, handlePrevious, onClose]);
+
+  // Desktop mouse hold-to-pause handlers
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    // Only apply to direct clicks on the viewer, not on buttons
+    if ((e.target as HTMLElement).closest('button')) return;
+    
+    isMouseHoldingRef.current = false;
+    mouseHoldTimerRef.current = setTimeout(() => {
+      isMouseHoldingRef.current = true;
+      setIsPaused(true);
+    }, HOLD_TO_PAUSE_DELAY);
+  }, []);
+
+  const handleMouseUp = useCallback(() => {
+    if (mouseHoldTimerRef.current) {
+      clearTimeout(mouseHoldTimerRef.current);
+      mouseHoldTimerRef.current = null;
+    }
+    
+    if (isMouseHoldingRef.current) {
+      isMouseHoldingRef.current = false;
+      setIsPaused(false);
+    }
+  }, []);
+
+  const handleMouseLeave = useCallback(() => {
+    // Resume if mouse leaves while holding
+    if (mouseHoldTimerRef.current) {
+      clearTimeout(mouseHoldTimerRef.current);
+      mouseHoldTimerRef.current = null;
+    }
+    if (isMouseHoldingRef.current) {
+      isMouseHoldingRef.current = false;
+      setIsPaused(false);
+    }
+  }, []);
 
   // Image load handler
   const handleImageLoad = useCallback(() => {
@@ -250,6 +348,7 @@ export default function OfferStoriesViewer({
     return () => {
       if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
       if (timerRef.current) clearTimeout(timerRef.current);
+      if (mouseHoldTimerRef.current) clearTimeout(mouseHoldTimerRef.current);
     };
   }, []);
 
@@ -316,6 +415,9 @@ export default function OfferStoriesViewer({
           onTouchStart={handleTouchStart}
           onTouchMove={handleTouchMove}
           onTouchEnd={handleTouchEnd}
+          onMouseDown={handleMouseDown}
+          onMouseUp={handleMouseUp}
+          onMouseLeave={handleMouseLeave}
         >
           {/* Tap Feedback Overlays */}
           <AnimatePresence>
@@ -330,7 +432,7 @@ export default function OfferStoriesViewer({
                   left: 0,
                   top: 0,
                   bottom: 0,
-                  width: "30%",
+                  width: "25%",
                   background: "radial-gradient(circle at left center, rgba(255,255,255,0.2) 0%, transparent 70%)",
                   zIndex: 2,
                   pointerEvents: "none",
@@ -348,7 +450,7 @@ export default function OfferStoriesViewer({
                   right: 0,
                   top: 0,
                   bottom: 0,
-                  width: "30%",
+                  width: "25%",
                   background: "radial-gradient(circle at right center, rgba(255,255,255,0.2) 0%, transparent 70%)",
                   zIndex: 2,
                   pointerEvents: "none",
@@ -432,7 +534,7 @@ export default function OfferStoriesViewer({
                 duration={STORY_DURATION}
                 isPaused={isPaused}
                 startTime={index === currentIndex ? storyStartTime : undefined}
-                totalPausedTime={index === currentIndex ? totalPausedTimeRef.current : 0}
+                totalPausedTime={index === currentIndex ? totalPausedTime : 0}
               />
             ))}
           </div>
@@ -486,24 +588,39 @@ export default function OfferStoriesViewer({
               </div>
             </div>
 
+            {/* Close button with larger tap zone and stopPropagation */}
             <button
-              onClick={onClose}
+              onClick={handleClose}
               style={{
-                width: "36px",
-                height: "36px",
+                width: "48px",
+                height: "48px",
                 borderRadius: "50%",
-                backgroundColor: "rgba(0, 0, 0, 0.6)",
-                backdropFilter: "blur(8px)",
-                border: "2px solid rgba(255, 255, 255, 0.9)",
+                backgroundColor: "transparent",
+                border: "none",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 cursor: "pointer",
-                zIndex: 20,
+                zIndex: 30,
                 flexShrink: 0,
+                padding: 0,
               }}
             >
-              <X color="white" size={20} strokeWidth={3} />
+              <div
+                style={{
+                  width: "36px",
+                  height: "36px",
+                  borderRadius: "50%",
+                  backgroundColor: "rgba(0, 0, 0, 0.6)",
+                  backdropFilter: "blur(8px)",
+                  border: "2px solid rgba(255, 255, 255, 0.9)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <X color="white" size={20} strokeWidth={3} />
+              </div>
             </button>
           </div>
 
@@ -731,7 +848,6 @@ function ProgressBar({
 }) {
   const [progress, setProgress] = useState(0);
   const animationRef = useRef<number | null>(null);
-  const pausedProgressRef = useRef<number>(0);
 
   useEffect(() => {
     // Cancel any existing animation
@@ -746,8 +862,7 @@ function ProgressBar({
     }
 
     if (isPaused) {
-      // Store current progress when paused
-      pausedProgressRef.current = progress;
+      // Keep current progress, don't animate
       return;
     }
 
@@ -769,7 +884,7 @@ function ProgressBar({
         animationRef.current = null;
       }
     };
-  }, [isActive, isCompleted, duration, isPaused, startTime, totalPausedTime, progress]);
+  }, [isActive, isCompleted, duration, isPaused, startTime, totalPausedTime]);
 
   return (
     <div
@@ -779,6 +894,9 @@ function ProgressBar({
         backgroundColor: "rgba(255, 255, 255, 0.3)",
         borderRadius: "2px",
         overflow: "hidden",
+        // Visual pause indicator - subtle opacity change
+        opacity: isPaused && isActive ? 0.7 : 1,
+        transition: "opacity 0.15s ease",
       }}
     >
       <div
