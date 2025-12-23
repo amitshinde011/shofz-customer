@@ -77,7 +77,9 @@ export default function OfferStoriesCarousel({
   const isLoadingMoreRef = useRef(false);
   
   // Stabilize offers array reference to prevent unnecessary re-renders in viewer
-  const stableOffers = useMemo(() => offers, [JSON.stringify(offers.map(o => o.id))]);
+  // Use offer IDs as dependency instead of JSON.stringify anti-pattern
+  const offerIds = useMemo(() => offers.map(o => o.id).join(','), [offers]);
+  const stableOffers = useMemo(() => offers, [offerIds]);
   
   // Use React Query cache for viewed offers
   const { data: viewedOffers } = useViewedOffers();
