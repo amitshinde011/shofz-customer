@@ -180,32 +180,35 @@ export const shopService = {
 
     console.log('shopService.getShopById raw result:', result);
 
-    // Always try to extract coordinates using RPC
     if (result.data) {
+      // Try to get coordinates from get_nearby_shops RPC
+      // This RPC properly extracts lat/lng from PostGIS geometry using ST_X and ST_Y
       try {
-        // Call get_nearby_shops to get formatted data with coordinates
-        const { data: nearbyData } = await (supabase as any).rpc('get_nearby_shops', {
-          user_lat: 18.5204,  // Pune approximate coordinates
+        const { data: nearbyData, error: nearbyError } = await (supabase as any).rpc('get_nearby_shops', {
+          user_lat: 18.5204,  // Default coordinates for Pune
           user_lng: 73.8567,
-          radius_km: 1000  // Large radius to get all shops
+          radius_km: 1000  // Large radius to include all shops
         });
 
-        // Find our shop in the results
-        const shopWithCoords = nearbyData?.find((s: any) => s.id === id);
-        if (shopWithCoords && shopWithCoords.latitude && shopWithCoords.longitude) {
-          // Transform coordinates into location object
-          result.data.location = {
-            lat: shopWithCoords.latitude,
-            lng: shopWithCoords.longitude
-          };
-          
-          // Also ensure delivery fields are included from RPC response
-          result.data.delivery_available = shopWithCoords.delivery_available ?? result.data.delivery_available;
-          result.data.delivery_coverage_km = shopWithCoords.delivery_coverage_km ?? result.data.delivery_coverage_km;
-          result.data.delivery_charge_per_km = shopWithCoords.delivery_charge_per_km ?? result.data.delivery_charge_per_km;
-          result.data.free_delivery_above = shopWithCoords.free_delivery_above ?? result.data.free_delivery_above;
-          result.data.delivery_notes = shopWithCoords.delivery_notes ?? result.data.delivery_notes;
+        if (!nearbyError && nearbyData) {
+          const shopWithCoords = nearbyData.find((s: any) => s.id === id);
+          if (shopWithCoords?.latitude && shopWithCoords?.longitude) {
+            result.data.location = {
+              lat: shopWithCoords.latitude,
+              lng: shopWithCoords.longitude
+            };
+            // Also include delivery fields from RPC response
+            result.data.delivery_available = shopWithCoords.delivery_available ?? result.data.delivery_available;
+            result.data.delivery_coverage_km = shopWithCoords.delivery_coverage_km ?? result.data.delivery_coverage_km;
+            result.data.delivery_charge_per_km = shopWithCoords.delivery_charge_per_km ?? result.data.delivery_charge_per_km;
+            result.data.free_delivery_above = shopWithCoords.free_delivery_above ?? result.data.free_delivery_above;
+            result.data.delivery_notes = shopWithCoords.delivery_notes ?? result.data.delivery_notes;
+          } else {
+            // Shop exists but has no location in database
+            result.data.location = null;
+          }
         } else {
+          console.log('get_nearby_shops RPC error:', nearbyError?.message);
           result.data.location = null;
         }
       } catch (err) {
