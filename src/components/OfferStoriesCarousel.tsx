@@ -72,28 +72,58 @@ export default function OfferStoriesCarousel({
   error = null,
 }: OfferStoriesCarouselProps) {
   const [viewerVisible, setViewerVisible] = useState(false);
-  const [selectedOfferIndex, setSelectedOfferIndex] = useState(0);
+  const [selectedOfferId, setSelectedOfferId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const isLoadingMoreRef = useRef(false);
-  
-  // Stabilize offers array reference to prevent unnecessary re-renders in viewer
-  // Include index and isViewed status to detect order changes when offers are reordered
-  const offersKey = useMemo(() => 
-    offers.map((o, i) => `${i}:${o.id}:${'isViewed' in o ? (o as EnhancedOffer).isViewed : false}`).join(','), 
-    [offers]
-  );
-  const stableOffers = useMemo(() => offers, [offersKey]);
   
   // Use React Query cache for viewed offers
   const { data: viewedOffers } = useViewedOffers();
   const markOfferViewed = useMarkOfferViewed();
 
+  // Sort offers locally to ensure immediate UI updates when viewed status changes
+  const displayOffers = useMemo(() => {
+    if (!offers || offers.length === 0) return [];
+    
+    const viewedSet = viewedOffers || new Set<string>();
+    
+    // Create enhanced copies with current viewed status
+    const offersWithStatus = offers.map(offer => ({
+      ...offer,
+      isViewed: viewedSet.has(offer.id),
+      isFavoriteShop: 'isFavoriteShop' in offer ? (offer as EnhancedOffer).isFavoriteShop : false,
+    }));
+    
+    // Check if all offers are viewed
+    const allViewed = offersWithStatus.every(o => o.isViewed);
+    
+    // Sort: unviewed favorites first, then unviewed non-favorites, then viewed
+    return offersWithStatus.sort((a, b) => {
+      if (allViewed) {
+        // All viewed - maintain original order or sort by some other criteria
+        return 0;
+      }
+      
+      // Group: 1 = favorite + unviewed, 2 = non-favorite + unviewed, 3 = viewed
+      const aGroup = a.isViewed ? 3 : (a.isFavoriteShop ? 1 : 2);
+      const bGroup = b.isViewed ? 3 : (b.isFavoriteShop ? 1 : 2);
+      
+      return aGroup - bGroup;
+    });
+  }, [offers, viewedOffers]);
+
+  // Derive initialIndex from selectedOfferId for the viewer
+  const selectedOfferIndex = useMemo(() => {
+    if (!selectedOfferId) return 0;
+    const index = displayOffers.findIndex(o => o.id === selectedOfferId);
+    return index >= 0 ? index : 0;
+  }, [selectedOfferId, displayOffers]);
+
   const handleOfferView = useCallback((offerId: string) => {
     markOfferViewed(offerId);
   }, [markOfferViewed]);
 
-  const handleOfferClick = (index: number) => {
-    setSelectedOfferIndex(index);
+  const handleOfferClick = (offerId: string) => {
+    setSelectedOfferId(offerId);
     setViewerVisible(true);
   };
 
@@ -185,13 +215,13 @@ export default function OfferStoriesCarousel({
           role="list"
           aria-label="Offer stories"
         >
-          {offers.map((offer, index) => (
+          {displayOffers.map((offer) => (
             <OfferStoryCard
               key={offer.id}
               offer={offer as EnhancedOffer}
-              isViewed={viewedOffers?.has(offer.id) ?? false}
+              isViewed={offer.isViewed}
               onView={handleOfferView}
-              onClick={() => handleOfferClick(index)}
+              onClick={() => handleOfferClick(offer.id)}
             />
           ))}
           
@@ -215,8 +245,8 @@ export default function OfferStoriesCarousel({
 
       {/* Full-Screen Stories Viewer */}
       <OfferStoriesViewer 
-        key={viewerVisible ? `viewer-${selectedOfferIndex}` : 'closed'}
-        offers={stableOffers}
+        key={viewerVisible ? `viewer-${selectedOfferId}` : 'closed'}
+        offers={displayOffers}
         initialIndex={selectedOfferIndex}
         isVisible={viewerVisible}
         onClose={() => setViewerVisible(false)}

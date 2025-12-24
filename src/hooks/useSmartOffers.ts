@@ -80,8 +80,9 @@ export function useSmartOffers(options: UseSmartOffersOptions) {
   const { data: viewedOffersSet } = useViewedOffers();
 
   // Infinite offers query with smart sorting
+  // Use primitives in queryKey to ensure stable caching
   const infiniteQuery = useInfiniteQuery({
-    queryKey: ['smart-offers', options.location, user?.id],
+    queryKey: ['smart-offers', user?.id, options.location?.lat, options.location?.lng, options.location?.radius ?? 50, pageSize],
     queryFn: async ({ pageParam = 0 }) => {
       if (!options.location) return { data: [], nextOffset: undefined };
 
