@@ -63,7 +63,11 @@ export default function Home() {
   const { location } = useUserLocation();
   const queryClient = useQueryClient();
   
-  const locationParams = location ? { lat: location.lat, lng: location.lng, radius: 50 } : undefined;
+  // Stabilize locationParams with useMemo to prevent React Query key churn
+  const locationParams = useMemo(() => {
+    if (!location) return undefined;
+    return { lat: location.lat, lng: location.lng, radius: 50 };
+  }, [location?.lat, location?.lng]);
   
   // Infinite scroll for featured content
   const { 
