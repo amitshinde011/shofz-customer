@@ -14,10 +14,10 @@ export interface RankingConfig {
 }
 
 export const DEFAULT_RANKING_CONFIG: RankingConfig = {
-  featuredWeight: 0.55,
-  distanceWeight: 0.45,
+  featuredWeight: 0.20,         // Minimal boost for featured items
+  distanceWeight: 0.80,         // Strong priority for nearby items
   maxDistanceKm: 50,
-  nearDistanceCutoffKm: 30
+  nearDistanceCutoffKm: 20      // Tighter "near" band
 };
 
 /**
